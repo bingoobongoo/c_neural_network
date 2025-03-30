@@ -1,21 +1,19 @@
 #include "network.h"
+#include "load_data.h"
+#include "preprocessing.h"
 #include <time.h>
 
 int main() {
-    srand(time(NULL));
+    Matrix* feature_m = load_ubyte_images("data/train-images-idx3-ubyte");
+    normalize(feature_m);
 
-    NeuralNet* net = neural_net_new(SIGMOID, 0.0, 32);
-    add_input_layer(5, net);
-    add_deep_layer(3, net);
-    add_deep_layer(3, net);
-    add_output_layer(1, net);
-    neural_net_compile(net);
+    Matrix* label_m = load_ubyte_labels("data/train-labels-idx1-ubyte");
+    Matrix* label_one_hot = one_hot_encode(label_m, 10);
+    matrix_free(label_m);
 
-    neural_net_info(net);
-    int n_layers = net->n_in_layers + net->n_ou_layers + net->n_de_layers;
-    for (int i=1; i<n_layers; i++) {
-        matrix_print(net->layers[i]->weights);
-        printf("\n");
-    }
-    neural_net_free(net);
+    matrix_save(feature_m, "features.mat");
+    matrix_save(label_one_hot, "label.mat");
+
+    matrix_free(feature_m);
+    matrix_free(label_one_hot);
 }

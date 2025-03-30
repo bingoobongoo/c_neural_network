@@ -34,8 +34,9 @@ void matrix_save(Matrix* m, char* file_path) {
     fprintf(file, "%d\n", m->n_cols);
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
-            fprintf(file, "%.6lf\n", m->entries[i][j]);
+            fprintf(file, "%.6lf ", m->entries[i][j]);
         }
+        fprintf(file, "\n");
     }
 
     fclose(file);
