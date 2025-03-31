@@ -27,6 +27,16 @@ void matrix_free(Matrix* m) {
     m = NULL;
 }
 
+void matrix_free_view(Matrix* view) {
+    if (view == NULL) return;
+
+    free(view->entries);
+    view->entries = NULL;
+
+    free(view);
+    view = NULL;
+}
+
 void matrix_save(Matrix* m, char* file_path) {
     FILE* file = fopen(file_path, "w");
 
@@ -144,6 +154,45 @@ Matrix* matrix_flatten(Matrix* m, int axis) {
 
     printf("No axis %d. 0 for horizontal, 1 for vertical", axis); 
     exit(1);
+}
+
+Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size) {
+    Matrix* slice = matrix_new(slice_size, m->n_cols);
+    if (start_idx >= m->n_rows) {
+        printf("Index out of range");
+        exit(1);
+    }
+    if (start_idx + slice_size > m->n_rows) {
+        slice_size = m->n_rows - start_idx;
+    }
+
+    for (int i=0; i<slice_size; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            slice->entries[i][j] = m->entries[i + start_idx][j];
+        }
+    }
+
+    return slice;
+}
+
+Matrix* matrix_slice_rows_view(Matrix* m, int start_idx, int slice_size) {
+    Matrix* slice_view = (Matrix*)malloc(sizeof(Matrix));
+    if (start_idx >= m->n_rows) {
+        printf("Index out of range");
+        exit(1);
+    }
+    if (start_idx + slice_size > m->n_rows) {
+        slice_size = m->n_rows - start_idx;
+    }
+
+    slice_view->n_rows = slice_size;
+    slice_view->n_cols = m->n_cols;
+    slice_view->entries = (double**)malloc(slice_size * sizeof(double*));
+    for (int i=0; i<slice_size; i++) {
+        slice_view->entries[i] = m->entries[i + start_idx];
+    }
+
+    return slice_view;
 }
 
 bool check_dimensions(Matrix* m1, Matrix* m2) {

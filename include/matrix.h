@@ -14,8 +14,9 @@ typedef struct {
     int n_cols;
 } Matrix;
 
-Matrix* matrix_new(int n_row, int n_col);
+Matrix* matrix_new(int n_rows, int n_cols);
 void matrix_free(Matrix* m);
+void matrix_free_view(Matrix* view);
 void matrix_save(Matrix* m, char* file_path);
 Matrix* matrix_load(char* file_path);
 Matrix* matrix_copy(Matrix* m);
@@ -24,6 +25,8 @@ void matrix_print_dimensions(Matrix* m);
 void matrix_fill(Matrix* m, double num);
 void matrix_fill_normal_distribution(Matrix* m, double mean, double std_deviation);
 Matrix* matrix_flatten(Matrix* m, int axis);
+Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size);
+Matrix* matrix_slice_rows_view(Matrix* m, int start_idx, int slice_size);
 
 bool matrix_check_dimensions(Matrix* m1, Matrix* m2);
 Matrix* matrix_add(Matrix* m1, Matrix* m2);
