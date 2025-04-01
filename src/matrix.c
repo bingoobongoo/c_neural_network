@@ -87,6 +87,12 @@ Matrix* matrix_copy(Matrix* m) {
     return copy;
 }
 
+void matrix_assign(Matrix** to, Matrix* from) {
+    Matrix* old = *to;
+    *to = from;
+    matrix_free(old);
+}
+
 void matrix_print(Matrix* m) {
     for (int i=0; i<m->n_rows; i++) {
         printf("%c", '|');
@@ -275,6 +281,82 @@ Matrix* matrix_multiply(Matrix* m1, Matrix* m2) {
     }
 
     return product_matrix;
+}
+
+Matrix* matrix_sum_axis(Matrix* m, int axis) {
+    switch (axis)
+    {
+    case 0: {
+        Matrix* sum_m = matrix_new(1, m->n_rows);
+        for (int i=0; i<m->n_rows; i++) {
+            double sum = 0.0;
+            for (int j=0; j<m->n_cols; j++) {
+                sum += m->entries[i][j];
+            }
+            sum_m->entries[0][i] = sum;
+        }
+
+        return sum_m;
+        break;
+    }
+    
+    case 1: {
+        Matrix* sum_m = matrix_new(1, m->n_cols);
+        for (int i=0; i<m->n_cols; i++) {
+            double sum = 0.0;
+            for (int j=0; j<m->n_rows; j++) {
+                sum += m->entries[j][i];
+            }
+            sum_m->entries[0][i] = sum;
+        }
+
+        return sum_m;
+        break;
+    }
+    
+    default:
+        printf("Invalid axis argument");
+        exit(1);
+        break;
+    }
+}
+
+Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size) {
+    switch (axis)
+    {
+    case 0: {
+        Matrix* new_m = matrix_new(m->n_rows, n_size * m->n_cols);
+        for (int i=0; i<m->n_rows; i++) {
+            for (int n=0; n<n_size; n++) {
+                for (int j=0; j<m->n_cols; j++) {
+                    new_m->entries[i][n*m->n_cols + j] = m->entries[i][j];
+                }
+            }
+        }
+        
+        return new_m;
+        break;
+    }
+    
+    case 1: {
+        Matrix* new_m = matrix_new(n_size * m->n_rows, m->n_cols);
+        for (int i=0; i<m->n_cols; i++) {
+            for (int n=0; n<n_size; n++) {
+                for (int j=0; j<m->n_rows; j++) {
+                    new_m->entries[n*m->n_rows + j][i] = m->entries[j][i];
+                }
+            }
+        }
+
+        return new_m;
+        break;
+    }
+
+    default:
+        printf("Invalid axis argument");
+        exit(1);
+        break;
+    }
 }
 
 Matrix* matrix_apply(double (*func)(double), Matrix* m) {
