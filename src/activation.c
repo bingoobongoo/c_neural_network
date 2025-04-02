@@ -58,6 +58,8 @@ Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m) {
             dZ->entries[i][j] = activation->dZ(z, param);
         }
     }
+
+    return dZ;
 }
 
 double sigmoid(double z, double param) {
@@ -85,7 +87,7 @@ double relu_dZ(double z, double param) {
 }
 
 double leaky_relu(double z, double param) {
-    if (param * z >= z) {
+    if (z <= 0.0) {
         return param * z;
     }
 

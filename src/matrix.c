@@ -321,6 +321,21 @@ Matrix* matrix_sum_axis(Matrix* m, int axis) {
     }
 }
 
+double matrix_sum(Matrix* m) {
+    double sum = 0;
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            sum += m->entries[i][j];
+        }
+    }
+
+    return sum;
+}
+
+double matrix_average(Matrix* m) {
+    return matrix_sum(m) / (double)(m->n_rows * m->n_cols);
+}
+
 Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size) {
     switch (axis)
     {

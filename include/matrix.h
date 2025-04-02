@@ -35,6 +35,8 @@ Matrix* matrix_subtract(Matrix* m1, Matrix* m2);
 Matrix* matrix_dot(Matrix* m1, Matrix* m2);
 Matrix* matrix_multiply(Matrix* m1, Matrix* m2);
 Matrix* matrix_sum_axis(Matrix* m, int axis);
+double matrix_sum(Matrix* m);
+double matrix_average(Matrix* m);
 Matrix* matrix_multiplicate(Matrix* m, int axis, int n_times);
 Matrix* matrix_apply(double (*func)(double), Matrix* m);
 void matrix_apply_inplace(double (*func)(double), Matrix* m);
