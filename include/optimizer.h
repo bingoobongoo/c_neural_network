@@ -12,4 +12,4 @@ typedef struct {
 } Optimizer;
 
 Optimizer* optimizer_new(OptimizerType type, double learning_rate);
-Matrix* update_params(Matrix* params, Matrix* gradient, Optimizer* optimizer);
+void update_params_inplace(Matrix* params, Matrix* gradient, Optimizer* optimizer);

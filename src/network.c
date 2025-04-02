@@ -9,6 +9,8 @@ NeuralNet* neural_net_new(ActivationType activation_type, CostType cost_type, do
     net->activation = activation_new(activation_type, activation_param);
     net->cost = cost_new(cost_type);
     net->optimizer = optimizer_new(SGD, learning_rate);
+    net->train_batch = NULL;
+    net->label_batch = NULL;
     net->batch_size = batch_size;
     net->layers = (Layer**)malloc(100 * sizeof(Layer*));
     net->compiled = false;
@@ -25,21 +27,27 @@ void neural_net_free(NeuralNet* net) {
     free(net->activation);
     free(net->cost);
     free(net->optimizer);
+    batch_free(net->train_batch);
+    batch_free(net->label_batch);
     free(net);
 }
 
 void neural_net_compile(NeuralNet* net) {
     // 1. link layers
     // 2. initialize weight and bias matrices
+    // 3. initialize static storage for gradients, activation and z
+    // 4. initialize static storage for auxiliary gradients
+    // 5. initialize batches
     neural_net_link_layers(net);
 
     for (int i=1; i<net->n_layers; i++) {
-        int n_units = net->layers[i]->n_units;
+        Layer* layer = net->layers[i];
+        int n_units = layer->n_units;
         int n_units_prev = net->layers[i-1]->n_units;
-        net->layers[i]->weight = matrix_new(n_units_prev, n_units);
-        net->layers[i]->bias = matrix_new(net->batch_size, n_units);
-        Matrix* weight = net->layers[i]->weight;
-        Matrix* bias = net->layers[i]->bias;
+        layer->weight = matrix_new(n_units_prev, n_units);
+        layer->bias = matrix_new(net->batch_size, n_units);
+        Matrix* weight = layer->weight;
+        Matrix* bias = layer->bias;
         
         matrix_fill(bias, 0.0);
         switch (net->activation->type)
@@ -58,7 +66,23 @@ void neural_net_compile(NeuralNet* net) {
             printf("Unknown activation type.");
             break;
         }
+
+        layer->activation = matrix_new(net->batch_size, n_units);
+        layer->z = matrix_new(net->batch_size, n_units);
+        layer->delta = matrix_new(net->batch_size, n_units);
+        layer->weight_gradient = matrix_new(n_units_prev, n_units);
+        layer->bias_gradient = matrix_new(net->batch_size, n_units);
+
+        layer->dCost_dA = matrix_new(net->batch_size, n_units);
+        layer->dActivation_dZ = matrix_new(net->batch_size, n_units);
+        layer->dZ_dW_t = matrix_new(n_units_prev, net->batch_size);
+        if (layer->l_type != OUTPUT)
+            layer->dZnext_dA_t = matrix_new(layer->next_layer->n_units, n_units); 
+        layer->dCost_dZ_col_sum = matrix_new(1, n_units);
     }
+
+    net->train_batch = batch_new(net->batch_size, net->layers[0]->n_units);
+    net->label_batch = batch_new(net->batch_size, net->layers[net->n_layers-1]->n_units);
 
     net->compiled = true;
 }
@@ -114,13 +138,11 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, NeuralNet* net) {
         double* avg_errs = (double*)malloc(n_batches * sizeof(double));
 
         for (start_idx; start_idx<x_train->n_rows - net->batch_size; start_idx+=net->batch_size, i++) {
-            Batch train_batch = batchify(x_train, start_idx, net->batch_size, true);
-            Batch label_batch = batchify(y_train, start_idx, net->batch_size, true);
-            forward_prop(&train_batch, net);
-            avg_errs[i] = get_batch_error(&label_batch, net);
-            back_prop(&label_batch, net);
-            batch_free(&train_batch);
-            batch_free(&label_batch);
+            batchify_into(x_train, start_idx, net->train_batch);
+            batchify_into(y_train, start_idx, net->label_batch);
+            forward_prop(net);
+            avg_errs[i] = get_batch_error(net);
+            back_prop(net);
         }
 
         shuffle_data_inplace(x_train, y_train);
@@ -135,8 +157,8 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, NeuralNet* net) {
     }
 }
 
-void forward_prop(Batch* batch, NeuralNet* net) {
-    Matrix* input = batch->data;
+void forward_prop(NeuralNet* net) {
+    Matrix* input = net->train_batch->data;
     for (int i=0; i<net->n_layers; i++) {
         Layer* layer = net->layers[i];
 
@@ -148,19 +170,18 @@ void forward_prop(Batch* batch, NeuralNet* net) {
 
         case DEEP:
         case OUTPUT:
-            Matrix* prod = matrix_dot(input, layer->weight);
-            layer->z = matrix_add(prod, layer->bias);
-            layer->activation = apply_activation_func(net->activation, layer->z);
+            matrix_dot_into(input, layer->weight, layer->z);
+            matrix_add_into(layer->z, layer->bias, layer->z);
+            apply_activation_func_into(net->activation, layer->z, layer->activation);
             input = layer->activation;
-            matrix_free(prod);
             break;
         }
     }
 }
 
 // TODO: move calculations of derivatives to cost.h and activation.h
-void back_prop(Batch* label_batch, NeuralNet* net) {
-    Matrix* label_m = label_batch->data;
+void back_prop(NeuralNet* net) {
+    Matrix* label_m = net->label_batch->data;
 
     for (int i=net->n_layers-1; i>=0; i--) {
         Layer* layer = net->layers[i];
@@ -168,74 +189,46 @@ void back_prop(Batch* label_batch, NeuralNet* net) {
         {
         case OUTPUT: {
             // delta gradient (dCost_dZ) calculations:
-            Matrix* dCost_dA = apply_cost_dA(net->cost, layer->activation, label_m);
-            Matrix* dActivation_dZ = apply_activation_dZ(net->activation, layer->z);
-            Matrix* dCost_dZ = matrix_multiply(dCost_dA, dActivation_dZ);
-            matrix_free(dCost_dA); matrix_free(dActivation_dZ);
+            apply_cost_dA_into(net->cost, layer->activation, label_m, layer->dCost_dA);
+            apply_activation_dZ_into(net->activation, layer->z, layer->dActivation_dZ);
+            matrix_multiply_into(layer->dCost_dA, layer->dActivation_dZ, layer->delta);
 
             // weight gradient (dCost_dW) calculations:
-            Matrix* dZ_dW_t = matrix_transpose(layer->prev_layer->activation);
-            Matrix* dCost_dW = matrix_dot(dZ_dW_t, dCost_dZ);
-            matrix_free(dZ_dW_t);
+            matrix_transpose_into(layer->prev_layer->activation, layer->dZ_dW_t);
+            matrix_dot_into(layer->dZ_dW_t, layer->delta, layer->weight_gradient);
 
             // bias gradient (dCost_dB) calculations:
-            Matrix* dCost_dZ_col_sum = matrix_sum_axis(dCost_dZ, 1);
-            Matrix* dCost_dB = matrix_multiplicate(dCost_dZ_col_sum, 1, label_batch->batch_size);
-            matrix_free(dCost_dZ_col_sum);
-
-            layer->delta = dCost_dZ;
-            layer->weight_gradient = dCost_dW;
-            layer->bias_gradient = dCost_dB;
+            matrix_sum_axis_into(layer->delta, 1, layer->dCost_dZ_col_sum);
+            matrix_multiplicate_into(layer->dCost_dZ_col_sum, 1, net->label_batch->batch_size, layer->bias_gradient);
 
             break;
         }
         
         case DEEP: {
             // delta gradient (dCost_dZ) calculations:
-            Matrix* dZnext_dA_t = matrix_transpose(layer->next_layer->weight); 
-            Matrix* dCost_dA = matrix_dot(layer->next_layer->delta, dZnext_dA_t);
-            Matrix* dActivation_dZ = apply_activation_dZ(net->activation, layer->z);
-            Matrix* dCost_dZ = matrix_multiply(dCost_dA, dActivation_dZ);
-            matrix_free(dZnext_dA_t); matrix_free(dCost_dA); matrix_free(dActivation_dZ);
+            matrix_transpose_into(layer->next_layer->weight, layer->dZnext_dA_t); 
+            matrix_dot_into(layer->next_layer->delta, layer->dZnext_dA_t, layer->dCost_dA);
+            apply_activation_dZ_into(net->activation, layer->z, layer->dActivation_dZ);
+            matrix_multiply_into(layer->dCost_dA, layer->dActivation_dZ, layer->delta);
 
             // weight gradient (dCost_dW) calculations:
-            Matrix* dZ_dW_t = matrix_transpose(layer->prev_layer->activation);
-            Matrix* dCost_dW = matrix_dot(dZ_dW_t, dCost_dZ);
-            matrix_free(dZ_dW_t);
+            matrix_transpose_into(layer->prev_layer->activation, layer->dZ_dW_t);
+            matrix_dot_into(layer->dZ_dW_t, layer->delta, layer->weight_gradient);
 
             // bias gradient (dCost_dB) calculations:
-            Matrix* dCost_dZ_col_sum = matrix_sum_axis(dCost_dZ, 1);
-            Matrix* dCost_dB = matrix_multiplicate(dCost_dZ_col_sum, 1, label_batch->batch_size);
-            matrix_free(dCost_dZ_col_sum);
+            matrix_sum_axis_into(layer->delta, 1, layer->dCost_dZ_col_sum);
+            matrix_multiplicate_into(layer->dCost_dZ_col_sum, 1, net->label_batch->batch_size, layer->bias_gradient);
 
-            layer->delta = dCost_dZ;
-            layer->weight_gradient = dCost_dW;
-            layer->bias_gradient = dCost_dB;
             break;
         }
-        
+
         case INPUT: {
             // here we just update all the weights and biases
             for (int j=1; j<net->n_layers; j++) {
                 Layer* current_layer = net->layers[j];
 
-                Matrix* new_weight = update_params(current_layer->weight, current_layer->weight_gradient, net->optimizer);
-                Matrix* new_bias = update_params(current_layer->bias, current_layer->bias_gradient, net->optimizer);
-
-                matrix_assign(&current_layer->weight, new_weight);
-                matrix_assign(&current_layer->bias, new_bias);
-
-                // also free memory of all gradients, z and activation matrices
-                matrix_free(current_layer->delta);
-                current_layer->delta = NULL;
-                matrix_free(current_layer->weight_gradient);
-                current_layer->weight_gradient = NULL;
-                matrix_free(current_layer->bias_gradient);
-                current_layer->bias_gradient = NULL;
-                matrix_free(current_layer->z);
-                current_layer->z = NULL;
-                matrix_free(current_layer->activation);
-                current_layer->activation = NULL;
+                update_params_inplace(current_layer->weight, current_layer->weight_gradient, net->optimizer);
+                update_params_inplace(current_layer->bias, current_layer->bias_gradient, net->optimizer);
             }
             break;
         }
@@ -243,8 +236,8 @@ void back_prop(Batch* label_batch, NeuralNet* net) {
     }
 }
 
-double get_batch_error(Batch* label_batch, NeuralNet* net) {
-    Matrix* err_m = apply_cost_func(net->cost, net->layers[net->n_layers-1]->activation, label_batch->data);
+double get_batch_error(NeuralNet* net) {
+    Matrix* err_m = apply_cost_func(net->cost, net->layers[net->n_layers-1]->activation, net->label_batch->data);
     double err_avg = matrix_average(err_m);
     matrix_free(err_m);
 
@@ -262,6 +255,11 @@ Layer* layer_new(LayerType l_type, int n_units, NeuralNet* net) {
     layer->delta = NULL;
     layer->weight_gradient = NULL;
     layer->bias_gradient = NULL;
+    layer->dCost_dA = NULL;
+    layer->dActivation_dZ = NULL;
+    layer->dZ_dW_t = NULL;
+    layer->dZnext_dA_t = NULL;
+    layer->dCost_dZ_col_sum = NULL;
     layer->prev_layer = NULL;
     layer->next_layer = NULL;
     layer->net_backref = net;
@@ -298,6 +296,26 @@ void layer_free(Layer* layer) {
         if (layer->bias_gradient != NULL) {
             matrix_free(layer->bias_gradient);
             layer->bias_gradient = NULL;
+        }
+        if (layer->dCost_dA != NULL) {
+            matrix_free(layer->dCost_dA);
+            layer->dCost_dA = NULL;
+        }
+        if (layer->dActivation_dZ != NULL) {
+            matrix_free(layer->dActivation_dZ);
+            layer->dActivation_dZ = NULL;
+        }
+        if (layer->dZ_dW_t != NULL) {
+            matrix_free(layer->dZ_dW_t);
+            layer->dZ_dW_t = NULL;
+        }
+        if (layer->dZnext_dA_t != NULL) {
+            matrix_free(layer->dZnext_dA_t);
+            layer->dZnext_dA_t = NULL;
+        }
+        if (layer->dCost_dZ_col_sum != NULL) {
+            matrix_free(layer->dCost_dZ_col_sum);
+            layer->dCost_dZ_col_sum = NULL;
         }
     }
     

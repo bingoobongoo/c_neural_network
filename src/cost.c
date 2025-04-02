@@ -40,6 +40,16 @@ Matrix* apply_cost_dA(Cost* cost, Matrix* output_activation_m, Matrix* label_m) 
     return dA;
 }
 
+void apply_cost_dA_into(Cost* cost, Matrix* output_activation_m, Matrix* label_m, Matrix* into) {
+    for (int i=0; i<output_activation_m->n_rows; i++) {
+        for (int j=0; j<output_activation_m->n_cols; j++) {
+            double output_activation = output_activation_m->entries[i][j];
+            double label = label_m->entries[i][j];
+            into->entries[i][j] = cost->dA(output_activation, label);
+        }
+    }
+}
+
 double mse(double output_activation, double label) {
     return pow(output_activation - label, 2.0);
 }

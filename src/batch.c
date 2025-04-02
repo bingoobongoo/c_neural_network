@@ -1,29 +1,21 @@
 #include "batch.h"
 
-Batch batchify(Matrix* m, int start_idx, int batch_size, bool is_view) {
-    Batch batch;
-    batch.is_view = is_view;
+Batch* batch_new(int batch_size, int n_features) {
+    Batch* b = (Batch*)malloc(sizeof(Batch));
+    b->batch_size = batch_size;
+    b->data = matrix_new(batch_size, n_features);
 
-    if (start_idx + batch_size > m->n_rows) 
-        batch.batch_size = m->n_rows - start_idx;
-    else
-        batch.batch_size = batch_size;
+    return b;
+}
 
-    if (is_view) {
-        batch.data = matrix_slice_rows_view(m, start_idx, batch.batch_size);
-    }
-    else {
-        batch.data = matrix_slice_rows(m, start_idx, batch.batch_size);
-    }
+void batchify_into(Matrix* m, int start_idx, Batch* into) {
+    if (start_idx + into->batch_size > m->n_rows) 
+        into->batch_size = m->n_rows - start_idx;
 
-    return batch;
+    matrix_slice_rows_into(m, start_idx, into->batch_size, into->data);
 }
 
 void batch_free(Batch* batch) {
-    if (batch->is_view) {
-        matrix_free_view(batch->data);
-    }
-    else {
-        matrix_free(batch->data);
-    }
+    matrix_free(batch->data);
+    free(batch);
 }

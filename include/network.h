@@ -27,6 +27,14 @@ struct Layer {
     Matrix* delta;
     Matrix* weight_gradient;
     Matrix* bias_gradient;
+
+    // auxiliary gradients
+    Matrix* dCost_dA; 
+    Matrix* dActivation_dZ;
+    Matrix* dZ_dW_t;
+    Matrix* dZnext_dA_t;
+    Matrix* dCost_dZ_col_sum;
+
     Layer* prev_layer;
     Layer* next_layer;
     NeuralNet* net_backref;
@@ -40,6 +48,8 @@ struct NeuralNet {
     Activation* activation;
     Cost* cost;
     Optimizer* optimizer;
+    Batch* train_batch;
+    Batch* label_batch;
     int batch_size;
     Layer** layers;
     bool compiled;
@@ -54,9 +64,9 @@ void neural_net_info(NeuralNet* net);
 void fit(Matrix* x_train, Matrix* y_train, int n_epochs, NeuralNet* net);
 void predict(Matrix* x_test, NeuralNet* net);
 void score(Matrix* x_test, Matrix* y_true, NeuralNet* net);
-void forward_prop(Batch* batch, NeuralNet* net);
-void back_prop(Batch* label_batch, NeuralNet* net);
-double get_batch_error(Batch* label_batch, NeuralNet* net);
+void forward_prop(NeuralNet* net);
+void back_prop(NeuralNet* net);
+double get_batch_error(NeuralNet* net);
 
 Layer* layer_new(LayerType l_type, int n_units, NeuralNet* net);
 void layer_free(Layer* layer);

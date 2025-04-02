@@ -19,7 +19,9 @@ typedef struct {
 Activation* activation_new(ActivationType type, double param);
 
 Matrix* apply_activation_func(Activation* activation, Matrix* z_m);
+void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* into);
 Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m);
+void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into);
 
 double sigmoid(double z, double param);
 double sigmoid_dZ(double z, double param);

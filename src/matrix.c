@@ -162,8 +162,7 @@ Matrix* matrix_flatten(Matrix* m, int axis) {
     exit(1);
 }
 
-Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size) {
-    Matrix* slice = matrix_new(slice_size, m->n_cols);
+void matrix_slice_rows_into(Matrix* m, int start_idx, int slice_size, Matrix* into) {
     if (start_idx >= m->n_rows) {
         printf("Index out of range");
         exit(1);
@@ -174,31 +173,9 @@ Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size) {
 
     for (int i=0; i<slice_size; i++) {
         for (int j=0; j<m->n_cols; j++) {
-            slice->entries[i][j] = m->entries[i + start_idx][j];
+            into->entries[i][j] = m->entries[i + start_idx][j];
         }
     }
-
-    return slice;
-}
-
-Matrix* matrix_slice_rows_view(Matrix* m, int start_idx, int slice_size) {
-    Matrix* slice_view = (Matrix*)malloc(sizeof(Matrix));
-    if (start_idx >= m->n_rows) {
-        printf("Index out of range");
-        exit(1);
-    }
-    if (start_idx + slice_size > m->n_rows) {
-        slice_size = m->n_rows - start_idx;
-    }
-
-    slice_view->n_rows = slice_size;
-    slice_view->n_cols = m->n_cols;
-    slice_view->entries = (double**)malloc(slice_size * sizeof(double*));
-    for (int i=0; i<slice_size; i++) {
-        slice_view->entries[i] = m->entries[i + start_idx];
-    }
-
-    return slice_view;
 }
 
 bool check_dimensions(Matrix* m1, Matrix* m2) {
@@ -226,6 +203,21 @@ Matrix* matrix_add(Matrix* m1, Matrix* m2) {
     return sum_matrix;
 }
 
+void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into) {
+    if (!check_dimensions(m1, m2)) {
+        printf("Matrices have different dimensions: ");
+        matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
+        exit(1); 
+    }
+
+    for (int i=0; i<m1->n_rows; i++) {
+        for (int j=0; j<m1->n_cols; j++) {
+            double sum = m1->entries[i][j] + m2->entries[i][j];
+            into->entries[i][j] = sum;
+        }
+    }
+}
+
 Matrix* matrix_subtract(Matrix* m1, Matrix* m2) {
     if (!check_dimensions(m1, m2)) {
         printf("Matrices have different dimensions: ");
@@ -242,6 +234,21 @@ Matrix* matrix_subtract(Matrix* m1, Matrix* m2) {
     }
 
     return diff_matrix;
+}
+
+void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into) {
+    if (!check_dimensions(m1, m2)) {
+        printf("Matrices have different dimensions: ");
+        matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
+        exit(1); 
+    }
+
+    for (int i=0; i<m1->n_rows; i++) {
+        for (int j=0; j<m1->n_cols; j++) {
+            double diff = m1->entries[i][j] - m2->entries[i][j];
+            into->entries[i][j] = diff;
+        }
+    }
 }
 
 Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
@@ -265,6 +272,44 @@ Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
     return dot_matrix;
 }
 
+void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
+    if (m1->n_cols != m2->n_rows) {
+        printf("Matrices have wrong dimensions: ");
+        matrix_print_dimensions(m1); printf(" and "); matrix_print_dimensions(m2);
+        exit(1);
+    }
+
+    int m = m1->n_rows;
+    int k = m1->n_cols;
+    int n = m2->n_cols;
+
+    #pragma omp parallel for collapse(2)
+    for (int i = 0; i < m; ++i)
+        for (int j = 0; j < n; ++j)
+            into->entries[i][j] = 0.0;
+
+    #pragma omp parallel for collapse(2)
+    for (int ii = 0; ii < m; ii += BLOCK_SIZE) {
+        for (int jj = 0; jj < n; jj += BLOCK_SIZE) {
+            for (int kk = 0; kk < k; kk += BLOCK_SIZE) {
+
+                for (int i = ii; i < ii + BLOCK_SIZE && i < m; i++) {
+                    for (int j = jj; j < jj + BLOCK_SIZE && j < n; j++) {
+                        double sum = into->entries[i][j];
+
+                        for (int l = kk; l < kk + BLOCK_SIZE && l < k; l++) {
+                            sum += m1->entries[i][l] * m2->entries[l][j];
+                        }
+
+                        into->entries[i][j] = sum;
+                    }
+                }
+
+            }
+        }
+    }
+}
+
 Matrix* matrix_multiply(Matrix* m1, Matrix* m2) {
     if (!check_dimensions(m1, m2)) {
         printf("Matrices have different dimensions: ");
@@ -281,6 +326,21 @@ Matrix* matrix_multiply(Matrix* m1, Matrix* m2) {
     }
 
     return product_matrix;
+}
+
+void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into) {
+    if (!check_dimensions(m1, m2)) {
+        printf("Matrices have different dimensions: ");
+        matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
+        exit(1); 
+    }
+
+    for (int i=0; i<m1->n_rows; i++) {
+        for (int j=0; j<m1->n_cols; j++) {
+            double product = m1->entries[i][j] * m2->entries[i][j];
+            into->entries[i][j] = product;
+        }
+    }
 }
 
 Matrix* matrix_sum_axis(Matrix* m, int axis) {
@@ -311,6 +371,40 @@ Matrix* matrix_sum_axis(Matrix* m, int axis) {
         }
 
         return sum_m;
+        break;
+    }
+    
+    default:
+        printf("Invalid axis argument");
+        exit(1);
+        break;
+    }
+}
+
+void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
+    switch (axis)
+    {
+    case 0: {
+        for (int i=0; i<m->n_rows; i++) {
+            double sum = 0.0;
+            for (int j=0; j<m->n_cols; j++) {
+                sum += m->entries[i][j];
+            }
+            into->entries[0][i] = sum;
+        }
+
+        break;
+    }
+    
+    case 1: {
+        for (int i=0; i<m->n_cols; i++) {
+            double sum = 0.0;
+            for (int j=0; j<m->n_rows; j++) {
+                sum += m->entries[j][i];
+            }
+            into->entries[0][i] = sum;
+        }
+
         break;
     }
     
@@ -364,6 +458,40 @@ Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size) {
         }
 
         return new_m;
+        break;
+    }
+
+    default:
+        printf("Invalid axis argument");
+        exit(1);
+        break;
+    }
+}
+
+void matrix_multiplicate_into(Matrix* m, int axis, int n_size, Matrix* into) {
+    switch (axis)
+    {
+    case 0: {
+        for (int i=0; i<m->n_rows; i++) {
+            for (int n=0; n<n_size; n++) {
+                for (int j=0; j<m->n_cols; j++) {
+                    into->entries[i][n*m->n_cols + j] = m->entries[i][j];
+                }
+            }
+        }
+        
+        break;
+    }
+    
+    case 1: {
+        for (int i=0; i<m->n_cols; i++) {
+            for (int n=0; n<n_size; n++) {
+                for (int j=0; j<m->n_rows; j++) {
+                    into->entries[n*m->n_rows + j][i] = m->entries[j][i];
+                }
+            }
+        }
+
         break;
     }
 
@@ -440,4 +568,12 @@ Matrix* matrix_transpose(Matrix* m) {
     }
 
     return transposed_matrix;
+}
+
+void matrix_transpose_into(Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            into->entries[j][i] = m->entries[i][j];
+        }
+    }
 }
