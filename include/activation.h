@@ -14,6 +14,7 @@ typedef struct {
     double(*activation_func)(double, double);
     double(*dZ)(double, double);
     double activation_param;
+    char* name;
 } Activation;
 
 Activation* activation_new(ActivationType type, double param);

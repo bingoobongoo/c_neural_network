@@ -43,6 +43,7 @@ Matrix* matrix_sum_axis(Matrix* m, int axis);
 void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into);
 double matrix_sum(Matrix* m);
 double matrix_average(Matrix* m);
+void matrix_argmax_into(Matrix* m, Matrix* into);
 Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size);
 void matrix_multiplicate_into(Matrix* m, int axis, int n_size, Matrix* into);
 Matrix* matrix_apply(double (*func)(double), Matrix* m);

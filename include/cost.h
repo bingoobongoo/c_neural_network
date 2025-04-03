@@ -8,6 +8,7 @@ typedef enum {
 
 typedef struct {
     CostType cost_type;
+    char* name;
     double (*cost_func)(double, double);
     double (*dA)(double, double);
 } Cost;

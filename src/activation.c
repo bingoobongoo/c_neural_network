@@ -9,24 +9,28 @@ Activation* activation_new(ActivationType type, double param) {
     case SIGMOID:
         act->activation_func = sigmoid;
         act->dZ = sigmoid_dZ;
+        act->name = "Sigmoid";
         return act;
         break;
 
     case RELU:
         act->activation_func = relu;
         act->dZ = relu_dZ;
+        act->name = "RELU";
         return act;
         break;
     
     case LRELU:
         act->activation_func = leaky_relu;
         act->dZ = leaky_relu_dZ;
+        act->name = "Leaky RELU";
         return act;
         break;
 
     case ELU:
         act->activation_func = elu;
         act->dZ = elu_dZ;
+        act->name = "ELU";
         return act;
         break;
     

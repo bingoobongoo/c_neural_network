@@ -5,6 +5,16 @@ Optimizer* optimizer_new(OptimizerType type, double learining_rate) {
     optimizer->type = type;
     optimizer->learning_rate = learining_rate;
 
+    switch (type)
+    {
+    case SGD:
+        optimizer->name = "Stochastic Gradient Descent (SGD)";
+        break;
+    
+    default:
+        break;
+    }
+
     return optimizer;
 }
 

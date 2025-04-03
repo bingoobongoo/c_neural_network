@@ -8,6 +8,7 @@ Cost* cost_new(CostType type) {
     case MSE:
         cost->cost_func = mse;
         cost->dA = mse_dA;
+        cost->name = "Mean Squared Error (MSE)";
         break;
     }
 

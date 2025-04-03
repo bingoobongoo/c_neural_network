@@ -468,6 +468,17 @@ Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size) {
     }
 }
 
+void matrix_argmax_into(Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        int argmax = 0;
+        for (int j=0; j<m->n_cols; j++) {
+            if (m->entries[i][j] > m->entries[i][argmax])
+                argmax = j; 
+        }
+        into->entries[0][i] = (double)argmax;
+    }
+}
+
 void matrix_multiplicate_into(Matrix* m, int axis, int n_size, Matrix* into) {
     switch (axis)
     {

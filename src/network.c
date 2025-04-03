@@ -1,14 +1,14 @@
 #include "network.h"
+#include <time.h>
+#include <sys/time.h>
 
 NeuralNet* neural_net_new(ActivationType activation_type, CostType cost_type, double activation_param, int batch_size, double learning_rate) {
     NeuralNet* net = (NeuralNet*)malloc(sizeof(NeuralNet));
     net->n_layers = 0;
-    net->n_in_layers = 0;
-    net->n_ou_layers = 0;
-    net->n_de_layers = 0;
     net->activation = activation_new(activation_type, activation_param);
     net->cost = cost_new(cost_type);
     net->optimizer = optimizer_new(SGD, learning_rate);
+    net->batch_score = score_new(batch_size);
     net->train_batch = NULL;
     net->label_batch = NULL;
     net->batch_size = batch_size;
@@ -27,6 +27,7 @@ void neural_net_free(NeuralNet* net) {
     free(net->activation);
     free(net->cost);
     free(net->optimizer);
+    score_free(net->batch_score);
     batch_free(net->train_batch);
     batch_free(net->label_batch);
     free(net);
@@ -124,36 +125,67 @@ void neural_net_info(NeuralNet* net) {
             printf("%d  %s  %d  (%d x %d)\n", i, layer, n_units, batch_size, n_units);
             printf("------------------------------------\n");
         }
+        printf("Activation function: %s\n", net->activation->name);
+        printf("Cost function: %s\n", net->cost->name);
+        printf("Optimizer: %s\n", net->optimizer->name);
+        printf("------------------------------------\n\n");
     }
     else {
         printf("Model has not been compiled. Please compile before running \"neural_net_info\".");
     }
 }
 
-void fit(Matrix* x_train, Matrix* y_train, int n_epochs, NeuralNet* net) {
+void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, NeuralNet* net) {
     for (int epoch=0; epoch<n_epochs; epoch++) {
         int start_idx = 0;
         int i = 0;
+        int training_thresh = (1.0 - validation) * x_train->n_rows;
         int n_batches = ceil(x_train->n_rows / (double)net->batch_size);
         double* avg_errs = (double*)malloc(n_batches * sizeof(double));
 
-        for (start_idx; start_idx<x_train->n_rows - net->batch_size; start_idx+=net->batch_size, i++) {
+        struct timeval start, end;
+        gettimeofday(&start, NULL);
+        for (start_idx; start_idx<training_thresh - net->batch_size; start_idx+=net->batch_size, i++) {
             batchify_into(x_train, start_idx, net->train_batch);
             batchify_into(y_train, start_idx, net->label_batch);
             forward_prop(net);
             avg_errs[i] = get_batch_error(net);
             back_prop(net);
         }
+        gettimeofday(&end, NULL);
+        double epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
 
-        shuffle_data_inplace(x_train, y_train);
         double  sum=0.0;
         for (int j=0; j<i; j++) {
             sum += avg_errs[j];
         }
         double avg_epoch_error = sum / (double)i;
 
-        printf("Epoch: %d   Err: %f\n", epoch, avg_epoch_error);
-        free(avg_errs);
+        int val_batches = n_batches - i;
+        double* acc = (double*)malloc(val_batches * sizeof(double));
+        i = 0;
+
+        for (start_idx; start_idx<x_train->n_rows - net->batch_size; start_idx+=net->batch_size, i++) {
+            batchify_into(x_train, start_idx, net->train_batch);
+            batchify_into(y_train, start_idx, net->label_batch);
+            forward_prop(net);
+            Matrix* y_pred = net->layers[net->n_layers-1]->activation;
+            Matrix* y_true = net->label_batch->data;
+            score_batch(net->batch_score, y_pred, y_true);
+            acc[i] = net->batch_score->accuracy;
+        }
+
+        sum = 0.0;
+        for (int j=0; j<i; j++) {
+            sum += acc[j];
+        }
+        double avg_epoch_val_acc = sum / (double)i;
+
+        shuffle_data_inplace(x_train, y_train);
+
+        printf("Epoch: %d   err: %f   val_acc: %.3f   time: %.3fs\n", epoch, avg_epoch_error, avg_epoch_val_acc, epoch_time);
+
+        free(avg_errs); free(acc);
     }
 }
 
@@ -325,20 +357,17 @@ void layer_free(Layer* layer) {
 void add_input_layer(int n_units, NeuralNet* net) {
     Layer* input_l = layer_new(INPUT, n_units, net);
     net->layers[net->n_layers] = input_l;
-    net->n_in_layers++;
     net->n_layers++;
 }
 
 void add_output_layer(int n_units, NeuralNet* net) {
     Layer* output_l = layer_new(OUTPUT, n_units, net);
     net->layers[net->n_layers] = output_l;
-    net->n_ou_layers++;
     net->n_layers++;
 }
 
 void add_deep_layer(int n_units, NeuralNet* net) {
     Layer* deep_l = layer_new(DEEP, n_units, net);
     net->layers[net->n_layers] = deep_l;
-    net->n_de_layers++;
     net->n_layers++;
 }

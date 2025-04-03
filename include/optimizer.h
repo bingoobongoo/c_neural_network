@@ -9,6 +9,7 @@ typedef enum {
 typedef struct {
     OptimizerType type;
     double learning_rate;
+    char* name;
 } Optimizer;
 
 Optimizer* optimizer_new(OptimizerType type, double learning_rate);

@@ -6,6 +6,7 @@
 #include "batch.h"
 #include "optimizer.h"
 #include "preprocessing.h"
+#include "score.h"
 
 typedef struct Layer Layer;
 typedef struct NeuralNet NeuralNet;
@@ -42,12 +43,10 @@ struct Layer {
 
 struct NeuralNet {
     int n_layers;
-    int n_in_layers;
-    int n_ou_layers;
-    int n_de_layers;
     Activation* activation;
     Cost* cost;
     Optimizer* optimizer;
+    Score* batch_score;
     Batch* train_batch;
     Batch* label_batch;
     int batch_size;
@@ -61,9 +60,9 @@ void neural_net_compile(NeuralNet* net);
 void neural_net_link_layers(NeuralNet* net);
 void neural_net_info(NeuralNet* net);
 
-void fit(Matrix* x_train, Matrix* y_train, int n_epochs, NeuralNet* net);
+void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, NeuralNet* net);
 void predict(Matrix* x_test, NeuralNet* net);
-void score(Matrix* x_test, Matrix* y_true, NeuralNet* net);
+void score(NeuralNet* net);
 void forward_prop(NeuralNet* net);
 void back_prop(NeuralNet* net);
 double get_batch_error(NeuralNet* net);
