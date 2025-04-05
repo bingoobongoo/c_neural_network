@@ -162,6 +162,26 @@ Matrix* matrix_flatten(Matrix* m, int axis) {
     exit(1);
 }
 
+Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size) {
+    if (start_idx >= m->n_rows) {
+        printf("Index out of range");
+        exit(1);
+    }
+
+    Matrix* slice = matrix_new(slice_size, m->n_cols);
+    if (start_idx + slice_size > m->n_rows) {
+        slice_size = m->n_rows - start_idx;
+    }
+
+    for (int i=0; i<slice_size; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            slice->entries[i][j] = m->entries[i + start_idx][j];
+        }
+    }
+
+    return slice;
+}
+
 void matrix_slice_rows_into(Matrix* m, int start_idx, int slice_size, Matrix* into) {
     if (start_idx >= m->n_rows) {
         printf("Index out of range");

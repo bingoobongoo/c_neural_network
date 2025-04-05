@@ -1,16 +1,19 @@
 #pragma once
 
 #include "matrix.h"
+#include "batch.h"
 
 typedef enum {
     SIGMOID,
     RELU,
     LRELU,
-    ELU
+    ELU,
+    SOFTMAX,
 } ActivationType;
 
 typedef struct {
     ActivationType type;
+    Batch* y_true_batch;
     double(*activation_func)(double, double);
     double(*dZ)(double, double);
     double activation_param;

@@ -21,7 +21,8 @@ typedef enum {
 struct Layer {
     LayerType l_type;
     int n_units;
-    Matrix* activation;
+    Activation* activation;
+    Matrix* output;
     Matrix* z;
     Matrix* weight;
     Matrix* bias;
@@ -54,18 +55,17 @@ struct NeuralNet {
     bool compiled;
 };
 
-NeuralNet* neural_net_new(ActivationType activation_type, CostType cost_type, double activation_param, int batch_size, double learning_rate);
+NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, double act_param, CostType cost_type, int batch_size);
 void neural_net_free(NeuralNet* net);
 void neural_net_compile(NeuralNet* net);
 void neural_net_link_layers(NeuralNet* net);
 void neural_net_info(NeuralNet* net);
 
 void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, NeuralNet* net);
-void predict(Matrix* x_test, NeuralNet* net);
-void score(NeuralNet* net);
+void score(Matrix* x_test, Matrix* y_test, NeuralNet* net);
+void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void forward_prop(NeuralNet* net);
 void back_prop(NeuralNet* net);
-double get_batch_error(NeuralNet* net);
 
 Layer* layer_new(LayerType l_type, int n_units, NeuralNet* net);
 void layer_free(Layer* layer);

@@ -3,6 +3,7 @@
 Activation* activation_new(ActivationType type, double param) {
     Activation* act = (Activation*)malloc(sizeof(Activation));
     act->type = type;
+    act->y_true_batch = NULL;
     act->activation_param = param;
     switch (type)
     {
@@ -34,6 +35,13 @@ Activation* activation_new(ActivationType type, double param) {
         return act;
         break;
     
+    case SOFTMAX:
+        act->activation_func = NULL;
+        act->dZ = NULL;
+        act->name = "Softmax";
+        return act;
+        break;
+    
     default:
         printf("Unknown activation type.");
         break;
@@ -41,48 +49,107 @@ Activation* activation_new(ActivationType type, double param) {
 }
 
 Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
-    Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
-    for (int i=0; i<z_m->n_rows; i++) {
-        for (int j=0; j<z_m->n_cols; j++) {
-            double z = z_m->entries[i][j];
-            double param = activation->activation_param;
-            a->entries[i][j] = activation->activation_func(z, param);
+    if (activation->type != SOFTMAX) {
+        Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
+        for (int i=0; i<z_m->n_rows; i++) {
+            for (int j=0; j<z_m->n_cols; j++) {
+                double z = z_m->entries[i][j];
+                double param = activation->activation_param;
+                a->entries[i][j] = activation->activation_func(z, param);
+            }
         }
+    
+        return a;
     }
+    else if (activation->type == SOFTMAX) {
+        Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
+        for (int i=0; i<z_m->n_rows; i++) {
+            double max_z = z_m->entries[i][0];
+            for (int j=0; j<z_m->n_cols; j++) {
+                if (z_m->entries[i][j] > max_z)
+                max_z = z_m->entries[i][j];
+            }
 
-    return a;
+            double sum_z = 0.0;
+            for (int j=0; j<a->n_cols; j++) {
+                a->entries[i][j] = exp(z_m->entries[i][j] - max_z);
+                sum_z += a->entries[i][j];
+            }
+
+            for (int j=0; j<a->n_cols; j++) {
+                a->entries[i][j] /= sum_z;
+            }
+        }
+
+        return a;
+    }
 }
 
 void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* into) {
-    for (int i=0; i<z_m->n_rows; i++) {
-        for (int j=0; j<z_m->n_cols; j++) {
-            double z = z_m->entries[i][j];
-            double param = activation->activation_param;
-            into->entries[i][j] = activation->activation_func(z, param);
+    if (activation->type != SOFTMAX) {
+        for (int i=0; i<z_m->n_rows; i++) {
+            for (int j=0; j<z_m->n_cols; j++) {
+                double z = z_m->entries[i][j];
+                double param = activation->activation_param;
+                into->entries[i][j] = activation->activation_func(z, param);
+            }
         }
     }
+    else if (activation->type == SOFTMAX) {
+        for (int i=0; i<z_m->n_rows; i++) {
+            double max_z = z_m->entries[i][0];
+            for (int j=0; j<z_m->n_cols; j++) {
+                if (z_m->entries[i][j] > max_z)
+                max_z = z_m->entries[i][j];
+            }
+
+            double sum_z = 0.0;
+            for (int j=0; j<into->n_cols; j++) {
+                into->entries[i][j] = exp(z_m->entries[i][j] - max_z);
+                sum_z += into->entries[i][j];
+            }
+
+            for (int j=0; j<into->n_cols; j++) {
+                into->entries[i][j] /= sum_z;
+            }
+        }
+    } 
 }
 
 Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m) {
-    Matrix* dZ = matrix_new(z_m->n_rows, z_m->n_cols);
-    for (int i=0; i<z_m->n_rows; i++) {
-        for (int j=0; j<z_m->n_cols; j++) {
-            double z = z_m->entries[i][j];
-            double param = activation->activation_param;
-            dZ->entries[i][j] = activation->dZ(z, param);
+    if (activation->type != SOFTMAX) {
+        Matrix* dZ = matrix_new(z_m->n_rows, z_m->n_cols);
+        for (int i=0; i<z_m->n_rows; i++) {
+            for (int j=0; j<z_m->n_cols; j++) {
+                double z = z_m->entries[i][j];
+                double param = activation->activation_param;
+                dZ->entries[i][j] = activation->dZ(z, param);
+            }
         }
+    
+        return dZ;
     }
+    else if (activation->type == SOFTMAX) {
+        Matrix* dZ = apply_activation_func(activation, z_m);
+        matrix_subtract_into(dZ, activation->y_true_batch->data, dZ);
 
-    return dZ;
+        return dZ;
+    }
 }
 
 void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into) {
-    for (int i=0; i<z_m->n_rows; i++) {
-        for (int j=0; j<z_m->n_cols; j++) {
-            double z = z_m->entries[i][j];
-            double param = activation->activation_param;
-            into->entries[i][j] = activation->dZ(z, param);
+    if (activation->type != SOFTMAX) {
+        for (int i=0; i<z_m->n_rows; i++) {
+            for (int j=0; j<z_m->n_cols; j++) {
+                double z = z_m->entries[i][j];
+                double param = activation->activation_param;
+                into->entries[i][j] = activation->dZ(z, param);
+            }
         }
+    }
+    else if (activation->type == SOFTMAX) {
+        apply_activation_func_into(activation, z_m, into);
+        matrix_subtract_into(into, activation->y_true_batch->data, into);
     }
 }
 

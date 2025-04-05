@@ -2,15 +2,25 @@
 
 #include "matrix.h"
 
+typedef struct Optimizer Optimizer;
+
 typedef enum {
-    SGD
+    SGD,
+    MOMENTUM
 } OptimizerType;    
 
-typedef struct {
+struct Optimizer {
+    void (*update_params)(Matrix* params, Matrix* gradient, Optimizer* optimizer);
+    void (*optimizer_free)(Optimizer* optimizer);
     OptimizerType type;
-    double learning_rate;
     char* name;
-} Optimizer;
+    void* settings;
+};
 
-Optimizer* optimizer_new(OptimizerType type, double learning_rate);
-void update_params_inplace(Matrix* params, Matrix* gradient, Optimizer* optimizer);
+typedef struct {
+    double learning_rate;
+} SGDConfig;
+
+Optimizer* optimizer_sgd_new(double learning_rate);
+void optimizer_sgd_free(Optimizer* optimizer);
+void update_params_sgd(Matrix* params, Matrix* gradient, Optimizer* optimizer);

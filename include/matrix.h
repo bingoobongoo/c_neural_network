@@ -28,6 +28,7 @@ void matrix_print_dimensions(Matrix* m);
 void matrix_fill(Matrix* m, double num);
 void matrix_fill_normal_distribution(Matrix* m, double mean, double std_deviation);
 Matrix* matrix_flatten(Matrix* m, int axis);
+Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size);
 void matrix_slice_rows_into(Matrix* m, int start_idx, int slice_size, Matrix* into);
 
 bool matrix_check_dimensions(Matrix* m1, Matrix* m2);

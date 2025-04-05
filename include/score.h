@@ -13,3 +13,4 @@ typedef struct {
 Score* score_new(int batch_size);
 void score_free(Score* s);
 void score_batch(Score* self, Matrix* y_pred, Matrix* y_true);
+void update_confusion_matrix(Score* self, Matrix* y_pred, Matrix* y_true, Matrix* conf_m);
