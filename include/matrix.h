@@ -30,7 +30,6 @@ void matrix_fill_normal_distribution(Matrix* m, double mean, double std_deviatio
 Matrix* matrix_flatten(Matrix* m, int axis);
 Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size);
 void matrix_slice_rows_into(Matrix* m, int start_idx, int slice_size, Matrix* into);
-
 bool matrix_check_dimensions(Matrix* m1, Matrix* m2);
 Matrix* matrix_add(Matrix* m1, Matrix* m2);
 void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into);

@@ -102,6 +102,31 @@ void neural_net_compile(NeuralNet* net) {
         layer->dCost_dZ_col_sum = matrix_new(1, n_units);
     }
 
+    // optimizer compilation
+    switch (net->optimizer->type)
+    {
+    case MOMENTUM:
+        MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
+        mom->n_layers = net->n_layers;
+        mom->weight_momentum = (Matrix**)malloc(mom->n_layers * sizeof(Matrix*));
+        mom->bias_momentum = (Matrix**)malloc(mom->n_layers * sizeof(Matrix*));
+        mom->weight_momentum[0] = NULL;
+        mom->bias_momentum[0] = NULL;
+        for (int i=1; i<mom->n_layers; i++) {
+            Layer* layer = net->layers[i];
+
+            mom->weight_momentum[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            matrix_fill(mom->weight_momentum[i], 0.0);
+
+            mom->bias_momentum[i] = matrix_new(net->batch_size, layer->n_units);
+            matrix_fill(mom->bias_momentum[i], 0.0);
+        }
+        break;
+    
+    default:
+        break;
+    }
+
     net->train_batch = batch_new(net->batch_size, net->layers[0]->n_units);
     net->label_batch = batch_new(net->batch_size, net->layers[net->n_layers-1]->n_units);
 
@@ -369,8 +394,8 @@ void back_prop(NeuralNet* net) {
             for (int j=1; j<net->n_layers; j++) {
                 Layer* layer = net->layers[j];
 
-                net->optimizer->update_params(layer->weight, layer->weight_gradient, net->optimizer);
-                net->optimizer->update_params(layer->bias, layer->bias_gradient, net->optimizer);
+                net->optimizer->update_weights(layer->weight, layer->weight_gradient, net->optimizer, j);
+                net->optimizer->update_bias(layer->bias, layer->bias_gradient, net->optimizer, j);
             }
             break;
         }

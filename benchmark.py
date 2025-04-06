@@ -32,4 +32,4 @@ class TimerCallback(tf.keras.callbacks.Callback):
         elapsed = time.time() - self.start
         print(f"Epoch {epoch+1} took {elapsed:.3f} seconds")
 
-model.fit(x_train, y_train, epochs=5, batch_size=64, callbacks=[TimerCallback()])
+model.fit(x_train, y_train, epochs=25, batch_size=64, callbacks=[TimerCallback()])
