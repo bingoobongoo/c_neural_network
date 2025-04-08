@@ -107,10 +107,13 @@ void neural_net_compile(NeuralNet* net) {
     case NESTEROV:
         MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
         mom->n_layers = net->n_layers;
+
         mom->weight_momentum = (Matrix**)malloc(mom->n_layers * sizeof(Matrix*));
         mom->bias_momentum = (Matrix**)malloc(mom->n_layers * sizeof(Matrix*));
+
         mom->weight_momentum[0] = NULL;
         mom->bias_momentum[0] = NULL;
+
         for (int i=1; i<mom->n_layers; i++) {
             Layer* layer = net->layers[i];
 
@@ -129,10 +132,12 @@ void neural_net_compile(NeuralNet* net) {
         ada->bias_s = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
         ada->intermediate_w = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
         ada->intermediate_b = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
+
         ada->weight_s[0] = NULL;
         ada->bias_s[0] = NULL;
         ada->intermediate_w[0] = NULL;
         ada->intermediate_b[0] = NULL;
+
         for (int i=1; i<ada->n_layers; i++) {
             Layer* layer = net->layers[i];
 
@@ -147,6 +152,61 @@ void neural_net_compile(NeuralNet* net) {
 
             ada->intermediate_b[i] = matrix_new(net->batch_size, layer->n_units);
             matrix_fill(ada->intermediate_b[i], 0.0);
+        }
+        break;
+    
+    case ADAM:
+        AdamConfig* adam = (AdamConfig*)net->optimizer->settings;;
+        adam->n_layers = net->n_layers;
+
+        adam->weight_m = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->weight_m_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->weight_s = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->weight_s_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->intermediate_w = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->bias_m = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->bias_m_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->bias_s = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->bias_s_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->intermediate_b = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+
+        adam->weight_m[0] = NULL;
+        adam->weight_m_corr[0] = NULL;
+        adam->weight_s[0] = NULL;
+        adam->weight_s_corr[0] = NULL;
+        adam->intermediate_w[0] = NULL;
+        adam->bias_m[0] = NULL;
+        adam->bias_m_corr[0] = NULL;
+        adam->bias_s[0] = NULL;
+        adam->bias_s_corr[0] = NULL;
+        adam->intermediate_b[0] = NULL;
+
+        for (int i=1; i<adam->n_layers; i++) {
+            Layer* layer = net->layers[i];
+
+            adam->weight_m[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            adam->weight_m_corr[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            adam->weight_s[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            adam->weight_s_corr[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            adam->intermediate_w[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+
+            matrix_fill(adam->weight_m[i], 0.0);
+            matrix_fill(adam->weight_m_corr[i], 0.0);
+            matrix_fill(adam->weight_s[i], 0.0);
+            matrix_fill(adam->weight_s_corr[i], 0.0);
+            matrix_fill(adam->intermediate_w[i], 0.0);
+            
+            adam->bias_m[i] = matrix_new(net->batch_size, layer->n_units);
+            adam->bias_m_corr[i] = matrix_new(net->batch_size, layer->n_units);
+            adam->bias_s[i] = matrix_new(net->batch_size, layer->n_units);
+            adam->bias_s_corr[i] = matrix_new(net->batch_size, layer->n_units);
+            adam->intermediate_b[i] = matrix_new(net->batch_size, layer->n_units);
+
+            matrix_fill(adam->bias_m[i], 0.0);
+            matrix_fill(adam->bias_m_corr[i], 0.0);
+            matrix_fill(adam->bias_s[i], 0.0);
+            matrix_fill(adam->bias_s_corr[i], 0.0);
+            matrix_fill(adam->intermediate_b[i], 0.0);
         }
         break;
     
@@ -293,6 +353,11 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
         shuffle_data_inplace(x_train_split, y_train_split);
         printf("Epoch: %d/%d   loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", epoch+1, n_epochs, avg_epoch_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time);
     }
+
+    if (net->optimizer->type == ADAM) {
+        AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
+        adam->ctr = 1;
+    }
     
     free(avg_loss); free(val_acc); free(train_acc);
     matrix_free(x_train_split); matrix_free(y_train_split);
@@ -430,6 +495,12 @@ void back_prop(NeuralNet* net) {
                 net->optimizer->update_weights(layer->weight, layer->weight_gradient, net->optimizer, j);
                 net->optimizer->update_bias(layer->bias, layer->bias_gradient, net->optimizer, j);
             }
+
+            if (net->optimizer->type == ADAM) {
+                AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
+                adam->ctr++;
+            }
+
             break;
         }
         }

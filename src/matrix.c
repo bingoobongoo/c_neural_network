@@ -604,6 +604,14 @@ Matrix* matrix_scale(double scalar, Matrix* m) {
     return scaled_matrix;
 }
 
+void matrix_scale_into(double scalar, Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            into->entries[i][j] = m->entries[i][j] * scalar;
+        }
+    }
+}
+
 void matrix_scale_inplace(double scalar, Matrix* m) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {

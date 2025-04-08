@@ -52,6 +52,7 @@ Matrix* matrix_apply(double (*func)(double), Matrix* m);
 void matrix_apply_into(double (*func)(double), Matrix* m, Matrix* into);
 void matrix_apply_inplace(double (*func)(double), Matrix* m);
 Matrix* matrix_scale(double scalar, Matrix* m);
+void matrix_scale_into(double scalar, Matrix* m, Matrix* into);
 void matrix_scale_inplace(double scalar, Matrix* m);
 Matrix* matrix_add_scalar(double scalar, Matrix* m);
 void matrix_add_scalar_into(double scalar, Matrix* m, Matrix* into);
