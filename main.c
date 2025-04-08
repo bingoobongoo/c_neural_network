@@ -4,12 +4,12 @@
 
 int main() {
     srand(time(NULL));
-    Matrix* x_train = load_ubyte_images("data/train-images-idx3-ubyte");
+    Matrix* x_train = load_ubyte_images("data/test-images-idx3-ubyte");
     Matrix* x_test = load_ubyte_images("data/test-images-idx3-ubyte");
     normalize(x_train); 
     normalize(x_test);
 
-    Matrix* y_train = load_ubyte_labels("data/train-labels-idx1-ubyte");
+    Matrix* y_train = load_ubyte_labels("data/test-labels-idx1-ubyte");
     Matrix* y_test = load_ubyte_labels("data/test-labels-idx1-ubyte");
     matrix_assign(&y_train, one_hot_encode(y_train, 10));
     matrix_assign(&y_test, one_hot_encode(y_test, 10));
@@ -18,7 +18,7 @@ int main() {
     shuffle_data_inplace(x_test, y_test);
     
     NeuralNet* net = neural_net_new(
-        optimizer_momentum_new(0.0001, 0.9, true),
+        optimizer_adagrad_new(0.003),
         ELU, 1.0,
         CAT_CROSS_ENTROPY, 
         256
@@ -34,7 +34,7 @@ int main() {
 
     struct timeval start, end;
     gettimeofday(&start, NULL);
-    fit(x_train, y_train, 5, 0.1, net);
+    fit(x_train, y_train, 1, 0.1, net);
     gettimeofday(&end, NULL);
     double fit_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
 

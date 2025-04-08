@@ -363,6 +363,39 @@ void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into) {
     }
 }
 
+Matrix* matrix_divide(Matrix* m1, Matrix* m2) {
+    if (!matrix_check_dimensions(m1, m2)) {
+        printf("Matrices have different dimensions: ");
+        matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
+        exit(1); 
+    }
+
+    Matrix* quotient_mat = matrix_new(m1->n_rows, m1->n_cols);
+    for (int i=0; i<m1->n_rows; i++) {
+        for (int j=0; j<m1->n_cols; j++) {
+            double quotient = m1->entries[i][j] / m2->entries[i][j];
+            quotient_mat->entries[i][j] = quotient;
+        }
+    }
+
+    return quotient_mat;
+}
+
+void matrix_divide_into(Matrix* m1, Matrix* m2, Matrix* into) {
+    if (!matrix_check_dimensions(m1, m2)) {
+        printf("Matrices have different dimensions: ");
+        matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
+        exit(1); 
+    }
+
+    for (int i=0; i<m1->n_rows; i++) {
+        for (int j=0; j<m1->n_cols; j++) {
+            double quotient = m1->entries[i][j] / m2->entries[i][j];
+            into->entries[i][j] = quotient;
+        }
+    }
+}
+
 Matrix* matrix_sum_axis(Matrix* m, int axis) {
     switch (axis)
     {
@@ -544,6 +577,14 @@ Matrix* matrix_apply(double (*func)(double), Matrix* m) {
     return transformed_matrix;
 }
 
+void matrix_apply_into(double (*func)(double), Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            into->entries[i][j] = func(m->entries[i][j]);
+        }
+    }
+}
+
 void matrix_apply_inplace(double (*func)(double), Matrix* m) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
@@ -580,6 +621,14 @@ Matrix* matrix_add_scalar(double scalar, Matrix* m) {
     }
 
     return scaled_matrix;
+}
+
+void matrix_add_scalar_into(double scalar, Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            into->entries[i][j] = m->entries[i][j] + scalar;
+        }
+    }
 }
 
 void matrix_add_scalar_inplace(double scalar, Matrix* m) {

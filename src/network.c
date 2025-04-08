@@ -122,6 +122,34 @@ void neural_net_compile(NeuralNet* net) {
         }
         break;
     
+    case ADAGRAD:
+        AdaGradConfig* ada = (AdaGradConfig*)net->optimizer->settings;
+        ada->n_layers = net->n_layers;
+        ada->weight_s = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
+        ada->bias_s = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
+        ada->intermediate_w = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
+        ada->intermediate_b = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
+        ada->weight_s[0] = NULL;
+        ada->bias_s[0] = NULL;
+        ada->intermediate_w[0] = NULL;
+        ada->intermediate_b[0] = NULL;
+        for (int i=1; i<ada->n_layers; i++) {
+            Layer* layer = net->layers[i];
+
+            ada->weight_s[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            matrix_fill(ada->weight_s[i], 0.0);
+
+            ada->bias_s[i] = matrix_new(net->batch_size, layer->n_units);
+            matrix_fill(ada->bias_s[i], 0.0);
+
+            ada->intermediate_w[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            matrix_fill(ada->intermediate_w[i], 0.0);
+
+            ada->intermediate_b[i] = matrix_new(net->batch_size, layer->n_units);
+            matrix_fill(ada->intermediate_b[i], 0.0);
+        }
+        break;
+    
     default:
         break;
     }
