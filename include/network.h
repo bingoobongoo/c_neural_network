@@ -7,6 +7,8 @@
 #include "optimizer.h"
 #include "preprocessing.h"
 #include "score.h"
+#include <time.h>
+#include <sys/time.h>
 
 typedef struct Layer Layer;
 typedef struct NeuralNet NeuralNet;
@@ -64,7 +66,7 @@ void neural_net_info(NeuralNet* net);
 void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, NeuralNet* net);
 void score(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net);
-void forward_prop(NeuralNet* net);
+void forward_prop(NeuralNet* net, bool training);
 void back_prop(NeuralNet* net);
 
 Layer* layer_new(LayerType l_type, int n_units, NeuralNet* net);

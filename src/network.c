@@ -1,6 +1,4 @@
 #include "network.h"
-#include <time.h>
-#include <sys/time.h>
 
 NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, double act_param, CostType cost_type, int batch_size) {
     NeuralNet* net = (NeuralNet*)malloc(sizeof(NeuralNet));
@@ -106,6 +104,7 @@ void neural_net_compile(NeuralNet* net) {
     switch (net->optimizer->type)
     {
     case MOMENTUM:
+    case NESTEROV:
         MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
         mom->n_layers = net->n_layers;
         mom->weight_momentum = (Matrix**)malloc(mom->n_layers * sizeof(Matrix*));
@@ -223,7 +222,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
         for (start_idx; start_idx<training_size - net->batch_size; start_idx+=net->batch_size, i++) {
             batchify_into(x_train_split, start_idx, net->train_batch);
             batchify_into(y_train_split, start_idx, net->label_batch);
-            forward_prop(net);
+            forward_prop(net, true);
             avg_loss[i] = get_avg_batch_loss(net->cost, net->layers[net->n_layers-1]->output, net->label_batch->data);
             Matrix* y_pred = net->layers[net->n_layers-1]->output;
             Matrix* y_true = net->label_batch->data;
@@ -250,7 +249,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
         for (start_idx=0; start_idx<val_size - net->batch_size; start_idx+=net->batch_size, i++) {
             batchify_into(x_val_split, start_idx, net->train_batch);
             batchify_into(y_val_split, start_idx, net->label_batch);
-            forward_prop(net);
+            forward_prop(net, false);
             Matrix* y_pred = net->layers[net->n_layers-1]->output;
             Matrix* y_true = net->label_batch->data;
             score_batch(net->batch_score, y_pred, y_true);
@@ -264,7 +263,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
         avg_epoch_val_acc = sum / (double)i;
 
         shuffle_data_inplace(x_train_split, y_train_split);
-        printf("Epoch: %d   loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", epoch, avg_epoch_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time);
+        printf("Epoch: %d/%d   loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", epoch+1, n_epochs, avg_epoch_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time);
     }
     
     free(avg_loss); free(val_acc); free(train_acc);
@@ -281,7 +280,7 @@ void score(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
     for (start_idx; start_idx<x_test->n_rows - net->batch_size; start_idx+=net->batch_size, i++) {
         batchify_into(x_test, start_idx, net->train_batch);
         batchify_into(y_test, start_idx, net->label_batch);
-        forward_prop(net);
+        forward_prop(net, false);
         Matrix* y_pred = net->layers[net->n_layers-1]->output;
         Matrix* y_true = net->label_batch->data;
         score_batch(net->batch_score, y_pred, y_true);
@@ -308,7 +307,7 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
     for (start_idx; start_idx<x_test->n_rows - net->batch_size; start_idx += net->batch_size) {
         batchify_into(x_test, start_idx, net->train_batch);
         batchify_into(y_test, start_idx, net->label_batch);
-        forward_prop(net);
+        forward_prop(net, false);
         Matrix* y_pred = net->layers[net->n_layers-1]->output;
         Matrix* y_true = net->label_batch->data;
         update_confusion_matrix(net->batch_score, y_pred, y_true, conf_m);
@@ -318,7 +317,7 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
     matrix_free(conf_m);
 }
 
-void forward_prop(NeuralNet* net) {
+void forward_prop(NeuralNet* net, bool training) {
     Matrix* input = net->train_batch->data;
     for (int i=0; i<net->n_layers; i++) {
         Layer* layer = net->layers[i];
@@ -330,12 +329,12 @@ void forward_prop(NeuralNet* net) {
             break;
 
         case DEEP:
-            matrix_dot_into(input, layer->weight, layer->z);
-            matrix_add_into(layer->z, layer->bias, layer->z);
-            apply_activation_func_into(layer->activation, layer->z, layer->output);
-            input = layer->output;
-            break;
         case OUTPUT:
+            if (net->optimizer->type == NESTEROV && training) {
+                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
+                matrix_add_into(layer->weight, mom->weight_momentum[i], layer->weight);
+                matrix_add_into(layer->bias, mom->bias_momentum[i], layer->bias);
+            }
             matrix_dot_into(input, layer->weight, layer->z);
             matrix_add_into(layer->z, layer->bias, layer->z);
             layer->activation->y_true_batch = net->label_batch;
@@ -393,6 +392,12 @@ void back_prop(NeuralNet* net) {
             // here we just update all the weights and biases
             for (int j=1; j<net->n_layers; j++) {
                 Layer* layer = net->layers[j];
+
+                if (net->optimizer->type == NESTEROV) {
+                    MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
+                    matrix_subtract_into(layer->weight, mom->weight_momentum[j], layer->weight);
+                    matrix_subtract_into(layer->bias, mom->bias_momentum[j], layer->bias);
+                }
 
                 net->optimizer->update_weights(layer->weight, layer->weight_gradient, net->optimizer, j);
                 net->optimizer->update_bias(layer->bias, layer->bias_gradient, net->optimizer, j);

@@ -6,7 +6,8 @@ typedef struct Optimizer Optimizer;
 
 typedef enum {
     SGD,
-    MOMENTUM
+    MOMENTUM,
+    NESTEROV
 } OptimizerType;    
 
 struct Optimizer {
@@ -35,7 +36,7 @@ void optimizer_sgd_free(Optimizer* optimizer);
 void update_weights_sgd(Matrix* weights, Matrix* gradient, Optimizer* optimizer, int layer_idx);
 void update_bias_sgd(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int layer_idx);
 
-Optimizer* optimizer_momentum_new(double learning_rate, double beta);
+Optimizer* optimizer_momentum_new(double learning_rate, double beta, bool nesterov);
 void optimizer_momentum_free(Optimizer* optimizer);
 void update_weights_momentum(Matrix* weights, Matrix* gradient, Optimizer* optimizer, int layer_idx);
 void update_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int layer_idx);

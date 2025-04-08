@@ -33,13 +33,19 @@ void update_bias_sgd(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int l
     matrix_subtract_into(bias, gradient, bias);
 }
 
-Optimizer* optimizer_momentum_new(double learning_rate, double beta) {
+Optimizer* optimizer_momentum_new(double learning_rate, double beta, bool nesterov) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_momentum;
     opt->update_bias = update_bias_momentum;
     opt->optimizer_free = optimizer_momentum_free;
-    opt->type = MOMENTUM;
-    opt->name = "Momentum";
+    if (nesterov) {
+        opt->type = NESTEROV;
+        opt->name = "Nesterov Accelerated Gradient (NAG)";
+    }
+    else {
+        opt->type = MOMENTUM;
+        opt->name = "Momentum";
+    }
 
     MomentumConfig* mom = (MomentumConfig*)malloc(sizeof(MomentumConfig));
     mom->learning_rate = learning_rate;

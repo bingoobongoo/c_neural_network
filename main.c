@@ -1,8 +1,6 @@
 #include "network.h"
 #include "load_data.h"
 #include "preprocessing.h"
-#include <time.h>
-#include <sys/time.h>
 
 int main() {
     srand(time(NULL));
@@ -20,10 +18,10 @@ int main() {
     shuffle_data_inplace(x_test, y_test);
     
     NeuralNet* net = neural_net_new(
-        optimizer_momentum_new(0.0001, 0.9),
-        RELU, 0.0,
+        optimizer_momentum_new(0.0001, 0.9, true),
+        ELU, 1.0,
         CAT_CROSS_ENTROPY, 
-        128
+        256
     );
 
     add_input_layer(x_train->n_cols, net);
@@ -36,7 +34,7 @@ int main() {
 
     struct timeval start, end;
     gettimeofday(&start, NULL);
-    fit(x_train, y_train, 1, 0.1, net);
+    fit(x_train, y_train, 5, 0.1, net);
     gettimeofday(&end, NULL);
     double fit_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
 
