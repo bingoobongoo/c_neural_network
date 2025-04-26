@@ -43,17 +43,16 @@ void neural_net_compile(NeuralNet* net) {
 
     for (int i=1; i<net->n_layers; i++) {
         Layer* layer = net->layers[i];
-        int n_units = layer->n_units;
-        int n_units_prev = net->layers[i-1]->n_units;
         
+        // init actiavtion and cost
         switch (layer->l_type)
         {
         case OUTPUT:
-            if (n_units == 1)
+            if (layer_get_n_units(layer) == 1)
                 layer->activation = activation_new(SIGMOID, 0.0);
-            if (n_units > 1)
+            if (layer_get_n_units(layer) > 1)
                 layer->activation = activation_new(SOFTMAX, 0.0);
-            net->cost->loss_m = matrix_new(net->batch_size, layer->n_units);
+            net->cost->loss_m = matrix_new(net->batch_size, layer_get_n_units(layer));
             break;
         
         default:
@@ -61,43 +60,99 @@ void neural_net_compile(NeuralNet* net) {
             break;
         }
 
-        layer->weight = matrix_new(n_units_prev, n_units);
-        layer->bias = matrix_new(net->batch_size, n_units);
-        Matrix* weight = layer->weight;
-        Matrix* bias = layer->bias;
-        
-        matrix_fill(bias, 0.0);
-        switch (net->activation->type)
+        // init weight and bias
+        switch (layer->l_type)
         {
-        case SIGMOID:
-            matrix_fill_normal_distribution(weight, 0.0, 2.0/(n_units + n_units_prev));
-            break;
+        case DEEP:
+        case OUTPUT:
+            layer->cache.dense.weight = matrix_new(
+                layer_get_n_units(layer->prev_layer),
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.bias = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
 
-        case RELU:
-        case LRELU:
-        case ELU:
-            matrix_fill_normal_distribution(weight, 0.0, 2.0/n_units_prev);
-            break;
+            Matrix* weight = layer->cache.dense.weight;
+            Matrix* bias = layer->cache.dense.bias;
+            matrix_fill(bias, 0.0);
 
-        default:
-            printf("Unknown activation type.");
-            break;
+            switch (net->activation->type)
+            {
+            case SIGMOID:
+                matrix_fill_normal_distribution(
+                    weight, 
+                    0.0, 
+                    2.0/(layer_get_n_units(layer) + layer_get_n_units(layer->prev_layer))
+                );
+                break;
+
+            case RELU:
+            case LRELU:
+            case ELU:
+                matrix_fill_normal_distribution(
+                    weight, 
+                    0.0, 
+                    2.0/layer_get_n_units(layer->prev_layer)
+                );
+                break;
+
+            default:
+                printf("Unknown activation type.");
+                break;
+            }
         }
 
-        // static gradients, output and z storage
-        layer->output = matrix_new(net->batch_size, n_units);
-        layer->z = matrix_new(net->batch_size, n_units);
-        layer->delta = matrix_new(net->batch_size, n_units);
-        layer->weight_gradient = matrix_new(n_units_prev, n_units);
-        layer->bias_gradient = matrix_new(net->batch_size, n_units);
-
-        // static auxiliary gradients storage
-        layer->dCost_dA = matrix_new(net->batch_size, n_units);
-        layer->dActivation_dZ = matrix_new(net->batch_size, n_units);
-        layer->dZ_dW_t = matrix_new(n_units_prev, net->batch_size);
-        if (layer->l_type != OUTPUT)
-            layer->dZnext_dA_t = matrix_new(layer->next_layer->n_units, n_units); 
-        layer->dCost_dZ_col_sum = matrix_new(1, n_units);
+        // init cache
+        switch (layer->l_type)
+        {
+        case DEEP:
+        case OUTPUT:
+            layer->cache.dense.output = matrix_new(
+                net->batch_size, 
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.z = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.delta = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.weight_gradient = matrix_new(
+                layer_get_n_units(layer->prev_layer),
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.bias_gradient = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.dCost_dA = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.dActivation_dZ = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
+            layer->cache.dense.dZ_dW_t = matrix_new(
+                layer_get_n_units(layer->prev_layer),
+                net->batch_size
+            );
+            if (layer->l_type == DEEP) {
+                layer->cache.dense.dZnext_dA_t = matrix_new(
+                    layer_get_n_units(layer->next_layer),
+                    layer_get_n_units(layer)
+                );
+            }
+            layer->cache.dense.dCost_dZ_col_sum = matrix_new(
+                1,
+                layer_get_n_units(layer)
+            );
+            break;
+        }
     }
 
     // optimizer compilation
@@ -117,10 +172,13 @@ void neural_net_compile(NeuralNet* net) {
         for (int i=1; i<mom->n_layers; i++) {
             Layer* layer = net->layers[i];
 
-            mom->weight_momentum[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            mom->weight_momentum[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
             matrix_fill(mom->weight_momentum[i], 0.0);
 
-            mom->bias_momentum[i] = matrix_new(net->batch_size, layer->n_units);
+            mom->bias_momentum[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
             matrix_fill(mom->bias_momentum[i], 0.0);
         }
         break;
@@ -141,16 +199,25 @@ void neural_net_compile(NeuralNet* net) {
         for (int i=1; i<ada->n_layers; i++) {
             Layer* layer = net->layers[i];
 
-            ada->weight_s[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            ada->weight_s[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
             matrix_fill(ada->weight_s[i], 0.0);
 
-            ada->bias_s[i] = matrix_new(net->batch_size, layer->n_units);
+            ada->bias_s[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
             matrix_fill(ada->bias_s[i], 0.0);
 
-            ada->intermediate_w[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            ada->intermediate_w[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
             matrix_fill(ada->intermediate_w[i], 0.0);
 
-            ada->intermediate_b[i] = matrix_new(net->batch_size, layer->n_units);
+            ada->intermediate_b[i] = matrix_new(
+                net->batch_size, 
+                layer_get_n_units(layer)
+            );
             matrix_fill(ada->intermediate_b[i], 0.0);
         }
         break;
@@ -184,11 +251,26 @@ void neural_net_compile(NeuralNet* net) {
         for (int i=1; i<adam->n_layers; i++) {
             Layer* layer = net->layers[i];
 
-            adam->weight_m[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
-            adam->weight_m_corr[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
-            adam->weight_s[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
-            adam->weight_s_corr[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
-            adam->intermediate_w[i] = matrix_new(layer->prev_layer->n_units, layer->n_units);
+            adam->weight_m[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
+            adam->weight_m_corr[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
+            adam->weight_s[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
+            adam->weight_s_corr[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
+            adam->intermediate_w[i] = matrix_new(
+                layer_get_n_units(layer->prev_layer), 
+                layer_get_n_units(layer)
+            );
 
             matrix_fill(adam->weight_m[i], 0.0);
             matrix_fill(adam->weight_m_corr[i], 0.0);
@@ -196,11 +278,11 @@ void neural_net_compile(NeuralNet* net) {
             matrix_fill(adam->weight_s_corr[i], 0.0);
             matrix_fill(adam->intermediate_w[i], 0.0);
             
-            adam->bias_m[i] = matrix_new(net->batch_size, layer->n_units);
-            adam->bias_m_corr[i] = matrix_new(net->batch_size, layer->n_units);
-            adam->bias_s[i] = matrix_new(net->batch_size, layer->n_units);
-            adam->bias_s_corr[i] = matrix_new(net->batch_size, layer->n_units);
-            adam->intermediate_b[i] = matrix_new(net->batch_size, layer->n_units);
+            adam->bias_m[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
+            adam->bias_m_corr[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
+            adam->bias_s[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
+            adam->bias_s_corr[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
+            adam->intermediate_b[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
 
             matrix_fill(adam->bias_m[i], 0.0);
             matrix_fill(adam->bias_m_corr[i], 0.0);
@@ -214,8 +296,11 @@ void neural_net_compile(NeuralNet* net) {
         break;
     }
 
-    net->train_batch = batch_new(net->batch_size, net->layers[0]->n_units);
-    net->label_batch = batch_new(net->batch_size, net->layers[net->n_layers-1]->n_units);
+    net->train_batch = batch_new(net->batch_size, layer_get_n_units(net->layers[0]));
+    net->label_batch = batch_new(
+        net->batch_size, 
+        layer_get_n_units(net->layers[net->n_layers-1])
+    );
 
     net->compiled = true;
 }
@@ -240,7 +325,7 @@ void neural_net_info(NeuralNet* net) {
         printf("------------------------------------\n");
         for (int i=0; i<net->n_layers; i++) {
             Layer* layer = net->layers[i];
-            int n_units = layer->n_units;
+            int n_units = layer_get_n_units(layer);
             int batch_size = net->batch_size;
             long long params = 0;
             char* l_name = NULL;
@@ -253,14 +338,17 @@ void neural_net_info(NeuralNet* net) {
                 break;
             case OUTPUT:
                 l_name = "Output";
-                params = n_units * layer->prev_layer->n_units + n_units;
+                params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
                 trainable_params += params;
                 break;
             case DEEP:
                 l_name = "Deep";
-                params = n_units * layer->prev_layer->n_units + n_units;
+                params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
                 trainable_params += params;
                 break;
+            case CONV_2D:
+                l_name = "Conv2D";
+                params = layer->params.conv.n_units + layer->params.conv.n_filters;
             default:
                 l_name = "Undefined";
                 break;
@@ -311,8 +399,8 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
             batchify_into(x_train_split, start_idx, net->train_batch);
             batchify_into(y_train_split, start_idx, net->label_batch);
             forward_prop(net, true);
-            avg_loss[i] = get_avg_batch_loss(net->cost, net->layers[net->n_layers-1]->output, net->label_batch->data);
-            Matrix* y_pred = net->layers[net->n_layers-1]->output;
+            avg_loss[i] = get_avg_batch_loss(net->cost, net->layers[net->n_layers-1]->cache.dense.output, net->label_batch->data);
+            Matrix* y_pred = net->layers[net->n_layers-1]->cache.dense.output;
             Matrix* y_true = net->label_batch->data;
             score_batch(net->batch_score, y_pred, y_true);
             train_acc[i] = net->batch_score->accuracy;
@@ -338,7 +426,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
             batchify_into(x_val_split, start_idx, net->train_batch);
             batchify_into(y_val_split, start_idx, net->label_batch);
             forward_prop(net, false);
-            Matrix* y_pred = net->layers[net->n_layers-1]->output;
+            Matrix* y_pred = net->layers[net->n_layers-1]->cache.dense.output;
             Matrix* y_true = net->label_batch->data;
             score_batch(net->batch_score, y_pred, y_true);
             val_acc[i] = net->batch_score->accuracy;
@@ -374,7 +462,7 @@ void score(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
         batchify_into(x_test, start_idx, net->train_batch);
         batchify_into(y_test, start_idx, net->label_batch);
         forward_prop(net, false);
-        Matrix* y_pred = net->layers[net->n_layers-1]->output;
+        Matrix* y_pred = net->layers[net->n_layers-1]->cache.dense.output;
         Matrix* y_true = net->label_batch->data;
         score_batch(net->batch_score, y_pred, y_true);
         acc[i] = net->batch_score->accuracy;
@@ -401,7 +489,7 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
         batchify_into(x_test, start_idx, net->train_batch);
         batchify_into(y_test, start_idx, net->label_batch);
         forward_prop(net, false);
-        Matrix* y_pred = net->layers[net->n_layers-1]->output;
+        Matrix* y_pred = net->layers[net->n_layers-1]->cache.dense.output;
         Matrix* y_true = net->label_batch->data;
         update_confusion_matrix(net->batch_score, y_pred, y_true, conf_m);
     }
@@ -418,21 +506,21 @@ void forward_prop(NeuralNet* net, bool training) {
         switch (layer->l_type)
         {
         case INPUT:
-            layer->output = input;
+            layer->cache.dense.output = input;
             break;
 
         case DEEP:
         case OUTPUT:
             if (net->optimizer->type == NESTEROV && training) {
                 MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                matrix_add_into(layer->weight, mom->weight_momentum[i], layer->weight);
-                matrix_add_into(layer->bias, mom->bias_momentum[i], layer->bias);
+                matrix_add_into(layer->cache.dense.weight, mom->weight_momentum[i], layer->cache.dense.weight);
+                matrix_add_into(layer->cache.dense.bias, mom->bias_momentum[i], layer->cache.dense.bias);
             }
-            matrix_dot_into(input, layer->weight, layer->z);
-            matrix_add_into(layer->z, layer->bias, layer->z);
+            matrix_dot_into(input, layer->cache.dense.weight, layer->cache.dense.z);
+            matrix_add_into(layer->cache.dense.z, layer->cache.dense.bias, layer->cache.dense.z);
             layer->activation->y_true_batch = net->label_batch;
-            apply_activation_func_into(layer->activation, layer->z, layer->output);
-            input = layer->output;
+            apply_activation_func_into(layer->activation, layer->cache.dense.z, layer->cache.dense.output);
+            input = layer->cache.dense.output;
             break;
         }
     }
@@ -448,35 +536,95 @@ void back_prop(NeuralNet* net) {
         {
         case OUTPUT: {
             // delta gradient (dCost_dZ) calculations:
-            apply_cost_dA_into(net->cost, layer->output, label_m, layer->dCost_dA);
-            apply_activation_dZ_into(layer->activation, layer->z, layer->dActivation_dZ);
-            matrix_multiply_into(layer->dCost_dA, layer->dActivation_dZ, layer->delta);
+            apply_cost_dA_into(
+                net->cost, 
+                layer->cache.dense.output, 
+                label_m, 
+                layer->cache.dense.dCost_dA
+            );
+            apply_activation_dZ_into(
+                layer->activation, 
+                layer->cache.dense.z, 
+                layer->cache.dense.dActivation_dZ
+            );
+            matrix_multiply_into(
+                layer->cache.dense.dCost_dA, 
+                layer->cache.dense.dActivation_dZ, 
+                layer->cache.dense.delta
+            );
 
             // weight gradient (dCost_dW) calculations:
-            matrix_transpose_into(layer->prev_layer->output, layer->dZ_dW_t);
-            matrix_dot_into(layer->dZ_dW_t, layer->delta, layer->weight_gradient);
+            matrix_transpose_into(
+                layer->prev_layer->cache.dense.output, 
+                layer->cache.dense.dZ_dW_t
+            );
+            matrix_dot_into(
+                layer->cache.dense.dZ_dW_t, 
+                layer->cache.dense.delta, 
+                layer->cache.dense.weight_gradient
+            );
 
             // bias gradient (dCost_dB) calculations:
-            matrix_sum_axis_into(layer->delta, 1, layer->dCost_dZ_col_sum);
-            matrix_multiplicate_into(layer->dCost_dZ_col_sum, 1, net->label_batch->batch_size, layer->bias_gradient);
+            matrix_sum_axis_into(
+                layer->cache.dense.delta, 
+                1, 
+                layer->cache.dense.dCost_dZ_col_sum
+            );
+            matrix_multiplicate_into(
+                layer->cache.dense.dCost_dZ_col_sum, 
+                1, 
+                net->label_batch->batch_size, 
+                layer->cache.dense.bias_gradient
+            );
 
             break;
         }
         
         case DEEP: {
             // delta gradient (dCost_dZ) calculations:
-            matrix_transpose_into(layer->next_layer->weight, layer->dZnext_dA_t); 
-            matrix_dot_into(layer->next_layer->delta, layer->dZnext_dA_t, layer->dCost_dA);
-            apply_activation_dZ_into(layer->activation, layer->z, layer->dActivation_dZ);
-            matrix_multiply_into(layer->dCost_dA, layer->dActivation_dZ, layer->delta);
+            matrix_transpose_into(
+                layer->next_layer->cache.dense.weight, 
+                layer->cache.dense.dZnext_dA_t
+            ); 
+            matrix_dot_into(
+                layer->next_layer->cache.dense.delta, 
+                layer->cache.dense.dZnext_dA_t, 
+                layer->cache.dense.dCost_dA
+            );
+            apply_activation_dZ_into(
+                layer->activation, 
+                layer->cache.dense.z, 
+                layer->cache.dense.dActivation_dZ
+            );
+            matrix_multiply_into(
+                layer->cache.dense.dCost_dA, 
+                layer->cache.dense.dActivation_dZ, 
+                layer->cache.dense.delta
+            );
 
             // weight gradient (dCost_dW) calculations:
-            matrix_transpose_into(layer->prev_layer->output, layer->dZ_dW_t);
-            matrix_dot_into(layer->dZ_dW_t, layer->delta, layer->weight_gradient);
+            matrix_transpose_into(
+                layer->prev_layer->cache.dense.output, 
+                layer->cache.dense.dZ_dW_t
+            );
+            matrix_dot_into(
+                layer->cache.dense.dZ_dW_t, 
+                layer->cache.dense.delta, 
+                layer->cache.dense.weight_gradient
+            );
 
             // bias gradient (dCost_dB) calculations:
-            matrix_sum_axis_into(layer->delta, 1, layer->dCost_dZ_col_sum);
-            matrix_multiplicate_into(layer->dCost_dZ_col_sum, 1, net->label_batch->batch_size, layer->bias_gradient);
+            matrix_sum_axis_into(
+                layer->cache.dense.delta, 
+                1, 
+                layer->cache.dense.dCost_dZ_col_sum
+            );
+            matrix_multiplicate_into(
+                layer->cache.dense.dCost_dZ_col_sum, 
+                1, 
+                net->label_batch->batch_size, 
+                layer->cache.dense.bias_gradient
+            );
 
             break;
         }
@@ -488,12 +636,30 @@ void back_prop(NeuralNet* net) {
 
                 if (net->optimizer->type == NESTEROV) {
                     MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                    matrix_subtract_into(layer->weight, mom->weight_momentum[j], layer->weight);
-                    matrix_subtract_into(layer->bias, mom->bias_momentum[j], layer->bias);
+                    matrix_subtract_into(
+                        layer->cache.dense.weight, 
+                        mom->weight_momentum[j], 
+                        layer->cache.dense.weight
+                    );
+                    matrix_subtract_into(
+                        layer->cache.dense.bias, 
+                        mom->bias_momentum[j], 
+                        layer->cache.dense.bias
+                    );
                 }
 
-                net->optimizer->update_weights(layer->weight, layer->weight_gradient, net->optimizer, j);
-                net->optimizer->update_bias(layer->bias, layer->bias_gradient, net->optimizer, j);
+                net->optimizer->update_weights(
+                    layer->cache.dense.weight, 
+                    layer->cache.dense.weight_gradient, 
+                    net->optimizer, 
+                    j
+                );
+                net->optimizer->update_bias(
+                    layer->cache.dense.bias, 
+                    layer->cache.dense.bias_gradient, 
+                    net->optimizer, 
+                    j
+                );
             }
 
             if (net->optimizer->type == ADAM) {
@@ -507,23 +673,10 @@ void back_prop(NeuralNet* net) {
     }
 }
 
-Layer* layer_new(LayerType l_type, int n_units, NeuralNet* net) {
+Layer* layer_new(LayerType l_type, NeuralNet* net) {
     Layer* layer = (Layer*)malloc(sizeof(Layer));
     layer->l_type = l_type;
-    layer->n_units = n_units;
     layer->activation = NULL;
-    layer->output = NULL;
-    layer->z = NULL;
-    layer->weight = NULL;
-    layer->bias = NULL;
-    layer->delta = NULL;
-    layer->weight_gradient = NULL;
-    layer->bias_gradient = NULL;
-    layer->dCost_dA = NULL;
-    layer->dActivation_dZ = NULL;
-    layer->dZ_dW_t = NULL;
-    layer->dZnext_dA_t = NULL;
-    layer->dCost_dZ_col_sum = NULL;
     layer->prev_layer = NULL;
     layer->next_layer = NULL;
     layer->net_backref = net;
@@ -532,78 +685,137 @@ Layer* layer_new(LayerType l_type, int n_units, NeuralNet* net) {
 }
 
 void layer_free(Layer* layer) { 
-    if (layer->l_type != INPUT && layer->net_backref->compiled) {
+    if (layer->net_backref->compiled) {
+        if (layer->l_type == INPUT) {
+            free(layer);
+            return;
+        }
+
+        if (layer->l_type == CONV_2D) {
+            if (layer->cache.conv.output != NULL) {
+                tensor3D_free(layer->cache.conv.output);
+                layer->cache.conv.output = NULL;
+            }
+            if (layer->cache.conv.z != NULL) {
+                tensor3D_free(layer->cache.conv.z);
+                layer->cache.conv.z = NULL;
+            }
+            if (layer->cache.conv.filter != NULL) {
+                tensor4D_free(layer->cache.conv.filter);
+                layer->cache.conv.filter = NULL;
+            }
+            if (layer->cache.conv.bias != NULL) {
+                matrix_free(layer->cache.conv.bias);
+                layer->cache.conv.bias = NULL;
+            }
+            if (layer->cache.conv.delta != NULL) {
+                tensor3D_free(layer->cache.conv.delta);
+                layer->cache.conv.delta = NULL;
+            }
+        }
+
+        else {
+            if (layer->cache.dense.output != NULL) {
+                matrix_free(layer->cache.dense.output);
+                layer->cache.dense.output = NULL;
+            }
+            if (layer->cache.dense.z != NULL) {
+                matrix_free(layer->cache.dense.z);
+                layer->cache.dense.z = NULL;
+            }
+            if (layer->cache.dense.weight != NULL) {
+                matrix_free(layer->cache.dense.weight);
+                layer->cache.dense.weight = NULL;
+            }
+            if (layer->cache.dense.bias != NULL) {
+                matrix_free(layer->cache.dense.bias);
+                layer->cache.dense.bias = NULL;
+            }
+            if (layer->cache.dense.delta != NULL) {
+                matrix_free(layer->cache.dense.delta);
+                layer->cache.dense.delta = NULL;
+            }
+            if (layer->cache.dense.weight_gradient != NULL) {
+                matrix_free(layer->cache.dense.weight_gradient);
+                layer->cache.dense.weight_gradient = NULL;
+            }
+            if (layer->cache.dense.bias_gradient != NULL) {
+                matrix_free(layer->cache.dense.bias_gradient);
+                layer->cache.dense.bias_gradient = NULL;
+            }
+            if (layer->cache.dense.dCost_dA != NULL) {
+                matrix_free(layer->cache.dense.dCost_dA);
+                layer->cache.dense.dCost_dA = NULL;
+            }
+            if (layer->cache.dense.dActivation_dZ != NULL) {
+                matrix_free(layer->cache.dense.dActivation_dZ);
+                layer->cache.dense.dActivation_dZ = NULL;
+            }
+            if (layer->cache.dense.dZ_dW_t != NULL) {
+                matrix_free(layer->cache.dense.dZ_dW_t);
+                layer->cache.dense.dZ_dW_t = NULL;
+            }
+            if (layer->cache.dense.dZnext_dA_t != NULL) {
+                matrix_free(layer->cache.dense.dZnext_dA_t);
+                layer->cache.dense.dZnext_dA_t = NULL;
+            }
+            if (layer->cache.dense.dCost_dZ_col_sum != NULL) {
+                matrix_free(layer->cache.dense.dCost_dZ_col_sum);
+                layer->cache.dense.dCost_dZ_col_sum = NULL;
+            }
+        }
         if (layer->activation != NULL) {
             free(layer->activation);
             layer->activation = NULL;
         }
-        if (layer->output != NULL) {
-            matrix_free(layer->output);
-            layer->output = NULL;
-        }
-        if (layer->z != NULL) {
-            matrix_free(layer->z);
-            layer->z = NULL;
-        }
-        if (layer->weight != NULL) {
-            matrix_free(layer->weight);
-            layer->weight = NULL;
-        }
-        if (layer->bias != NULL) {
-            matrix_free(layer->bias);
-            layer->bias = NULL;
-        }
-        if (layer->delta != NULL) {
-            matrix_free(layer->delta);
-            layer->delta = NULL;
-        }
-        if (layer->weight_gradient != NULL) {
-            matrix_free(layer->weight_gradient);
-            layer->weight_gradient = NULL;
-        }
-        if (layer->bias_gradient != NULL) {
-            matrix_free(layer->bias_gradient);
-            layer->bias_gradient = NULL;
-        }
-        if (layer->dCost_dA != NULL) {
-            matrix_free(layer->dCost_dA);
-            layer->dCost_dA = NULL;
-        }
-        if (layer->dActivation_dZ != NULL) {
-            matrix_free(layer->dActivation_dZ);
-            layer->dActivation_dZ = NULL;
-        }
-        if (layer->dZ_dW_t != NULL) {
-            matrix_free(layer->dZ_dW_t);
-            layer->dZ_dW_t = NULL;
-        }
-        if (layer->dZnext_dA_t != NULL) {
-            matrix_free(layer->dZnext_dA_t);
-            layer->dZnext_dA_t = NULL;
-        }
-        if (layer->dCost_dZ_col_sum != NULL) {
-            matrix_free(layer->dCost_dZ_col_sum);
-            layer->dCost_dZ_col_sum = NULL;
-        }
     }
-    
     free(layer);
 }
 
+int layer_get_n_units(Layer* layer) {
+    switch (layer->l_type)
+    {
+    case INPUT:
+    case DEEP:
+    case OUTPUT:
+        return layer->params.dense.n_units;
+        break;
+    
+    case CONV_2D:
+        return layer->params.conv.n_units;
+        break;
+    }
+
+    exit(1);
+}
+
 void add_input_layer(int n_units, NeuralNet* net) {
-    Layer* input_l = layer_new(INPUT, n_units, net);
+    Layer* input_l = layer_new(INPUT, net);
+    input_l->params.dense.n_units = n_units;
     net->layers[net->n_layers] = input_l;
     net->n_layers++;
 }
 
 void add_output_layer(int n_units, NeuralNet* net) {
-    Layer* output_l = layer_new(OUTPUT, n_units, net);
+    Layer* output_l = layer_new(OUTPUT, net);
+    output_l->params.dense.n_units = n_units;
     net->layers[net->n_layers] = output_l;
     net->n_layers++;
 }
 
 void add_deep_layer(int n_units, NeuralNet* net) {
-    Layer* deep_l = layer_new(DEEP, n_units, net);
+    Layer* deep_l = layer_new(DEEP, net);
+    deep_l->params.dense.n_units = n_units;
     net->layers[net->n_layers] = deep_l;
+    net->n_layers++;
+}
+
+void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net) {
+    Layer* conv_l = layer_new(CONV_2D, net);
+    conv_l->params.conv.n_filters = n_filters;
+    conv_l->params.conv.filter_size = filter_size;
+    conv_l->params.conv.stride = stride;
+    conv_l->params.conv.n_units = n_filters * filter_size * filter_size; // temp
+    net->layers[net->n_layers] = conv_l;
     net->n_layers++;
 }

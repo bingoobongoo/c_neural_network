@@ -1,6 +1,7 @@
 #pragma once
 
 #include "matrix.h"
+#include "tensor.h"
 #include "activation.h"
 #include "cost.h"
 #include "batch.h"
@@ -17,13 +18,16 @@ typedef enum {
     INPUT,
     OUTPUT,
     DEEP,
+    CONV_2D,
     UNDEFINED
 } LayerType;
 
-struct Layer {
-    LayerType l_type;
+
+typedef struct {
     int n_units;
-    Activation* activation;
+} DenseParams;
+
+typedef struct {
     Matrix* output;
     Matrix* z;
     Matrix* weight;
@@ -31,14 +35,45 @@ struct Layer {
     Matrix* delta;
     Matrix* weight_gradient;
     Matrix* bias_gradient;
-
+    
     // auxiliary gradients
     Matrix* dCost_dA; 
     Matrix* dActivation_dZ;
     Matrix* dZ_dW_t;
     Matrix* dZnext_dA_t;
     Matrix* dCost_dZ_col_sum;
+} DenseCache;
 
+typedef struct {
+    int n_filters;
+    int filter_size;
+    int stride;
+    int n_units;
+} ConvParams;
+
+typedef struct {
+    Tensor3D* output;
+    Tensor3D* z;
+    Tensor4D* filter;
+    Matrix* bias;
+    Tensor3D* delta;
+} ConvCache;
+
+typedef union {
+    DenseParams dense;
+    ConvParams conv;
+} LayerParams;
+
+typedef union {
+    DenseCache dense;
+    ConvCache conv;
+} LayerCache;
+
+struct Layer {
+    LayerType l_type;
+    LayerParams params;
+    LayerCache cache;
+    Activation* activation;
     Layer* prev_layer;
     Layer* next_layer;
     NeuralNet* net_backref;
@@ -69,8 +104,10 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void forward_prop(NeuralNet* net, bool training);
 void back_prop(NeuralNet* net);
 
-Layer* layer_new(LayerType l_type, int n_units, NeuralNet* net);
+Layer* layer_new(LayerType l_type, NeuralNet* net);
 void layer_free(Layer* layer);
+int layer_get_n_units(Layer* layer);
 void add_input_layer(int n_units, NeuralNet* net);
 void add_output_layer(int n_units, NeuralNet* net);
 void add_deep_layer(int n_units, NeuralNet* net);
+void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);
