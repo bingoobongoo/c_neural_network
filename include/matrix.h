@@ -22,6 +22,7 @@ void matrix_free_view(Matrix* view);
 void matrix_save(Matrix* m, char* file_path);
 Matrix* matrix_load(char* file_path);
 Matrix* matrix_copy(Matrix* m);
+void matrix_copy_into(Matrix* m, Matrix* into);
 void matrix_assign(Matrix** to, Matrix* from);
 void matrix_print(Matrix* m);
 void matrix_print_dimensions(Matrix* m);

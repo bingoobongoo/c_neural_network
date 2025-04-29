@@ -87,6 +87,14 @@ Matrix* matrix_copy(Matrix* m) {
     return copy;
 }
 
+void matrix_copy_into(Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            into->entries[i][j] = m->entries[i][j];
+        }
+    }
+}
+
 void matrix_assign(Matrix** to, Matrix* from) {
     Matrix* old = *to;
     *to = from;

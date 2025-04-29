@@ -131,7 +131,7 @@ Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m) {
     }
     else if (activation->type == SOFTMAX) {
         Matrix* dZ = apply_activation_func(activation, z_m);
-        matrix_subtract_into(dZ, activation->y_true_batch->data, dZ);
+        matrix_subtract_into(dZ, activation->y_true_batch->data.matrix, dZ);
 
         return dZ;
     }
@@ -149,7 +149,7 @@ void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into)
     }
     else if (activation->type == SOFTMAX) {
         apply_activation_func_into(activation, z_m, into);
-        matrix_subtract_into(into, activation->y_true_batch->data, into);
+        matrix_subtract_into(into, activation->y_true_batch->data.matrix, into);
     }
 }
 

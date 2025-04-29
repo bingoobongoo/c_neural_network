@@ -52,11 +52,18 @@ typedef struct {
 } ConvParams;
 
 typedef struct {
-    Tensor3D* output;
-    Tensor3D* z;
+    Tensor4D* output;
+    Tensor4D* z;
     Tensor4D* filter;
-    Matrix* bias;
-    Tensor3D* delta;
+    Tensor4D* bias;
+    Tensor4D* delta;
+    Tensor4D* filter_gradient;
+    Tensor4D* bias_gradient;
+
+    // auxiliary
+    Tensor4D* rotated_filter;
+    Tensor4D* dCost_dA;
+    Tensor4D* dActivation_dZ;
 } ConvCache;
 
 typedef union {
@@ -90,6 +97,7 @@ struct NeuralNet {
     int batch_size;
     Layer** layers;
     bool compiled;
+    bool is_cnn;
 };
 
 NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, double act_param, CostType cost_type, int batch_size);
@@ -108,6 +116,7 @@ Layer* layer_new(LayerType l_type, NeuralNet* net);
 void layer_free(Layer* layer);
 int layer_get_n_units(Layer* layer);
 void add_input_layer(int n_units, NeuralNet* net);
+void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net);
 void add_output_layer(int n_units, NeuralNet* net);
 void add_deep_layer(int n_units, NeuralNet* net);
 void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);

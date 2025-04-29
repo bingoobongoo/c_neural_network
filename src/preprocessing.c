@@ -41,7 +41,7 @@ void renormalize(Matrix* m, int original_min, int original_max) {
     }
 }
 
-void shuffle_data_inplace(Matrix* feature_m, Matrix* label_m) {
+void shuffle_matrix_inplace(Matrix* feature_m, Matrix* label_m) {
     if (feature_m->n_rows != label_m->n_rows) {
         fprintf(stderr, "shuffle_data_inplace: Mismatched row counts\n");
         exit(1);
@@ -53,6 +53,25 @@ void shuffle_data_inplace(Matrix* feature_m, Matrix* label_m) {
         double* tmp_f = feature_m->entries[i];
         feature_m->entries[i] = feature_m->entries[j];
         feature_m->entries[j] = tmp_f;
+
+        double* tmp_l = label_m->entries[i];
+        label_m->entries[i] = label_m->entries[j];
+        label_m->entries[j] = tmp_l;
+    }
+}
+
+void shuffle_tensor4D_inplace(Tensor4D* feature_t, Matrix* label_m) {
+    if (feature_t->n_filters != label_m->n_rows) {
+        fprintf(stderr, "shuffle_data_inplace: Mismatched row counts\n");
+        exit(1);
+    }
+
+    for (int i = feature_t->n_filters - 1; i>0; i--) {
+        int j= rand() % (i+1);
+
+        Tensor3D* tmp_f = feature_t->filters[i];
+        feature_t->filters[i] = feature_t->filters[j];
+        feature_t->filters[j] = tmp_f;
 
         double* tmp_l = label_m->entries[i];
         label_m->entries[i] = label_m->entries[j];
