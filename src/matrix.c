@@ -673,3 +673,127 @@ void matrix_transpose_into(Matrix* m, Matrix* into) {
         }
     }
 }
+
+void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type) {
+    switch (type)
+    {
+    case VALID: {
+        int out_h = input->n_rows - kernel->n_rows + 1;
+        int out_w = input->n_cols - kernel->n_cols + 1;
+
+        for (int i=0; i<out_h; i++) {
+            for (int j=0; j<out_w; j++) {
+                double sum = 0.0;
+                for (int k=0; k<kernel->n_rows; k++) {
+                    for (int l=0; l<kernel->n_cols; l++) {
+                        sum += input->entries[i+k][j+l] *
+                               kernel->entries[k][l];
+                    }
+                }
+                into->entries[i][j] = sum;
+            }
+        }
+        break;
+    }
+    
+    case FULL: {
+        int out_h = input->n_rows + kernel->n_rows - 1;
+        int out_w = input->n_cols + kernel->n_cols - 1;
+        int input_h_idx, input_w_idx;
+        int k, k_stick_out, l, l_stick_out;
+        double sum;
+
+        for (int i=0; i<out_h; i++) {
+            for (int j=0; j<out_w; j++) {
+                sum = 0.0;
+                k = kernel->n_rows - i - 1;
+                if (k<0) k=0;
+                k_stick_out = i - kernel->n_cols;
+                if (k_stick_out<0) k_stick_out=0;
+                for (k; k<kernel->n_rows - k_stick_out; k++) {
+                    l = kernel->n_cols - j - 1;
+                    if (l<0) l=0;
+                    l_stick_out = j - kernel->n_cols;
+                    if (l_stick_out<0) l_stick_out=0;
+                    for (l; l<kernel->n_cols - l_stick_out; l++) {
+                        input_h_idx = i + k - kernel->n_rows + 1;
+                        input_w_idx = j + l - kernel->n_cols + 1;
+                        sum += input->entries[input_h_idx][input_w_idx] *
+                               kernel->entries[k][l]; 
+                    }
+                }
+                into->entries[i][j] = sum;
+            }
+        }
+        break;
+    }
+    
+    default:
+        printf("Correlation type doesn't exist.");
+        exit(1);
+        break;
+    }
+}
+
+void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type) {
+    switch (type)
+    {
+    case VALID: {
+        int out_h = input->n_rows - kernel->n_rows + 1;
+        int out_w = input->n_cols - kernel->n_cols + 1;
+
+        for (int i=0; i<out_h; i++) {
+            for (int j=0; j<out_w; j++) {
+                double sum = 0.0;
+                for (int k=0; k<kernel->n_rows; k++) {
+                    for (int l=0; l<kernel->n_cols; l++) {
+                        sum += input->entries[i+k][j+l] *
+                               kernel->entries[kernel->n_rows-k-1][kernel->n_cols-l-1];
+                    }
+                }
+                into->entries[i][j] = sum;
+            }
+        }
+        break;
+    }
+    
+    case FULL: {
+        int out_h = input->n_rows + kernel->n_rows - 1;
+        int out_w = input->n_cols + kernel->n_cols - 1;
+        int input_h_idx, input_w_idx;
+        int k, k_stick_out, l, l_stick_out;
+        double sum;
+
+        for (int i=0; i<out_h; i++) {
+            for (int j=0; j<out_w; j++) {
+                sum = 0.0;
+                k = kernel->n_rows - i - 1;
+                if (k<0) k=0;
+                k_stick_out = i - kernel->n_cols;
+                if (k_stick_out<0) k_stick_out=0;
+                for (k; k<kernel->n_rows - k_stick_out; k++) {
+                    l = kernel->n_cols - j - 1;
+                    if (l<0) l=0;
+                    l_stick_out = j - kernel->n_cols;
+                    if (l_stick_out<0) l_stick_out=0;
+                    for (l; l<kernel->n_cols - l_stick_out; l++) {
+                        input_h_idx = i + k - kernel->n_rows + 1;
+                        input_w_idx = j + l - kernel->n_cols + 1;
+                        sum += input->entries[input_h_idx][input_w_idx] *
+                               kernel->entries
+                               [kernel->n_rows-k-1]
+                               [kernel->n_cols-l-1]; 
+                    }
+                }
+                into->entries[i][j] = sum;
+            }
+        }
+        break;
+    }
+    
+    default:
+        printf("Correlation type doesn't exist.");
+        exit(1);
+        break;
+    }
+}

@@ -10,7 +10,7 @@ NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, double act_pa
     net->train_batch = NULL;
     net->label_batch = NULL;
     net->batch_size = batch_size;
-    net->layers = (Layer**)malloc(100 * sizeof(Layer*));
+    net->layers = (Layer**)malloc(20 * sizeof(Layer*));
     net->compiled = false;
     net->is_cnn = false;
 
@@ -56,12 +56,15 @@ void neural_net_compile(NeuralNet* net) {
             net->cost->loss_m = matrix_new(net->batch_size, layer_get_n_units(layer));
             break;
         
+        case FLATTEN:
+            break;
+        
         default:
             layer->activation = activation_new(net->activation->type, net->activation->activation_param);
             break;
         }
 
-        // init weight and bias
+        // init cache
         switch (layer->l_type)
         {
         case DEEP:
@@ -74,30 +77,6 @@ void neural_net_compile(NeuralNet* net) {
                 net->batch_size,
                 layer_get_n_units(layer)
             );
-            break;
-        }
-
-        case CONV_2D:
-            layer->cache.conv.filter = tensor4D_new(
-                layer->params.conv.filter_size,
-                layer->params.conv.filter_size,
-                layer->prev_layer->cache.conv.output->n_channels,
-                layer->params.conv.n_filters
-            );
-            layer->cache.conv.bias = tensor4D_new(
-                layer->params.conv.filter_size,
-                layer->params.conv.filter_size,
-                1,
-                layer->params.conv.n_filters
-            );
-            break;
-        }
-
-        // init cache
-        switch (layer->l_type)
-        {
-        case DEEP:
-        case OUTPUT: {
             layer->cache.dense.output = matrix_new(
                 net->batch_size, 
                 layer_get_n_units(layer)
@@ -136,6 +115,9 @@ void neural_net_compile(NeuralNet* net) {
                     layer_get_n_units(layer)
                 );
             }
+            else {
+                layer->cache.dense.dZnext_dA_t = NULL;
+            }
             layer->cache.dense.dCost_dZ_col_sum = matrix_new(
                 1,
                 layer_get_n_units(layer)
@@ -173,12 +155,24 @@ void neural_net_compile(NeuralNet* net) {
         }
 
         case CONV_2D: {
-            int input_height = layer->prev_layer->cache.conv.output->n_rows;
-            int input_width = layer->prev_layer->cache.conv.output->n_cols;
+            int input_height = layer_get_output_tensor4D(layer->prev_layer)->n_rows;
+            int input_width = layer_get_output_tensor4D(layer->prev_layer)->n_cols;
             int filter_height = layer->params.conv.filter_size;
             int filter_width = layer->params.conv.filter_size;
             int stride = layer->params.conv.stride;
 
+            layer->cache.conv.filter = tensor4D_new(
+                layer->params.conv.filter_size,
+                layer->params.conv.filter_size,
+                layer_get_output_tensor4D(layer->prev_layer)->n_channels,
+                layer->params.conv.n_filters
+            );
+            layer->cache.conv.bias = tensor4D_new(
+                floor((input_height - filter_height) / stride) + 1,
+                floor((input_width - filter_width) / stride) + 1,
+                1,
+                layer->params.conv.n_filters
+            );
             layer->cache.conv.output = tensor4D_new(
                 floor((input_height - filter_height) / stride) + 1,
                 floor((input_width - filter_width) / stride) + 1,
@@ -200,19 +194,19 @@ void neural_net_compile(NeuralNet* net) {
             layer->cache.conv.filter_gradient = tensor4D_new(
                 layer->params.conv.filter_size,
                 layer->params.conv.filter_size,
-                layer->prev_layer->cache.conv.output->n_channels,
+                layer_get_output_tensor4D(layer->prev_layer)->n_channels,
                 layer->params.conv.n_filters
             );
             layer->cache.conv.bias_gradient = tensor4D_new(
-                layer->params.conv.filter_size,
-                layer->params.conv.filter_size,
+                floor((input_height - filter_height) / stride) + 1,
+                floor((input_width - filter_width) / stride) + 1,
                 1,
                 layer->params.conv.n_filters
             );
             layer->cache.conv.rotated_filter = tensor4D_new(
                 layer->params.conv.filter_size,
                 layer->params.conv.filter_size,
-                layer->prev_layer->cache.conv.output->n_channels,
+                layer_get_output_tensor4D(layer->prev_layer)->n_channels,
                 layer->params.conv.n_filters
             );
             layer->cache.conv.dCost_dA = tensor4D_new(
@@ -231,16 +225,15 @@ void neural_net_compile(NeuralNet* net) {
             layer->params.conv.n_units = 
                 layer->cache.conv.output->n_rows *
                 layer->cache.conv.output->n_cols *
-                layer->params.conv.n_filters;
+                layer->cache.conv.output->n_channels;
 
             Tensor4D* filter = layer->cache.conv.filter;
             Tensor4D* bias = layer->cache.conv.bias;
 
             for (int i=0; i<bias->n_filters; i++) {
                 Tensor3D* t3d = bias->filters[i];
-                for (int j=0; j<t3d->n_channels; j++) {
-                    matrix_fill(t3d->channels[j], 0.0);
-                }
+                matrix_fill(t3d->channels[0], 0.0);
+
             }
 
             switch (net->activation->type)
@@ -267,7 +260,7 @@ void neural_net_compile(NeuralNet* net) {
                         matrix_fill_normal_distribution(
                             t3d->channels[j],
                             0.0,
-                            2.0/layer_get_n_units(layer->prev_layer)
+                            2.0/(filter->n_channels*filter->n_cols*filter->n_rows)
                         );
                     }
                 }
@@ -277,9 +270,28 @@ void neural_net_compile(NeuralNet* net) {
                 printf("Unknown activation type.");
                 break;
             }
+            break;
         }
-        break;
 
+        case FLATTEN: {
+            int prev_chan = layer_get_output_tensor4D(layer->prev_layer)->n_channels;
+            int prev_rows = layer_get_output_tensor4D(layer->prev_layer)->n_rows;
+            int prev_cols = layer_get_output_tensor4D(layer->prev_layer)->n_cols;
+            layer->params.flat.n_units = prev_chan * prev_rows * prev_cols;
+            layer->cache.flat.output = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
+            layer->cache.flat.dCost_dA_matrix = matrix_new(
+                net->batch_size,
+                layer_get_n_units(layer)
+            );
+            layer->cache.flat.dZnext_dA_t = matrix_new(
+                layer_get_n_units(layer->next_layer),
+                layer_get_n_units(layer)
+            );
+            break;
+        } 
         }
     }
 
@@ -457,31 +469,66 @@ void neural_net_info(NeuralNet* net) {
             char* l_name = NULL;
             switch (layer->l_type)
             {
-            case INPUT:
-                l_name = "Input";
+            case INPUT: {
+                l_name = "InputDense";
                 params = n_units;
                 non_trainable_params += params;
+                printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
+                printf("------------------------------------\n");
                 break;
-            case OUTPUT:
+            }
+            case CONV_2D_INPUT: {
+                l_name = "InputConv2D";
+                int out_chan = layer->cache.conv.output->n_channels;
+                int out_rows = layer->cache.conv.output->n_rows;
+                int out_cols = layer->cache.conv.output->n_cols;
+                params = n_units;
+                non_trainable_params += params;
+                printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
+                printf("------------------------------------\n");
+                break;
+            }
+            case OUTPUT: {
                 l_name = "Output";
                 params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
                 trainable_params += params;
+                printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
+                printf("------------------------------------\n");
                 break;
-            case DEEP:
+            }
+            case DEEP: {
                 l_name = "Deep";
                 params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
                 trainable_params += params;
+                printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
+                printf("------------------------------------\n");
                 break;
-            case CONV_2D:
+            }
+            case CONV_2D: {
                 l_name = "Conv2D";
-                params = layer->params.conv.n_units + layer->params.conv.n_filters;
+                int out_chan = layer->cache.conv.output->n_channels;
+                int out_rows = layer->cache.conv.output->n_rows;
+                int out_cols = layer->cache.conv.output->n_cols;
+                int filter_size = layer->params.conv.filter_size;
+                int filter_chan = layer->cache.conv.filter->n_channels;
+                int n_filters = layer->params.conv.n_filters;
+                params = n_filters * (pow(filter_size, 2) * filter_chan + 1);
                 trainable_params += params;
+                printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
+                printf("------------------------------------\n");
+                break;
+            }
+            case FLATTEN: {
+                l_name = "Flatten";
+                params = 0;
+                printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
+                printf("------------------------------------\n");
+                break;
+            }
             default:
                 l_name = "Undefined";
                 break;
             }
-            printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
-            printf("------------------------------------\n");
         }
         printf("Trainable params: %lld\n", trainable_params);
         printf("Non-trainable params: %lld\n", non_trainable_params);
@@ -500,42 +547,33 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
     int training_size = (1.0 - validation) * x_train->n_rows;
     int val_size = validation * x_train->n_rows;
 
-    Tensor4D* x_train_tensor = NULL;
+    Matrix* x_train_split_mat = matrix_slice_rows(x_train, 0, training_size);
+    Matrix* x_val_split_mat = matrix_slice_rows(x_train, training_size, val_size);
     Tensor4D* x_train_split_tensor = NULL;
     Tensor4D* x_val_split_tensor = NULL;
-    Matrix* x_train_split_mat = NULL;
-    Matrix* x_val_split_mat = NULL;
 
     int train_batches;
     int val_batches;
 
-    // change allocation - useless x_train_tensor
-    // better to directly create splits from tensor4D new and matrix slice
     if (net->is_cnn) {
-        x_train_tensor = matrix_to_tensor4D(
-            x_train,
+        x_train_split_tensor = matrix_to_tensor4D(
+            x_train_split_mat,
             net->train_batch->data.tensor->n_rows,
             net->train_batch->data.tensor->n_cols,
-            net->train_batch->data.tensor->n_channels 
+            net->train_batch->data.tensor->n_channels
         );
-        tensor4D_slice_into(
-            x_train_tensor,
-            0,
-            training_size,
-            x_train_split_tensor
+
+        x_val_split_tensor = matrix_to_tensor4D(
+            x_val_split_mat,
+            net->train_batch->data.tensor->n_rows,
+            net->train_batch->data.tensor->n_cols,
+            net->train_batch->data.tensor->n_channels
         );
-        tensor4D_slice_into(
-            x_train_tensor,
-            training_size,
-            val_size,
-            x_val_split_tensor
-        );
+        
         train_batches = ceil(x_train_split_tensor->n_filters / (double)net->batch_size);
         val_batches = ceil(x_val_split_tensor->n_filters / (double)net->batch_size);
     }
     else {
-        x_train_split_mat = matrix_slice_rows(x_train, 0, training_size);
-        x_val_split_mat = matrix_slice_rows(x_train, training_size, val_size);
         train_batches = ceil(x_train_split_mat->n_rows / (double)net->batch_size);
         val_batches = ceil(x_val_split_mat->n_rows / (double)net->batch_size); 
     }
@@ -577,6 +615,9 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
         }
         gettimeofday(&end, NULL);
         epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+
+        matrix_print(net->layers[net->n_layers-1]->cache.dense.output);
+        printf("\n");
 
         sum=0.0;
         for (int j=0; j<i; j++) {
@@ -628,7 +669,6 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
     }
 
     if (net->is_cnn) {
-        tensor4D_free(x_train_tensor);
         tensor4D_free(x_train_split_tensor);
         tensor4D_free(x_val_split_tensor);
     }
@@ -739,12 +779,11 @@ void forward_prop(NeuralNet* net, bool training) {
         switch (layer->l_type)
         {
         case INPUT:
-            if (net->is_cnn) {
-                layer->cache.conv.output = input->data.tensor;
-            }
-            else {
-                layer->cache.dense.output = input->data.matrix;
-            }
+            layer->cache.dense.output = input->data.matrix;
+            break;
+        
+        case CONV_2D_INPUT:
+            layer->cache.conv.output = input->data.tensor;
             break;
 
         case DEEP:
@@ -754,30 +793,60 @@ void forward_prop(NeuralNet* net, bool training) {
                 matrix_add_into(layer->cache.dense.weight, mom->weight_momentum[i], layer->cache.dense.weight);
                 matrix_add_into(layer->cache.dense.bias, mom->bias_momentum[i], layer->cache.dense.bias);
             }
-            matrix_dot_into(layer->prev_layer->cache.dense.output, layer->cache.dense.weight, layer->cache.dense.z);
+
+            matrix_dot_into(layer_get_output_matrix(layer->prev_layer), layer->cache.dense.weight, layer->cache.dense.z);
             matrix_add_into(layer->cache.dense.z, layer->cache.dense.bias, layer->cache.dense.z);
             layer->activation->y_true_batch = net->label_batch;
             apply_activation_func_into(layer->activation, layer->cache.dense.z, layer->cache.dense.output);
             break;
 
         case CONV_2D:
-            conv2d_forward(
-                layer->prev_layer->cache.conv.output,
-                layer->cache.conv.filter,
-                layer->cache.conv.bias,
-                layer->params.conv.stride,
-                layer->cache.conv.z
+            Tensor4D* z = layer->cache.conv.z;
+            Tensor4D* output = layer->cache.conv.output;
+            Tensor4D* filter = layer->cache.conv.filter;
+            Tensor4D* input = layer_get_output_tensor4D(layer->prev_layer);
+            Tensor3D* corr_t3d = tensor3D_new(
+                z->n_rows,
+                z->n_cols,
+                filter->n_channels
             );
-
-            for (int i=0; i<net->batch_size; i++) {
-                for (int j=0; j<layer->params.conv.n_filters; j++) {
+            for (int n=0; n<net->batch_size; n++) {
+                Tensor3D* z_n = z->filters[n];
+                Tensor3D* output_n = output->filters[n];
+                Tensor3D* input_n = input->filters[n];
+                for (int i=0; i<filter->n_filters; i++) {
+                    Tensor3D* kernel = filter->filters[i];
+                    Matrix* bias = layer->cache.conv.bias->filters[i]->channels[0];
+                    tensor3D_correlate_into(
+                        input_n,
+                        kernel,
+                        corr_t3d,
+                        VALID
+                    );
+                    tensor3D_sum_element_wise_into(
+                        corr_t3d,
+                        z_n->channels[i]
+                    );
+                    matrix_add_into(
+                        z_n->channels[i],
+                        bias,
+                        z_n->channels[i]
+                    );
                     apply_activation_func_into(
                         layer->activation,
-                        layer->cache.conv.z->filters[i]->channels[j],
-                        layer->cache.conv.output->filters[i]->channels[j]
+                        z_n->channels[i],
+                        output_n->channels[i]
                     );
                 }
             }
+            tensor3D_free(corr_t3d);
+            break;
+            
+        case FLATTEN:
+            tensor4D_into_matrix(
+                layer_get_output_tensor4D(layer->prev_layer),
+                layer->cache.flat.output
+            );
             break;
         }
     }
@@ -811,7 +880,7 @@ void back_prop(NeuralNet* net) {
 
             // weight gradient (dCost_dW) calculations:
             matrix_transpose_into(
-                layer->prev_layer->cache.dense.output, 
+                layer_get_output_matrix(layer->prev_layer), 
                 layer->cache.dense.dZ_dW_t
             );
             matrix_dot_into(
@@ -860,7 +929,7 @@ void back_prop(NeuralNet* net) {
 
             // weight gradient (dCost_dW) calculations:
             matrix_transpose_into(
-                layer->prev_layer->cache.dense.output, 
+                layer_get_output_matrix(layer->prev_layer), 
                 layer->cache.dense.dZ_dW_t
             );
             matrix_dot_into(
@@ -886,149 +955,140 @@ void back_prop(NeuralNet* net) {
         }
 
         case CONV_2D: {
-            // delta gradient (dCost_dZ) calculation
-            // 1. dCost_dA
-            Tensor4D* delta = layer->cache.conv.delta;
+            Tensor4D* delta_next = layer->next_layer->cache.conv.delta;
+            Tensor4D* filter_next = layer->next_layer->cache.conv.filter;
             Tensor4D* filter = layer->cache.conv.filter;
-            Tensor4D* rot_filter = layer->cache.conv.rotated_filter;
-            tensor4D_rot180_into(filter, rot_filter);
-            Tensor4D* dCost_dA = layer->cache.conv.dCost_dA;
-            for (int n=0; n<delta->n_filters; n++) {
-                for (int c=0; c<delta->n_channels; c++) {
-                    for (int dh=0; dh<delta->n_rows; dh++) {
-                        for (int dw=0; dw<delta->n_cols; dw++) {
-                            
-                            double delta_val = delta
-                                ->filters[n]
-                                ->channels[c]
-                                ->entries[dh][dw];
-                            
-                            for (int fc=0; fc<filter->n_channels; fc++) {
-                                for (int fh=0; fh<filter->n_rows; fh++) {
-                                    for (int fw=0; fw<filter->n_cols; fw++) {
-
-                                        int out_h = dh + fh;
-                                        int out_w = dw + fw;
-                                        dCost_dA
-                                        ->filters[n]
-                                        ->channels[fc]
-                                        ->entries[out_h][out_w]
-                                        += delta_val * rot_filter
-                                        ->filters[c]
-                                        ->channels[fc]
-                                        ->entries[fh][fw];
-
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. dA_dZ
-            Tensor4D* z = layer->cache.conv.z;
-            Tensor4D* dA_dZ = layer->cache.conv.dActivation_dZ;
-            for (int n=0; n<z->n_filters; n++) {
-                for (int c=0; c<z->n_channels; c++) {
-                    Matrix* z_m = z->filters[n]->channels[c];
-                    Matrix* dA_dZ_m = dA_dZ->filters[n]->channels[c];
-                    apply_activation_dZ_into(layer->activation, z_m, dA_dZ_m);
-                }
-            }
-
-            // 3. dCost_dZ
-            for (int n=0; n<z->n_filters; n++) {
-                for(int c=0; c<z->n_channels; c++) {
-                    Matrix* dCost_dA_m = dCost_dA->filters[n]->channels[c];
-                    Matrix* dA_dZ_m = dA_dZ->filters[n]->channels[c];
-                    Matrix* delta_m = delta->filters[n]->channels[c];
-                    matrix_multiply_into(dCost_dA_m, dA_dZ_m, delta_m);
-                }
-            }
-
-            // weight gradient (dCost_dw) calculation
-            Tensor4D* input = layer->prev_layer->cache.conv.output;
             Tensor4D* filter_grad = layer->cache.conv.filter_gradient;
-            int stride = layer->params.conv.stride;
-            for (int delta_c=0; delta_c<delta->n_channels; delta_c++) {
-                for (int input_c=0; input_c<input->n_channels; input_c++) {
-                    for (int gh=0; gh<filter_grad->n_rows; gh++) {
-                        for (int gw=0; gw<filter_grad->n_cols; gw++) {
+            Tensor4D* bias_grad = layer->cache.conv.bias_gradient;
+            Tensor4D* delta = layer->cache.conv.delta;
+            Tensor4D* dA_dZ = layer->cache.conv.dActivation_dZ;
+            Tensor4D* dCost_dA = layer->cache.conv.dCost_dA;
+            Tensor4D* z = layer->cache.conv.z;
 
-                            double grad = 0.0;
+            // delta gradient (dCost_dZ) calculation
+            if (layer->next_layer->l_type == FLATTEN) {
+                for (int n=0; n<net->batch_size; n++) {
+                    for (int c=0; c<layer->cache.conv.dCost_dA->n_channels; c++) {
+                        apply_activation_dZ_into(
+                            layer->activation,
+                            z->filters[n]->channels[c],
+                            dA_dZ->filters[n]->channels[c]
+                        );
+                        matrix_multiply_into(
+                            dCost_dA->filters[n]->channels[c],
+                            dA_dZ->filters[n]->channels[c],
+                            delta->filters[n]->channels[c]
+                        );
+                    }
+                }
+            }
+            else {
+                Tensor3D* corr_t3d = tensor3D_new(
+                    delta->n_rows,
+                    delta->n_cols,
+                    filter_next->n_filters
+                );
+                for (int n=0; n<net->batch_size; n++) {
+                    for (int i=0; i<delta->n_channels; i++) {
+                        for (int f=0; f<filter_next->n_filters; f++) {
+                            matrix_convolve_into(
+                                delta_next->filters[n]->channels[f],
+                                filter_next->filters[f]->channels[i],
+                                corr_t3d->channels[f],
+                                FULL
+                            );
+                        }
+                        tensor3D_sum_element_wise_into(
+                            corr_t3d,
+                            dCost_dA->filters[n]->channels[i]
+                        );
+                        apply_activation_dZ_into(
+                            layer->activation,
+                            z->filters[n]->channels[i],
+                            dA_dZ->filters[n]->channels[i]
+                        );
+                        matrix_multiply_into(
+                            dCost_dA->filters[n]->channels[i],
+                            dA_dZ->filters[n]->channels[i],
+                            delta->filters[n]->channels[i]
+                        );
 
-                            for (int n=0; n<input->n_filters; n++) {
-                                for (int dh=0; dh<delta->n_rows; dh++) {
-                                    for (int dw=0; dw<delta->n_cols; dw++) {
+                    }
+                }
+                tensor3D_free(corr_t3d);
+            }
 
-                                        int ih = dh*stride + gh;
-                                        int iw = dw*stride + gw;
 
-                                        double delta_val = delta
-                                        ->filters[n]
-                                        ->channels[delta_c]
-                                        ->entries[dh][dw];
-
-                                        double input_val = input
-                                        ->filters[n]
-                                        ->channels[input_c]
-                                        ->entries[ih][iw];
-
-                                        grad += delta_val * input_val;
-                                    }
-                                }
-                            }
-
-                            filter_grad
-                            ->filters[delta_c]
-                            ->channels[input_c]
-                            ->entries[gh][gw] = grad;
+            // filter gradient (dCost_dW) calculation
+            {
+                Tensor3D* corr_t3d = tensor3D_new(
+                    filter->n_rows,
+                    filter->n_cols,
+                    net->batch_size
+                );
+                for (int i=0; i<filter->n_filters; i++) {
+                    for (int j=0; j<filter->n_channels; j++) {
+                        for (int n=0; n<net->batch_size; n++) {
+                            matrix_correlate_into(
+                                z->filters[n]->channels[j],
+                                delta->filters[n]->channels[i],
+                                corr_t3d->channels[n],
+                                VALID
+                            );
+                            tensor3D_sum_element_wise_into(
+                                corr_t3d,
+                                filter_grad->filters[i]->channels[j]
+                            );
                         }
                     }
                 }
+                tensor3D_free(corr_t3d);
             }
 
             // bias gradient (dCost_dB) calculation
-            Tensor4D* bias_grad = layer->cache.conv.bias_gradient;
-            for (int c=0; c<delta->n_channels; c++) {
-
-                double bias_sum=0.0;
-
-                for (int n=0; n<delta->n_filters; n++) {
-                    for (int dh=0; dh<delta->n_rows; dh++) {
-                        for (int dw=0; dw<delta->n_cols; dw++) {
-                            bias_sum += delta
-                            ->filters[n]
-                            ->channels[c]
-                            ->entries[dh][dw];
-                        }
-                    }
+            for (int i=0; i<filter->n_filters; i++) {
+                double sum = 0.0;
+                for (int n=0; n<net->batch_size; n++) {
+                    sum += matrix_sum(delta->filters[n]->channels[i]);
                 }
-                
-                matrix_fill(
-                    bias_grad->filters[c]->channels[0],
-                    bias_sum
-                );
+                matrix_fill(bias_grad->filters[i]->channels[0], sum);
             }
             break;
         }
 
-        case INPUT: {
+        case FLATTEN: {
+            matrix_transpose_into(
+                layer->next_layer->cache.dense.weight, 
+                layer->cache.flat.dZnext_dA_t
+            ); 
+            matrix_dot_into(
+                layer->next_layer->cache.dense.delta,
+                layer->cache.flat.dZnext_dA_t,
+                layer->cache.flat.dCost_dA_matrix
+            );
+            matrix_into_tensor4D(
+                layer->cache.flat.dCost_dA_matrix,
+                layer->prev_layer->cache.conv.dCost_dA
+            );
+            break;
+        }
+
+        case INPUT: 
+        case CONV_2D_INPUT: {
             // here we just update all the weights and biases
-            for (int j=1; j<net->n_layers; j++) {
-                Layer* layer = net->layers[j];
+            for (int l=1; l<net->n_layers; l++) {
+                Layer* layer = net->layers[l];
 
                 if (net->optimizer->type == NESTEROV) {
                     MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
                     matrix_subtract_into(
                         layer->cache.dense.weight, 
-                        mom->weight_momentum[j], 
+                        mom->weight_momentum[l], 
                         layer->cache.dense.weight
                     );
                     matrix_subtract_into(
                         layer->cache.dense.bias, 
-                        mom->bias_momentum[j], 
+                        mom->bias_momentum[l], 
                         layer->cache.dense.bias
                     );
                 }
@@ -1041,41 +1101,38 @@ void back_prop(NeuralNet* net) {
                         layer->cache.dense.weight, 
                         layer->cache.dense.weight_gradient, 
                         net->optimizer, 
-                        j
+                        l
                     );
                     net->optimizer->update_bias(
                         layer->cache.dense.bias, 
                         layer->cache.dense.bias_gradient, 
                         net->optimizer, 
-                        j
+                        l
                     );
                     break;
 
                 case CONV_2D:
                     Tensor4D* filter = layer->cache.conv.filter;
-                    Tensor4D* filter_grad = layer->cache.conv.filter_gradient;
                     Tensor4D* bias = layer->cache.conv.bias;
+                    Tensor4D* filter_grad = layer->cache.conv.filter_gradient;
                     Tensor4D* bias_grad = layer->cache.conv.bias_gradient;
                     for (int i=0; i<filter->n_filters; i++) {
-                        Matrix* bias_m = bias->filters[i]->channels[0];
-                        Matrix* bias_grad_m = bias_grad->filters[i]->channels[0];
                         for (int j=0; j<filter->n_channels; j++) {
-                            Matrix* filter_m = filter->filters[i]->channels[j];
-                            Matrix* filter_grad_m = filter->filters[i]->channels[j];
                             net->optimizer->update_weights(
-                                filter_m,
-                                filter_grad_m,
+                                filter->filters[i]->channels[j],
+                                filter_grad->filters[i]->channels[j],
                                 net->optimizer,
-                                j // unsafe! add logic for more complex opt
+                                l
                             );
                         }
                         net->optimizer->update_bias(
-                            bias_m,
-                            bias_grad_m,
+                            bias->filters[i]->channels[0],
+                            bias_grad->filters[i]->channels[0],
                             net->optimizer,
-                            j // here also
+                            l
                         );
                     }
+                    break;
                 }
             }
 
@@ -1103,12 +1160,15 @@ Layer* layer_new(LayerType l_type, NeuralNet* net) {
 
 void layer_free(Layer* layer) { 
     if (layer->net_backref->compiled) {
-        if (layer->l_type == INPUT) {
+        switch (layer->l_type)
+        {
+        case INPUT:
+        case CONV_2D_INPUT:
             free(layer);
             return;
-        }
-
-        if (layer->l_type == CONV_2D) {
+            break;
+        
+        case CONV_2D:
             if (layer->cache.conv.output != NULL) {
                 tensor4D_free(layer->cache.conv.output);
                 layer->cache.conv.output = NULL;
@@ -1149,9 +1209,10 @@ void layer_free(Layer* layer) {
                 tensor4D_free(layer->cache.conv.dActivation_dZ);
                 layer->cache.conv.dActivation_dZ = NULL;
             }
-        }
-
-        else {
+           break;
+           
+        case DEEP:
+        case OUTPUT:
             if (layer->cache.dense.output != NULL) {
                 matrix_free(layer->cache.dense.output);
                 layer->cache.dense.output = NULL;
@@ -1200,7 +1261,24 @@ void layer_free(Layer* layer) {
                 matrix_free(layer->cache.dense.dCost_dZ_col_sum);
                 layer->cache.dense.dCost_dZ_col_sum = NULL;
             }
+            break;
+
+        case FLATTEN:
+            if (layer->cache.flat.output != NULL) {
+                matrix_free(layer->cache.flat.output);
+                layer->cache.flat.output = NULL;
+            }
+            if (layer->cache.flat.dCost_dA_matrix != NULL) {
+                matrix_free(layer->cache.flat.dCost_dA_matrix);
+                layer->cache.flat.dCost_dA_matrix = NULL;
+            }
+            if (layer->cache.flat.dZnext_dA_t != NULL) {
+                matrix_free(layer->cache.flat.dZnext_dA_t);
+                layer->cache.flat.dZnext_dA_t = NULL;
+            }
+            break;
         }
+
         if (layer->activation != NULL) {
             free(layer->activation);
             layer->activation = NULL;
@@ -1218,12 +1296,80 @@ int layer_get_n_units(Layer* layer) {
         return layer->params.dense.n_units;
         break;
     
+    case CONV_2D_INPUT:
     case CONV_2D:
         return layer->params.conv.n_units;
+        break;
+    
+    case FLATTEN:
+        return layer->params.flat.n_units;
         break;
     }
 
     exit(1);
+}
+
+Matrix* layer_get_output_matrix(Layer* layer) {
+    switch (layer->l_type)
+    {
+    case INPUT:
+    case DEEP:
+    case OUTPUT:
+        return layer->cache.dense.output;
+        break;
+
+    case FLATTEN:
+        return layer->cache.flat.output;    
+        break;
+
+    default:
+        printf("Expected to return matrix, not tensor.");
+        exit(1);
+    }
+}
+
+Tensor4D* layer_get_output_tensor4D(Layer* layer) {
+    switch (layer->l_type)
+    {
+    case CONV_2D_INPUT:
+    case CONV_2D:
+        return layer->cache.conv.output;
+        break;
+    
+    default:
+        printf("Expected to return tensor, not matrix.");
+        exit(1);
+    }
+}
+
+Matrix* layer_get_delta_matrix(Layer* layer) {
+    switch (layer->l_type)
+    {
+    case DEEP:
+    case OUTPUT:
+        return layer->cache.dense.delta;
+        break;
+    
+    case FLATTEN:
+        return layer->cache.flat.dCost_dA_matrix;
+        break;
+    
+    default:
+        printf("Object doesn't have delta matrix.");
+        exit(1);
+    }
+}
+Tensor4D* layer_get_delta_tensor4D(Layer* layer) {
+    switch (layer->l_type)
+    {
+    case CONV_2D:
+        return layer->cache.conv.delta;
+        break;
+    
+    default:
+        printf("Object doesn't have delta tensor.");
+        exit(1);
+    }
 }
 
 void add_input_layer(int n_units, NeuralNet* net) {
@@ -1242,7 +1388,7 @@ void add_input_layer(int n_units, NeuralNet* net) {
 }
 
 void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net) {
-    Layer* input_l = layer_new(INPUT, net);
+    Layer* input_l = layer_new(CONV_2D_INPUT, net);
     input_l->params.conv.n_filters = net->batch_size;
     input_l->params.conv.filter_size = 0;
     input_l->params.conv.stride = 0;
@@ -1283,5 +1429,11 @@ void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net) 
     conv_l->params.conv.stride = stride;
     net->is_cnn = true;
     net->layers[net->n_layers] = conv_l;
+    net->n_layers++;
+}
+
+void add_flatten_layer(NeuralNet* net) {
+    Layer* flat_l = layer_new(FLATTEN, net);
+    net->layers[net->n_layers] = flat_l;
     net->n_layers++;
 }

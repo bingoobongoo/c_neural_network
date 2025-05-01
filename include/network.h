@@ -18,7 +18,9 @@ typedef enum {
     INPUT,
     OUTPUT,
     DEEP,
+    CONV_2D_INPUT,
     CONV_2D,
+    FLATTEN,
     UNDEFINED
 } LayerType;
 
@@ -66,14 +68,26 @@ typedef struct {
     Tensor4D* dActivation_dZ;
 } ConvCache;
 
+typedef struct {
+    int n_units;
+} FlattenParams;
+
+typedef struct {
+    Matrix* output;
+    Matrix* dCost_dA_matrix;
+    Matrix* dZnext_dA_t;
+} FlattenCache;
+
 typedef union {
     DenseParams dense;
     ConvParams conv;
+    FlattenParams flat;
 } LayerParams;
 
 typedef union {
     DenseCache dense;
     ConvCache conv;
+    FlattenCache flat;
 } LayerCache;
 
 struct Layer {
@@ -115,8 +129,13 @@ void back_prop(NeuralNet* net);
 Layer* layer_new(LayerType l_type, NeuralNet* net);
 void layer_free(Layer* layer);
 int layer_get_n_units(Layer* layer);
+Matrix* layer_get_output_matrix(Layer* layer);
+Tensor4D* layer_get_output_tensor4D(Layer* layer);
+Matrix* layer_get_delta_matrix(Layer* layer);
+Tensor4D* layer_get_delta_tensor4D(Layer* layer);
 void add_input_layer(int n_units, NeuralNet* net);
 void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net);
 void add_output_layer(int n_units, NeuralNet* net);
 void add_deep_layer(int n_units, NeuralNet* net);
 void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);
+void add_flatten_layer(NeuralNet* net);

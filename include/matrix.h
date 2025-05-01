@@ -16,6 +16,11 @@ typedef struct {
     int n_cols;
 } Matrix;
 
+typedef enum {
+    VALID,
+    FULL
+} CorrelationType;
+
 Matrix* matrix_new(int n_rows, int n_cols);
 void matrix_free(Matrix* m);
 void matrix_free_view(Matrix* view);
@@ -60,3 +65,5 @@ void matrix_add_scalar_into(double scalar, Matrix* m, Matrix* into);
 void matrix_add_scalar_inplace(double scalar, Matrix* m);
 Matrix* matrix_transpose(Matrix* m);
 void matrix_transpose_into(Matrix* m, Matrix* into);
+void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type);
+void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type);

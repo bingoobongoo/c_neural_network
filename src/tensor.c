@@ -28,6 +28,28 @@ void tensor3D_copy_into(Tensor3D* t, Tensor3D* into) {
     }
 }
 
+void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into) {
+    matrix_fill(into, 0.0);
+    for (int c=0; c<t->n_channels; c++) {
+        for (int i=0; i<t->n_rows; i++) {
+            for (int j=0; j<t->n_cols; j++) {
+                into->entries[i][j] += t->channels[c]->entries[i][j];
+            }
+        }
+    }
+}
+
+void tensor3D_correlate_into(Tensor3D* input, Tensor3D* kernel, Tensor3D* into, CorrelationType type) {
+    for (int c=0; c<input->n_channels; c++) {
+        matrix_correlate_into(
+            input->channels[c],
+            kernel->channels[c],
+            into->channels[c],
+            type
+        );
+    }
+}
+
 Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
     Tensor4D* t = (Tensor4D*)malloc(sizeof(Tensor4D));
     t->n_rows = n_rows;
@@ -48,6 +70,12 @@ void tensor4D_free(Tensor4D* t) {
     }
     free(t->filters);
     free(t);
+}
+
+void tensor4D_copy_into(Tensor4D* t, Tensor4D* into) {
+    for (int i=0; i<t->n_filters; i++) {
+        tensor3D_copy_into(t->filters[i], into->filters[i]);
+    }
 }
 
 void tensor4D_slice_into(Tensor4D* t, int start_idx, int slice_size, Tensor4D* into) {
@@ -83,63 +111,45 @@ Tensor4D* matrix_to_tensor4D(Matrix* m, int n_rows, int n_cols, int n_channels) 
     return t;
 }
 
-void conv2d_forward(Tensor4D* in, Tensor4D* filter, Tensor4D* bias, int stride, Tensor4D* out) {
-    int batch_size = in->n_filters;
-    int input_h = in->n_rows;
-    int input_w = in->n_cols;
-    int input_c = in->n_channels;
+void matrix_into_tensor4D(Matrix* m, Tensor4D* t) {
+    for (int i=0; i<t->n_filters; i++) {
+        Tensor3D* t3d = t->filters[i];
 
-    int n_filters = filter->n_filters;
-    int filter_h = filter->n_rows;
-    int filter_w = filter->n_cols;
+        for (int j=0; j<t->n_channels; j++) {
+            Matrix* channel_mat = t3d->channels[j];
 
-    int output_h = out->n_rows;
-    int output_w = out->n_cols;
-
-    for (int n=0; n<batch_size; n++) {
-        for (int f=0; f<n_filters; f++) {
-            for (int oh=0; oh<output_h; oh++) {
-                for (int ow=0; ow<output_w; ow++) {
-
-                    double sum = 0.0;
-
-                    for (int c=0; c<input_c; c++) {
-                        for (int kh=0; kh<filter_h; kh++) {
-                            for (int kw=0; kw<filter_w; kw++) {
-
-                                int ih = oh * stride + kh;
-                                int iw = ow * stride + kw;
-
-                                if (ih >= 0 && ih < input_h && iw >= 0 && iw < input_w) {
-                                    double input_val = in->filters[n]->channels[c]->entries[ih][iw];
-                                    double filter_val = filter->filters[f]->channels[c]->entries[kh][kw];
-    
-                                    sum += input_val * filter_val;
-                                }
-                            }
-                        }
-                    }
-
-                    sum += bias->filters[f]->channels[0]->entries[0][0];
-                    out->filters[n]->channels[f]->entries[oh][ow] = sum;
+            for (int k=0; k<t->n_rows; k++) {
+                for (int l=0; l<t->n_cols; l++) {
+                    int idx = j * (t->n_rows * t->n_cols) + k * t->n_cols + l;
+                    channel_mat->entries[k][l] = m->entries[i][idx];
                 }
             }
         }
     }
 }
 
-void tensor4D_rot180_into(Tensor4D* t, Tensor4D* into) {
-    for (int sample=0; sample<t->n_filters; sample++) {
-        for (int channel = 0; channel < t->n_channels; channel++) {
-            int rows = t->n_rows;
-            int cols = t->n_cols;
+void tensor4D_into_matrix(Tensor4D* t, Matrix* m) {
+    for (int i=0; i<t->n_filters; i++) {
+        Tensor3D* t3d = t->filters[i];
 
-            for (int i=0; i<rows; i++) {
-                for (int j=0; j<cols; j++) {
-                    into->filters[sample]->channels[channel]->entries[i][j] = 
-                        t->filters[sample]->channels[channel]->entries[rows - 1 - i][cols - 1 - j];
+        for (int j=0; j<t->n_channels; j++) {
+            Matrix* channel_mat = t3d->channels[j];
+
+            for (int k=0; k<t->n_rows; k++) {
+                for (int l=0; l<t->n_cols; l++) {
+                    int idx = j * (t->n_rows * t->n_cols) + k * t->n_cols + l;
+                    m->entries[i][idx] = channel_mat->entries[k][l];
                 }
             }
         }
     }
+}
+
+void tensor4D_print_shape(Tensor4D* t) {
+    printf("[%d x %d x %d x %d]\n", 
+        t->n_filters,
+        t->n_channels,
+        t->n_rows,
+        t->n_cols
+    );
 }
