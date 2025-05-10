@@ -2,7 +2,7 @@ import time
 import tensorflow as tf
 import keras
 from keras import Sequential
-from keras.api.layers import Dense, Flatten
+from keras.api.layers import Dense, Flatten, MaxPooling2D, Conv2D, Input
 from keras.api.datasets import fashion_mnist
 from keras.api.utils import to_categorical
 
@@ -12,15 +12,27 @@ x_test  = x_test.astype("float32") / 255.0
 
 x_train = x_train.reshape(-1, 784)
 x_test  = x_test.reshape(-1, 784)
+# x_train = x_train.reshape(-1, 28, 28, 1)
+# x_test  = x_test.reshape(-1, 28, 28, 1)
 
 y_train = to_categorical(y_train, 10)
 y_test  = to_categorical(y_test, 10)
 
 model = Sequential([
-    Dense(300, activation='relu', input_shape=(784,)),
-    Dense(100, activation='relu'),
-    Dense(10, activation='softmax')
+    Dense(300, activation="relu"),
+    Dense(100, activation="relu"),
+    Dense(10, activation="relu")
 ])
+
+# model = Sequential([
+#     Conv2D(8, (3, 3), 1, activation="relu", data_format="channels_last"),
+#     MaxPooling2D((2, 2), 2),
+#     Flatten(),
+#     Dense(256, activation="relu"),
+#     Dense(10, activation="softmax")
+# ])
+
+opt = keras.optimizers.SGD(learning_rate=0.01)
 
 model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy'])
 
@@ -32,4 +44,5 @@ class TimerCallback(tf.keras.callbacks.Callback):
         elapsed = time.time() - self.start
         print(f"Epoch {epoch+1} took {elapsed:.3f} seconds")
 
-model.fit(x_train, y_train, epochs=25, batch_size=64, callbacks=[TimerCallback()])
+model.fit(x_train, y_train, epochs=5, batch_size=32, callbacks=[TimerCallback()])
+print(model.count_params())

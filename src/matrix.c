@@ -674,19 +674,19 @@ void matrix_transpose_into(Matrix* m, Matrix* into) {
     }
 }
 
-void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type) {
+void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type) {
     switch (type)
     {
     case VALID: {
-        int out_h = input->n_rows - kernel->n_rows + 1;
-        int out_w = input->n_cols - kernel->n_cols + 1;
+        int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
+        int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
                 double sum = 0.0;
                 for (int k=0; k<kernel->n_rows; k++) {
                     for (int l=0; l<kernel->n_cols; l++) {
-                        sum += input->entries[i+k][j+l] *
+                        sum += input->entries[i*stride+k][j*stride+l] *
                                kernel->entries[k][l];
                     }
                 }
@@ -697,8 +697,8 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, Correlat
     }
     
     case FULL: {
-        int out_h = input->n_rows + kernel->n_rows - 1;
-        int out_w = input->n_cols + kernel->n_cols - 1;
+        int out_h = (input->n_rows + kernel->n_rows - 2 + stride)/stride;
+        int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
         int input_h_idx, input_w_idx;
         int k, k_stick_out, l, l_stick_out;
         double sum;
@@ -706,18 +706,18 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, Correlat
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
                 sum = 0.0;
-                k = kernel->n_rows - i - 1;
+                k = kernel->n_rows - i*stride - 1;
                 if (k<0) k=0;
-                k_stick_out = i - kernel->n_cols;
+                k_stick_out = i*stride - input->n_rows + 1;
                 if (k_stick_out<0) k_stick_out=0;
                 for (k; k<kernel->n_rows - k_stick_out; k++) {
-                    l = kernel->n_cols - j - 1;
+                    l = kernel->n_cols - j*stride - 1;
                     if (l<0) l=0;
-                    l_stick_out = j - kernel->n_cols;
+                    l_stick_out = j*stride - input->n_cols + 1;
                     if (l_stick_out<0) l_stick_out=0;
                     for (l; l<kernel->n_cols - l_stick_out; l++) {
-                        input_h_idx = i + k - kernel->n_rows + 1;
-                        input_w_idx = j + l - kernel->n_cols + 1;
+                        input_h_idx = i*stride + k - kernel->n_rows + 1;
+                        input_w_idx = j*stride + l - kernel->n_cols + 1;
                         sum += input->entries[input_h_idx][input_w_idx] *
                                kernel->entries[k][l]; 
                     }
@@ -735,19 +735,19 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, Correlat
     }
 }
 
-void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type) {
+void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type) {
     switch (type)
     {
     case VALID: {
-        int out_h = input->n_rows - kernel->n_rows + 1;
-        int out_w = input->n_cols - kernel->n_cols + 1;
+        int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
+        int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
                 double sum = 0.0;
                 for (int k=0; k<kernel->n_rows; k++) {
                     for (int l=0; l<kernel->n_cols; l++) {
-                        sum += input->entries[i+k][j+l] *
+                        sum += input->entries[i*stride+k][j*stride+l] *
                                kernel->entries[kernel->n_rows-k-1][kernel->n_cols-l-1];
                     }
                 }
@@ -758,8 +758,8 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, Correlati
     }
     
     case FULL: {
-        int out_h = input->n_rows + kernel->n_rows - 1;
-        int out_w = input->n_cols + kernel->n_cols - 1;
+        int out_h = (input->n_rows + kernel->n_rows - 2 + stride)/stride;
+        int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
         int input_h_idx, input_w_idx;
         int k, k_stick_out, l, l_stick_out;
         double sum;
@@ -767,18 +767,18 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, Correlati
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
                 sum = 0.0;
-                k = kernel->n_rows - i - 1;
+                k = kernel->n_rows - i*stride - 1;
                 if (k<0) k=0;
-                k_stick_out = i - kernel->n_cols;
+                k_stick_out = i*stride - input->n_rows + 1;
                 if (k_stick_out<0) k_stick_out=0;
                 for (k; k<kernel->n_rows - k_stick_out; k++) {
-                    l = kernel->n_cols - j - 1;
+                    l = kernel->n_cols - j*stride - 1;
                     if (l<0) l=0;
-                    l_stick_out = j - kernel->n_cols;
+                    l_stick_out = j*stride - input->n_cols + 1;
                     if (l_stick_out<0) l_stick_out=0;
                     for (l; l<kernel->n_cols - l_stick_out; l++) {
-                        input_h_idx = i + k - kernel->n_rows + 1;
-                        input_w_idx = j + l - kernel->n_cols + 1;
+                        input_h_idx = i*stride + k - kernel->n_rows + 1;
+                        input_w_idx = j*stride + l - kernel->n_cols + 1;
                         sum += input->entries[input_h_idx][input_w_idx] *
                                kernel->entries
                                [kernel->n_rows-k-1]
@@ -795,5 +795,22 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, Correlati
         printf("Correlation type doesn't exist.");
         exit(1);
         break;
+    }
+}
+
+void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stride) {
+    int out_h = (input->n_rows - kernel_size)/stride + 1;
+    int out_w = (input->n_cols - kernel_size)/stride + 1;
+    for (int i=0; i<out_h; i++) {
+        for (int j=0; j<out_w; j++) {
+            double max = input->entries[i*stride][j*stride];
+            for (int k=0; k<kernel_size; k++) {
+                for (int l=1; l<kernel_size; l++) {
+                    double entry = input->entries[i*stride+k][j*stride+l];
+                    if (entry > max) max = entry;
+                }
+            }
+            into->entries[i][j] = max;
+        }
     }
 }

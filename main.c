@@ -18,7 +18,7 @@ int main() {
     shuffle_matrix_inplace(x_test, y_test);
     
     NeuralNet* net = neural_net_new(
-        optimizer_sgd_new(0.001),
+        optimizer_sgd_new(0.01),
         RELU, 1.0,
         CAT_CROSS_ENTROPY, 
         32
@@ -30,10 +30,11 @@ int main() {
     // add_output_layer(y_train->n_cols, net);
 
     add_conv_input_layer(28, 28, 1, net);
-    add_conv_layer(1, 5, 1, net);
+    add_conv_layer(8, 3, 1, net);
+    add_max_pool_layer(2, 2, net);
+
     add_flatten_layer(net);
-    add_deep_layer(300, net);
-    add_deep_layer(100, net);
+    add_deep_layer(256, net);
     add_output_layer(10, net);
 
     neural_net_compile(net);
@@ -41,7 +42,7 @@ int main() {
 
     struct timeval start, end;
     gettimeofday(&start, NULL);
-    fit(x_train, y_train, 1, 0.1, net);
+    fit(x_train, y_train, 5, 0.1, net);
     gettimeofday(&end, NULL);
     double fit_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
 

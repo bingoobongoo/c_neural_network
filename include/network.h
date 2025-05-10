@@ -20,6 +20,7 @@ typedef enum {
     DEEP,
     CONV_2D_INPUT,
     CONV_2D,
+    MAX_POOL,
     FLATTEN,
     UNDEFINED
 } LayerType;
@@ -63,7 +64,6 @@ typedef struct {
     Tensor4D* bias_gradient;
 
     // auxiliary
-    Tensor4D* rotated_filter;
     Tensor4D* dCost_dA;
     Tensor4D* dActivation_dZ;
 } ConvCache;
@@ -128,14 +128,23 @@ void back_prop(NeuralNet* net);
 
 Layer* layer_new(LayerType l_type, NeuralNet* net);
 void layer_free(Layer* layer);
+
 int layer_get_n_units(Layer* layer);
 Matrix* layer_get_output_matrix(Layer* layer);
 Tensor4D* layer_get_output_tensor4D(Layer* layer);
 Matrix* layer_get_delta_matrix(Layer* layer);
 Tensor4D* layer_get_delta_tensor4D(Layer* layer);
+
 void add_input_layer(int n_units, NeuralNet* net);
 void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net);
 void add_output_layer(int n_units, NeuralNet* net);
 void add_deep_layer(int n_units, NeuralNet* net);
 void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);
 void add_flatten_layer(NeuralNet* net);
+void add_max_pool_layer(int filter_size, int stride, NeuralNet* net);
+
+void layer_deep_compile(Layer* l, NeuralNet* net);
+void layer_output_compile(Layer* l, NeuralNet* net);
+void layer_conv2D_compile(Layer* l, NeuralNet* net);
+void layer_flatten_compile(Layer* l, NeuralNet* net);
+void layer_max_pool_compile(Layer* l, NeuralNet* net);

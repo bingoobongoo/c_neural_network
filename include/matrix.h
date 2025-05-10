@@ -65,5 +65,6 @@ void matrix_add_scalar_into(double scalar, Matrix* m, Matrix* into);
 void matrix_add_scalar_inplace(double scalar, Matrix* m);
 Matrix* matrix_transpose(Matrix* m);
 void matrix_transpose_into(Matrix* m, Matrix* into);
-void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type);
-void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, CorrelationType type);
+void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type);
+void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type);
+void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stride);

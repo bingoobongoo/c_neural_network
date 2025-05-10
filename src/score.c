@@ -39,12 +39,12 @@ void update_confusion_matrix(Score* self, Matrix* y_pred, Matrix* y_true, Matrix
         int pred_class = self->y_pred_argmax->entries[0][i];
         c->entries[true_class][pred_class]++;
     }
-    Matrix* row_sum = matrix_sum_axis(c, 0);
-    for (int i=0; i<row_sum->n_cols; i++) {
-        for (int j=0; j<row_sum->n_cols; j++) {
-            c->entries[i][j] = c->entries[i][j] / row_sum->entries[0][i];
-        }
-    }
+    // Matrix* row_sum = matrix_sum_axis(c, 0);
+    // for (int i=0; i<row_sum->n_cols; i++) {
+    //     for (int j=0; j<row_sum->n_cols; j++) {
+    //         c->entries[i][j] = c->entries[i][j] / row_sum->entries[0][i];
+    //     }
+    // }
 
-    matrix_free(row_sum);
+    // matrix_free(row_sum);
 }

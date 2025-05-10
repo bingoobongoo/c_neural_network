@@ -39,14 +39,35 @@ void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into) {
     }
 }
 
-void tensor3D_correlate_into(Tensor3D* input, Tensor3D* kernel, Tensor3D* into, CorrelationType type) {
+void tensor3D_correlate_into(Tensor3D* input, Tensor3D* kernel, Tensor3D* into, int stride, CorrelationType type) {
     for (int c=0; c<input->n_channels; c++) {
         matrix_correlate_into(
             input->channels[c],
             kernel->channels[c],
             into->channels[c],
+            stride,
             type
         );
+    }
+}
+
+void tensor4D_fill(Tensor4D* t, double num) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_fill(t->filters[i]->channels[j], num);
+        }
+    }
+}
+
+void tensor4D_fill_normal_distribution(Tensor4D* t, double mean, double std_deviation) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_fill_normal_distribution(
+                t->filters[i]->channels[j],
+                mean,
+                std_deviation
+            );
+        }
     }
 }
 
