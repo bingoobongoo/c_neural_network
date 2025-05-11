@@ -393,7 +393,6 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, Neur
             score_batch(net->batch_score, y_pred, y_true);
             train_acc[i] = net->batch_score->accuracy;
             back_prop(net);
-            // printf("%d\n", i);
         }
         gettimeofday(&end, NULL);
         epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;;
@@ -544,7 +543,12 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
     Matrix* row_sum = matrix_sum_axis(conf_m, 0);
     for (int i=0; i<row_sum->n_cols; i++) {
         for (int j=0; j<row_sum->n_cols; j++) {
-            conf_m->entries[i][j] = conf_m->entries[i][j] / row_sum->entries[0][i];
+            matrix_assign(
+                conf_m,
+                i,
+                j,
+                matrix_get(conf_m, i, j) / matrix_get(row_sum, 0, i)
+            );
         }
     }
 
@@ -593,24 +597,51 @@ void forward_prop(NeuralNet* net, bool training) {
             Tensor4D* filter = layer->cache.conv.filter;
             Tensor4D* bias = layer->cache.conv.bias;
             Tensor4D* input = layer_get_output_tensor4D(layer->prev_layer);
-            Tensor3D* corr_t3d = tensor3D_new(
-                z->n_rows,
-                z->n_cols,
-                filter->n_channels
-            );
+            // Tensor3D* corr_t3d = tensor3D_new(
+            //     z->n_rows,
+            //     z->n_cols,
+            //     filter->n_channels
+            // );
+            // for (int n=0; n<net->batch_size; n++) {
+            //     for (int i=0; i<filter->n_filters; i++) {
+            //         tensor3D_correlate_into(
+            //             input->filters[n],
+            //             filter->filters[i],
+            //             corr_t3d,
+            //             layer->params.conv.stride,
+            //             VALID
+            //         );
+            //         tensor3D_sum_element_wise_into(
+            //             corr_t3d,
+            //             z->filters[n]->channels[i]
+            //         );
+            //         matrix_add_into(
+            //             z->filters[n]->channels[i],
+            //             bias->filters[i]->channels[0],
+            //             z->filters[n]->channels[i]
+            //         );
+            //         apply_activation_func_into(
+            //             layer->activation,
+            //             z->filters[n]->channels[i],
+            //             output->filters[n]->channels[i]
+            //         );
+            //     }
+            // }
+            // tensor3D_free(corr_t3d);
             for (int n=0; n<net->batch_size; n++) {
+                input_into_im2col(
+                    input->filters[n],
+                    filter,
+                    layer->params.conv.stride,
+                    layer->cache.conv.input_im2col 
+                );
+                im2col_correlate(
+                    layer->cache.conv.input_im2col,
+                    layer->cache.conv.kernel_im2col,
+                    layer->cache.conv.im2col_dot,
+                    z->filters[n]
+                );
                 for (int i=0; i<filter->n_filters; i++) {
-                    tensor3D_correlate_into(
-                        input->filters[n],
-                        filter->filters[i],
-                        corr_t3d,
-                        layer->params.conv.stride,
-                        VALID
-                    );
-                    tensor3D_sum_element_wise_into(
-                        corr_t3d,
-                        z->filters[n]->channels[i]
-                    );
                     matrix_add_into(
                         z->filters[n]->channels[i],
                         bias->filters[i]->channels[0],
@@ -623,14 +654,14 @@ void forward_prop(NeuralNet* net, bool training) {
                     );
                 }
             }
-            tensor3D_free(corr_t3d);
             break;
         }
             
         case FLATTEN:
             tensor4D_into_matrix(
                 layer_get_output_tensor4D(layer->prev_layer),
-                layer->cache.flat.output
+                layer->cache.flat.output,
+                false
             );
             break;
         
@@ -798,9 +829,13 @@ void back_prop(NeuralNet* net) {
                             for (int j=0; j<output_next->n_cols; j++) {
                                 for (int k=0; k<pool_size; k++) {
                                     for (int l=0; l<pool_size; l++) {
-                                        if (out_mat->entries[i*stride+k][j*stride+l] == out_next_mat->entries[i][j]) {
-                                            dCost_dA_mat->entries[i*stride+k][j*stride+l]
-                                            += delta_next_mat->entries[i][j];
+                                        if (matrix_get(out_mat, i*stride+k, j*stride+l) ==  matrix_get(out_next_mat, i, j)) {
+                                            matrix_assign(
+                                                dCost_dA_mat,
+                                                i*stride+k,
+                                                j*stride+l,
+                                                matrix_get(dCost_dA_mat, i*stride+k, j*stride+l) + matrix_get(delta_next_mat, i, j)
+                                            );
                                             l = pool_size;
                                             k = pool_size;
                                         }
@@ -1012,6 +1047,7 @@ void back_prop(NeuralNet* net) {
                             l
                         );
                     }
+                    kernel_into_im2col(filter, layer->cache.conv.kernel_im2col);
                     break;
                 }
             }
@@ -1084,6 +1120,18 @@ void layer_free(Layer* layer) {
             if (layer->cache.conv.dActivation_dZ != NULL) {
                 tensor4D_free(layer->cache.conv.dActivation_dZ);
                 layer->cache.conv.dActivation_dZ = NULL;
+            }
+            if (layer->cache.conv.input_im2col != NULL) {
+                matrix_free(layer->cache.conv.input_im2col);
+                layer->cache.conv.input_im2col = NULL;
+            }
+            if (layer->cache.conv.kernel_im2col != NULL) {
+                matrix_free(layer->cache.conv.kernel_im2col);
+                layer->cache.conv.kernel_im2col = NULL;
+            }
+            if (layer->cache.conv.im2col_dot != NULL) {
+                matrix_free(layer->cache.conv.im2col_dot);
+                layer->cache.conv.im2col_dot = NULL;
             }
            break;
            
@@ -1517,63 +1565,78 @@ void layer_conv2D_compile(Layer* l, NeuralNet* net) {
 
     int input_height = layer_get_output_tensor4D(l->prev_layer)->n_rows;
     int input_width = layer_get_output_tensor4D(l->prev_layer)->n_cols;
+    int input_channels = layer_get_output_tensor4D(l->prev_layer)->n_channels;
     int filter_height = l->params.conv.filter_size;
     int filter_width = l->params.conv.filter_size;
     int stride = l->params.conv.stride;
+    int output_height = floor((input_height - filter_height) / stride) + 1;
+    int output_width = floor((input_width - filter_width) / stride) + 1;
 
     l->cache.conv.filter = tensor4D_new(
         l->params.conv.filter_size,
         l->params.conv.filter_size,
-        layer_get_output_tensor4D(l->prev_layer)->n_channels,
+        input_channels,
         l->params.conv.n_filters
     );
     l->cache.conv.bias = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         1,
         l->params.conv.n_filters
     );
     l->cache.conv.output = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         l->params.conv.n_filters,
         net->batch_size
     );
     l->cache.conv.z = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         l->params.conv.n_filters,
         net->batch_size
     );
     l->cache.conv.delta = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         l->params.conv.n_filters,
         net->batch_size
     );
     l->cache.conv.filter_gradient = tensor4D_new(
         l->params.conv.filter_size,
         l->params.conv.filter_size,
-        layer_get_output_tensor4D(l->prev_layer)->n_channels,
+        input_channels,
         l->params.conv.n_filters
     );
     l->cache.conv.bias_gradient = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         1,
         l->params.conv.n_filters
     );
     l->cache.conv.dCost_dA = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         l->params.conv.n_filters,
         net->batch_size
     );
     l->cache.conv.dActivation_dZ = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         l->params.conv.n_filters,
         net->batch_size
+    );
+    l->cache.conv.input_im2col = matrix_new(
+        output_height * output_width,
+        filter_height * filter_width * input_channels
+    );
+    l->cache.conv.kernel_im2col = matrix_new(
+        filter_height * filter_width * input_channels,
+        l->params.conv.n_filters
+    );
+    l->cache.conv.im2col_dot = matrix_new(
+        output_height * output_width,
+        l->params.conv.n_filters
     );
 
     l->params.conv.n_units = 
@@ -1609,7 +1672,12 @@ void layer_conv2D_compile(Layer* l, NeuralNet* net) {
         printf("Unknown activation type.");
         exit(1);
         break;
-    }  
+    }
+    
+    kernel_into_im2col(
+        l->cache.conv.filter,
+        l->cache.conv.kernel_im2col
+    );
 }
 
 void layer_flatten_compile(Layer* l, NeuralNet* net) {
@@ -1638,16 +1706,18 @@ void layer_max_pool_compile(Layer* l, NeuralNet* net) {
     int filter_height = l->params.conv.filter_size;
     int filter_width = l->params.conv.filter_size;
     int stride = l->params.conv.stride;
+    int output_height = floor((input_height - filter_height) / stride) + 1;
+    int output_width = floor((input_width - filter_width) / stride) + 1;
 
     l->cache.conv.output = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         input_channels,
         net->batch_size
     );
     l->cache.conv.delta = tensor4D_new(
-        floor((input_height - filter_height) / stride) + 1,
-        floor((input_width - filter_width) / stride) + 1,
+        output_height,
+        output_width,
         input_channels,
         net->batch_size
     );
@@ -1659,6 +1729,9 @@ void layer_max_pool_compile(Layer* l, NeuralNet* net) {
     l->cache.conv.filter_gradient = NULL;
     l->cache.conv.bias_gradient = NULL;
     l->cache.conv.dActivation_dZ = NULL;
+    l->cache.conv.input_im2col = NULL;
+    l->cache.conv.kernel_im2col = NULL;
+    l->cache.conv.im2col_dot = NULL;
 
     l->params.conv.n_units = 
         l->cache.conv.output->n_rows *

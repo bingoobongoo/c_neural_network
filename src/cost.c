@@ -31,9 +31,9 @@ Matrix* apply_cost_func(Cost* cost, Matrix* output_activation_m, Matrix* label_m
     Matrix* err_m = matrix_new(output_activation_m->n_rows, output_activation_m->n_cols);
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
-            double output_activation = output_activation_m->entries[i][j];
-            double label = label_m->entries[i][j];
-            err_m->entries[i][j] = cost->cost_func(output_activation, label);
+            double output_activation = matrix_get(output_activation_m, i, j);
+            double label = matrix_get(label_m, i, j);
+            matrix_assign(err_m, i, j, cost->cost_func(output_activation, label));
         }
     }
 
@@ -43,9 +43,9 @@ Matrix* apply_cost_func(Cost* cost, Matrix* output_activation_m, Matrix* label_m
 void apply_cost_func_into(Cost* cost, Matrix* output_activation_m, Matrix* label_m, Matrix* into) {
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
-            double output_activation = output_activation_m->entries[i][j];
-            double label = label_m->entries[i][j];
-            into->entries[i][j] = cost->cost_func(output_activation, label);
+            double output_activation = matrix_get(output_activation_m, i, j);
+            double label = matrix_get(label_m, i, j);
+            matrix_assign(into, i, j, cost->cost_func(output_activation, label));
         }
     }
 }
@@ -54,9 +54,9 @@ Matrix* apply_cost_dA(Cost* cost, Matrix* output_activation_m, Matrix* label_m) 
     Matrix* dA = matrix_new(output_activation_m->n_rows, output_activation_m->n_cols);
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
-            double output_activation = output_activation_m->entries[i][j];
-            double label = label_m->entries[i][j];
-            dA->entries[i][j] = cost->dA(output_activation, label);
+            double output_activation = matrix_get(output_activation_m, i, j);
+            double label = matrix_get(label_m, i, j);
+            matrix_assign(dA, i, j, cost->dA(output_activation, label));
         }
     }
 
@@ -66,9 +66,9 @@ Matrix* apply_cost_dA(Cost* cost, Matrix* output_activation_m, Matrix* label_m) 
 void apply_cost_dA_into(Cost* cost, Matrix* output_activation_m, Matrix* label_m, Matrix* into) {
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
-            double output_activation = output_activation_m->entries[i][j];
-            double label = label_m->entries[i][j];
-            into->entries[i][j] = cost->dA(output_activation, label);
+            double output_activation = matrix_get(output_activation_m, i, j);
+            double label = matrix_get(label_m, i, j);
+            matrix_assign(into, i, j, cost->dA(output_activation, label));
         }
     }
 }

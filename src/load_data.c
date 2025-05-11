@@ -29,10 +29,10 @@ Matrix** load_csv(char* csv_file, bool header) {
         int j = 0;
         while (token != NULL) {
             if (j == 0) {
-                label_m->entries[i][0] = strtod(token, &endptr);
+                matrix_assign(label_m, i, 0, strtod(token, &endptr));
             }
             else {
-                feature_m->entries[i][j-1] = strtod(token, &endptr);
+                matrix_assign(feature_m, i, j-1, strtod(token, &endptr));
             }
             token = strtok(NULL, ",");
             j++;
@@ -75,7 +75,7 @@ Matrix* load_ubyte_images(char* ubyte_file) {
     for (int i=0; i<n_samples; i++) {
         fread(pixel_values, 1, n_pixels, file);
         for (int j=0; j<n_pixels; j++) {
-            feature_m->entries[i][j] = (double)pixel_values[j];
+            matrix_assign(feature_m, i, j, (double)pixel_values[j]);
         }
     }
 
@@ -107,7 +107,7 @@ Matrix* load_ubyte_labels(char* ubyte_file) {
     unsigned char* labels = malloc(n_labels * sizeof(unsigned char));
     fread(labels, 1, n_labels, file);
     for (int i=0; i<n_labels; i++) {
-        label_m->entries[i][0] = (double)labels[i];
+        matrix_assign(label_m, i, 0, (double)labels[i]);
     }
 
     free(labels);

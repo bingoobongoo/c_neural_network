@@ -10,8 +10,10 @@
 #define PI 3.14159265358979323846
 #define BLOCK_SIZE 32
 
+// #define DEBUG
+
 typedef struct {
-    double** entries;
+    double* entries;
     int n_rows;
     int n_cols;
 } Matrix;
@@ -23,17 +25,18 @@ typedef enum {
 
 Matrix* matrix_new(int n_rows, int n_cols);
 void matrix_free(Matrix* m);
-void matrix_free_view(Matrix* view);
+double matrix_get(Matrix* m, int row, int col);
+void matrix_assign(Matrix* m, int row, int col, double num);
 void matrix_save(Matrix* m, char* file_path);
 Matrix* matrix_load(char* file_path);
 Matrix* matrix_copy(Matrix* m);
 void matrix_copy_into(Matrix* m, Matrix* into);
-void matrix_assign(Matrix** to, Matrix* from);
+void matrix_assign_ptr(Matrix** to, Matrix* from);
 void matrix_print(Matrix* m);
 void matrix_print_dimensions(Matrix* m);
+void matrix_zero(Matrix* m);
 void matrix_fill(Matrix* m, double num);
 void matrix_fill_normal_distribution(Matrix* m, double mean, double std_deviation);
-Matrix* matrix_flatten(Matrix* m, int axis);
 Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size);
 void matrix_slice_rows_into(Matrix* m, int start_idx, int slice_size, Matrix* into);
 bool matrix_check_dimensions(Matrix* m1, Matrix* m2);
