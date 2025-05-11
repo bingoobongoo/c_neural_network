@@ -53,9 +53,9 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
         Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                double z = z_m->entries[i][j];
+                double z = matrix_get(z_m, i, j);
                 double param = activation->activation_param;
-                a->entries[i][j] = activation->activation_func(z, param);
+                matrix_assign(a, i, j, activation->activation_func(z, param));
             }
         }
     
@@ -64,20 +64,20 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
     else if (activation->type == SOFTMAX) {
         Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
-            double max_z = z_m->entries[i][0];
+            double max_z = matrix_get(z_m, i, 0);
             for (int j=0; j<z_m->n_cols; j++) {
-                if (z_m->entries[i][j] > max_z)
-                max_z = z_m->entries[i][j];
+                if (matrix_get(z_m, i, j) > max_z)
+                max_z = matrix_get(z_m, i, j);
             }
 
             double sum_z = 0.0;
             for (int j=0; j<a->n_cols; j++) {
-                a->entries[i][j] = exp(z_m->entries[i][j] - max_z);
-                sum_z += a->entries[i][j];
+                matrix_assign(a, i, j, exp(matrix_get(z_m, i, j) - max_z));
+                sum_z += matrix_get(a, i, j);
             }
 
             for (int j=0; j<a->n_cols; j++) {
-                a->entries[i][j] /= sum_z;
+                matrix_assign(a, i, j, matrix_get(a, i, j) / sum_z);
             }
         }
 
@@ -89,28 +89,28 @@ void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* int
     if (activation->type != SOFTMAX) {
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                double z = z_m->entries[i][j];
+                double z = matrix_get(z_m, i, j);
                 double param = activation->activation_param;
-                into->entries[i][j] = activation->activation_func(z, param);
+                matrix_assign(into, i, j, activation->activation_func(z, param));
             }
         }
     }
     else if (activation->type == SOFTMAX) {
         for (int i=0; i<z_m->n_rows; i++) {
-            double max_z = z_m->entries[i][0];
+            double max_z = matrix_get(z_m, i, 0);
             for (int j=0; j<z_m->n_cols; j++) {
-                if (z_m->entries[i][j] > max_z)
-                max_z = z_m->entries[i][j];
+                if (matrix_get(z_m, i, j) > max_z)
+                max_z = matrix_get(z_m, i, j);
             }
 
             double sum_z = 0.0;
             for (int j=0; j<into->n_cols; j++) {
-                into->entries[i][j] = exp(z_m->entries[i][j] - max_z);
-                sum_z += into->entries[i][j];
+                matrix_assign(into, i, j, exp(matrix_get(z_m, i, j) - max_z));
+                sum_z += matrix_get(into, i, j);
             }
 
             for (int j=0; j<into->n_cols; j++) {
-                into->entries[i][j] /= sum_z;
+                matrix_assign(into, i, j, matrix_get(into, i, j) / sum_z);
             }
         }
     } 
@@ -121,9 +121,9 @@ Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m) {
         Matrix* dZ = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                double z = z_m->entries[i][j];
+                double z = matrix_get(z_m, i, j);
                 double param = activation->activation_param;
-                dZ->entries[i][j] = activation->dZ(z, param);
+                matrix_assign(dZ, i, j, activation->dZ(z, param));
             }
         }
     
@@ -141,9 +141,9 @@ void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into)
     if (activation->type != SOFTMAX) {
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                double z = z_m->entries[i][j];
+                double z = matrix_get(z_m, i, j);
                 double param = activation->activation_param;
-                into->entries[i][j] = activation->dZ(z, param);
+                matrix_assign(into, i, j, activation->dZ(z, param));
             }
         }
     }

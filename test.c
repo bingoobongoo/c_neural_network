@@ -4,26 +4,41 @@
 
 int main() {
     srand(time(NULL));
-    Matrix* mat1 = matrix_load("mat1.mat");
-    Matrix* mat2 = matrix_load("mat2.mat");
-    Matrix* mat3 = matrix_new(4,4);
+    Matrix* input_m = matrix_load("input.mat");
+    Matrix* kernel_m = matrix_load("kernel.mat");
 
-    struct timeval start, end;
-    gettimeofday(&start, NULL);
-    for (int i=0; i<100000000; i++) {
-        matrix_multiply_into(mat1, mat2, mat3);
-    }
-    gettimeofday(&end, NULL);
-    double time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
-    printf("time: %.5f seconds\n", time);
+    Tensor3D* input = tensor3D_new(3, 3, 2);
+    Tensor4D* kernel = tensor4D_new(2, 2, 2, 2);
 
-    matrix_print(mat1);
-    printf("\n");
-    matrix_print(mat2);
-    printf("\n");
-    matrix_print(mat3);
+    matrix_into_tensor3D(input_m, input, false);
+    matrix_into_tensor4D(kernel_m, kernel);
 
-    matrix_free(mat1);
-    matrix_free(mat2);
-    matrix_free(mat3);
+    // im2col test
+
+    int stride = 1;
+    int num_patches = pow((input->n_rows - kernel->n_rows)/stride + 1, 2);
+    Matrix* input_im2col = matrix_new(
+        num_patches,
+        kernel->n_rows*kernel->n_cols*kernel->n_channels
+    );
+    Matrix* kernel_im2col = matrix_new(
+        kernel->n_rows*kernel->n_cols*kernel->n_channels,
+        kernel->n_filters
+    );
+    Matrix* im2col_dot = matrix_new(
+        num_patches,
+        kernel->n_filters
+    );
+    Tensor3D* output = tensor3D_new(2, 2, kernel->n_filters);
+
+    input_into_im2col(input, kernel, stride, input_im2col);
+    kernel_into_im2col(kernel, kernel_im2col);
+
+    // matrix_print(input_im2col);
+    // matrix_print(kernel_im2col);
+
+    im2col_correlate(input_im2col, kernel_im2col, im2col_dot, output);
+
+    matrix_print(output->channels[1]);
+    
 }

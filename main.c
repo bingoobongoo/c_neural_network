@@ -11,8 +11,8 @@ int main() {
 
     Matrix* y_train = load_ubyte_labels("data/mnist/train-labels-idx1-ubyte");
     Matrix* y_test = load_ubyte_labels("data/mnist/test-labels-idx1-ubyte");
-    matrix_assign(&y_train, one_hot_encode(y_train, 10));
-    matrix_assign(&y_test, one_hot_encode(y_test, 10));
+    matrix_assign_ptr(&y_train, one_hot_encode(y_train, 10));
+    matrix_assign_ptr(&y_test, one_hot_encode(y_test, 10));
 
     shuffle_matrix_inplace(x_train, y_train);
     shuffle_matrix_inplace(x_test, y_test);
@@ -24,22 +24,14 @@ int main() {
         32
     );
 
-    // add_input_layer(x_train->n_cols, net);
-    // add_deep_layer(300, net);
-    // add_deep_layer(100, net);
-    // add_output_layer(y_train->n_cols, net);
-
-    add_conv_input_layer(28, 28, 1, net);
-    add_conv_layer(8, 3, 1, net);
-    add_max_pool_layer(2, 2, net);
-
-    add_flatten_layer(net);
-    add_deep_layer(256, net);
-    add_output_layer(10, net);
+    add_input_layer(x_train->n_cols, net);
+    add_deep_layer(300, net);
+    add_deep_layer(100, net);
+    add_output_layer(y_train->n_cols, net);
 
     neural_net_compile(net);
     neural_net_info(net);
-
+    
     struct timeval start, end;
     gettimeofday(&start, NULL);
     fit(x_train, y_train, 5, 0.1, net);
