@@ -12,8 +12,8 @@ Matrix* one_hot_encode(Matrix* column, int n_classes) {
 }
 
 void normalize(Matrix* m) {
-    double min = matrix_get(m, 0, 0);
-    double max = matrix_get(m, 0, 0);
+    float min = matrix_get(m, 0, 0);
+    float max = matrix_get(m, 0, 0);
 
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
@@ -26,7 +26,7 @@ void normalize(Matrix* m) {
 
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
-            double x = matrix_get(m, i, j);
+            float x = matrix_get(m, i, j);
             matrix_assign(m, i, j, (x - min)/(max - min));
         }
     }
@@ -35,7 +35,7 @@ void normalize(Matrix* m) {
 void renormalize(Matrix* m, int original_min, int original_max) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
-            double x = matrix_get(m, i, j);
+            float x = matrix_get(m, i, j);
             matrix_assign(m, i, j, x*(original_max - original_min) + original_min);
         }
     }
@@ -54,13 +54,13 @@ void shuffle_matrix_inplace(Matrix* feature_m, Matrix* label_m) {
         int j = rand() % (i+1);
 
         for (int k=0; k<f_cols; k++) {
-            double tmp = matrix_get(feature_m, i, k);
+            float tmp = matrix_get(feature_m, i, k);
             matrix_assign(feature_m, i, k, matrix_get(feature_m, j, k));
             matrix_assign(feature_m, j, k, tmp);
         }
 
         for (int k=0; k<l_cols; k++) {
-            double tmp = matrix_get(label_m, i, k);
+            float tmp = matrix_get(label_m, i, k);
             matrix_assign(label_m, i, k, matrix_get(label_m, j, k));
             matrix_assign(label_m, j, k, tmp);
         }
@@ -83,7 +83,7 @@ void shuffle_tensor4D_inplace(Tensor4D* feature_t, Matrix* label_m) {
         feature_t->filters[j] = tmp_f;
 
         for (int k=0; k<l_cols; k++) {
-            double tmp = matrix_get(label_m, i, k);
+            float tmp = matrix_get(label_m, i, k);
             matrix_assign(label_m, i, k, matrix_get(label_m, j, k));
             matrix_assign(label_m, j, k, tmp);
         }

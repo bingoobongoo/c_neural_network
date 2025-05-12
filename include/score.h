@@ -3,7 +3,7 @@
 #include "matrix.h"
 
 typedef struct {
-    double accuracy;
+    float accuracy;
     int batch_size;
     Matrix* y_pred_argmax;
     Matrix* y_true_argmax;

@@ -31,14 +31,33 @@ int main() {
     );
     Tensor3D* output = tensor3D_new(2, 2, kernel->n_filters);
 
-    input_into_im2col(input, kernel, stride, input_im2col);
+    struct timeval start, end;
+    gettimeofday(&start, NULL);
+    for (int n=0; n<10000; n++) {
+        for (int i=0; i<kernel->n_filters; i++) {
+            for (int j=0; j<kernel->n_channels; j++) {
+                matrix_correlate_into(
+                    input->channels[j],
+                    kernel->filters[i]->channels[j],
+                    output->channels[j],
+                    1,
+                    VALID
+                );
+            }
+        }
+    }
+    gettimeofday(&end, NULL);
+    double conv_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+    printf("Conv time taken: %.3f seconds\n", conv_time);
+
+
+    gettimeofday(&start, NULL);
     kernel_into_im2col(kernel, kernel_im2col);
-
-    // matrix_print(input_im2col);
-    // matrix_print(kernel_im2col);
-
-    im2col_correlate(input_im2col, kernel_im2col, im2col_dot, output);
-
-    matrix_print(output->channels[1]);
-    
+    for (int n=0; n<10000; n++) {
+        input_into_im2col(input, kernel, stride, input_im2col);
+        im2col_correlate(input_im2col, kernel_im2col, im2col_dot, output);
+    }    
+    gettimeofday(&end, NULL);
+    double im2col_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+    printf("im2col time taken: %.3f seconds\n", im2col_time);
 }

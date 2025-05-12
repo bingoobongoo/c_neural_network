@@ -14,27 +14,27 @@ typedef enum {
 typedef struct {
     ActivationType type;
     Batch* y_true_batch;
-    double(*activation_func)(double, double);
-    double(*dZ)(double, double);
-    double activation_param;
+    float(*activation_func)(float, float);
+    float(*dZ)(float, float);
+    float activation_param;
     char* name;
 } Activation;
 
-Activation* activation_new(ActivationType type, double param);
+Activation* activation_new(ActivationType type, float param);
 
 Matrix* apply_activation_func(Activation* activation, Matrix* z_m);
 void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* into);
 Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m);
 void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into);
 
-double sigmoid(double z, double param);
-double sigmoid_dZ(double z, double param);
+float sigmoid(float z, float param);
+float sigmoid_dZ(float z, float param);
 
-double relu(double z, double param);
-double relu_dZ(double z, double param);
+float relu(float z, float param);
+float relu_dZ(float z, float param);
 
-double leaky_relu(double z, double param);
-double leaky_relu_dZ(double z, double param);
+float leaky_relu(float z, float param);
+float leaky_relu_dZ(float z, float param);
 
-double elu(double z, double param);
-double elu_dZ(double z, double param);
+float elu(float z, float param);
+float elu_dZ(float z, float param);

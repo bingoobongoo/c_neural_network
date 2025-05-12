@@ -1,6 +1,6 @@
 #include "optimizer.h"
 
-Optimizer* optimizer_sgd_new(double learning_rate) {
+Optimizer* optimizer_sgd_new(float learning_rate) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_sgd;
     opt->update_bias = update_bias_sgd;
@@ -33,7 +33,7 @@ void update_bias_sgd(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int l
     matrix_subtract_into(bias, gradient, bias);
 }
 
-Optimizer* optimizer_momentum_new(double learning_rate, double beta, bool nesterov) {
+Optimizer* optimizer_momentum_new(float learning_rate, float beta, bool nesterov) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_momentum;
     opt->update_bias = update_bias_momentum;
@@ -96,7 +96,7 @@ void update_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optimizer, 
     matrix_add_into(bias, bias_momentum_mat, bias);
 }
 
-Optimizer* optimizer_adagrad_new(double learning_rate) {
+Optimizer* optimizer_adagrad_new(float learning_rate) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_adagrad;
     opt->update_bias = update_bias_adagrad;
@@ -147,7 +147,7 @@ void update_weights_adagrad(Matrix* weights, Matrix* gradient, Optimizer* optimi
     
     matrix_scale_inplace(ada->learning_rate, gradient);
     matrix_add_scalar_into(1e-9, weight_s, intermediate);
-    matrix_apply_inplace(sqrt, intermediate);
+    matrix_apply_inplace(sqrtf, intermediate);
     matrix_divide_into(gradient, intermediate, intermediate);
     matrix_subtract_into(weights, intermediate, weights);
 }
@@ -163,12 +163,12 @@ void update_bias_adagrad(Matrix* bias, Matrix* gradient, Optimizer* optimizer, i
     
     matrix_scale_inplace(ada->learning_rate, gradient);
     matrix_add_scalar_into(1e-9, bias_s, intermediate);
-    matrix_apply_inplace(sqrt, intermediate);
+    matrix_apply_inplace(sqrtf, intermediate);
     matrix_divide_into(gradient, intermediate, intermediate);
     matrix_subtract_into(bias, intermediate, bias);
 }
 
-Optimizer* optimizer_adam_new(double learning_rate, double beta_m, double beta_s) {
+Optimizer* optimizer_adam_new(float learning_rate, float beta_m, float beta_s) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_adam;
     opt->update_bias = update_bias_adam;
@@ -257,7 +257,7 @@ void update_weights_adam(Matrix* weights, Matrix* gradient, Optimizer* optimizer
     matrix_scale_into(1.0 / (1.0 - pow(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
 
     matrix_add_scalar_into(1e-9, weight_s_corr, intermediate_w);
-    matrix_apply_inplace(sqrt, intermediate_w);
+    matrix_apply_inplace(sqrtf, intermediate_w);
     matrix_divide_into(weight_m_corr, intermediate_w, intermediate_w);
     matrix_scale_inplace(adam->learning_rate, intermediate_w);
     matrix_add_into(weights, intermediate_w, weights);
@@ -285,7 +285,7 @@ void update_bias_adam(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int 
     matrix_scale_into(1.0 / (1.0 - pow(adam->beta_s, adam->ctr)), bias_s, bias_s_corr);
 
     matrix_add_scalar_into(1e-9, bias_s_corr, intermediate_b);
-    matrix_apply_inplace(sqrt, intermediate_b);
+    matrix_apply_inplace(sqrtf, intermediate_b);
     matrix_divide_into(bias_m_corr, intermediate_b, intermediate_b);
     matrix_scale_inplace(adam->learning_rate, intermediate_b);
     matrix_add_into(bias, intermediate_b, bias);

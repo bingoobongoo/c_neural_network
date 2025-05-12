@@ -4,7 +4,7 @@ Matrix* matrix_new(int n_rows, int n_cols) {
     Matrix* m = (Matrix*)malloc(sizeof(Matrix));
     m->n_rows = n_rows;
     m->n_cols = n_cols;
-    m->entries = (double*)malloc(n_rows * n_cols * sizeof(double));
+    m->entries = (float*)malloc(n_rows * n_cols * sizeof(float));
 
     return m;
 }
@@ -19,7 +19,7 @@ void matrix_free(Matrix* m) {
     m = NULL;
 }
 
-double matrix_get(Matrix* m, int row, int col) {
+float matrix_get(Matrix* m, int row, int col) {
     #ifdef DEBUG
 
     if (col >= m->n_cols || row >= m->n_rows) {
@@ -32,7 +32,7 @@ double matrix_get(Matrix* m, int row, int col) {
     return m->entries[row*m->n_cols + col];
 }
 
-void matrix_assign(Matrix* m, int row, int col, double num) {
+void matrix_assign(Matrix* m, int row, int col, float num) {
     #ifdef DEBUG
 
     if (col >= m->n_cols || row >= m->n_rows) {
@@ -52,7 +52,7 @@ void matrix_save(Matrix* m, char* file_path) {
     fprintf(file, "%d\n", m->n_cols);
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
-            fprintf(file, "%.6lf ", matrix_get(m, i, j));
+            fprintf(file, "%.6f ", matrix_get(m, i, j));
         }
         fprintf(file, "\n");
     }
@@ -74,8 +74,8 @@ Matrix* matrix_load(char* file_path) {
     Matrix* m = matrix_new(n_rows, n_cols);
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
-            double num;
-            fscanf(file, "%lf", &num);
+            float num;
+            fscanf(file, "%f", &num);
             matrix_assign(m, i, j, num);
         }
     }
@@ -114,10 +114,10 @@ void matrix_print(Matrix* m) {
         printf("%c", '|');
         for (int j=0; j<m->n_cols; j++) {
             if (matrix_get(m, i, j) < 0.0){
-                printf("%.3lf  ", matrix_get(m, i, j));
+                printf("%.3f  ", matrix_get(m, i, j));
             }
             else {
-                printf(" %.3lf  ", matrix_get(m, i, j));
+                printf(" %.3f  ", matrix_get(m, i, j));
             }
         }
         printf("%c\n", '|');
@@ -129,10 +129,10 @@ void matrix_print_dimensions(Matrix* m) {
 }
 
 void matrix_zero(Matrix* m) {
-    memset(m->entries, 0, m->n_rows * m->n_cols * sizeof(double));
+    memset(m->entries, 0, m->n_rows * m->n_cols * sizeof(float));
 }
 
-void matrix_fill(Matrix* m, double num) {
+void matrix_fill(Matrix* m, float num) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, num);
@@ -140,17 +140,17 @@ void matrix_fill(Matrix* m, double num) {
     }
 }
 
-void matrix_fill_normal_distribution(Matrix* m, double mean, double std_deviation) {
+void matrix_fill_normal_distribution(Matrix* m, float mean, float std_deviation) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
-            double u1, u2;
+            float u1, u2;
             do {
                 u1 = rand() / (RAND_MAX + 1.0);
             } while (u1 < 1e-10);
             u2 = rand() / (RAND_MAX + 1.0);
         
-            double z = sqrt(-2.0 * log(u1)) * cos(2.0 * PI * u2);
-            double x = mean + std_deviation * z;
+            float z = sqrt(-2.0 * log(u1)) * cos(2.0 * PI * u2);
+            float x = mean + std_deviation * z;
             matrix_assign(m, i, j, x);
         }
     }
@@ -222,7 +222,7 @@ Matrix* matrix_add(Matrix* m1, Matrix* m2) {
     Matrix* sum_matrix = matrix_new(m1->n_rows, m1->n_cols);
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
+            float sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
             matrix_assign(sum_matrix, i, j, sum);
         }
     }
@@ -243,7 +243,7 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
+            float sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
             matrix_assign(into, i, j, sum);;
         }
     }
@@ -263,7 +263,7 @@ Matrix* matrix_subtract(Matrix* m1, Matrix* m2) {
     Matrix* diff_matrix = matrix_new(m1->n_rows, m1->n_cols);
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double diff = matrix_get(m1, i, j) - matrix_get(m2, i, j);
+            float diff = matrix_get(m1, i, j) - matrix_get(m2, i, j);
             matrix_assign(diff_matrix, i, j, diff);
         }
     }
@@ -284,7 +284,7 @@ void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double diff = matrix_get(m1, i, j) - matrix_get(m2, i, j);
+            float diff = matrix_get(m1, i, j) - matrix_get(m2, i, j);
             matrix_assign(into, i, j, diff);
         }
     }
@@ -304,7 +304,7 @@ Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
     Matrix* dot_matrix = matrix_new(m1->n_rows, m2->n_cols);
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m2->n_cols; j++) {
-            double dot = 0;
+            float dot = 0;
             for (int k=0; k<m1->n_cols; k++) {
                 dot += matrix_get(m1, i, k) * matrix_get(m2, k, j);
             }
@@ -325,33 +325,47 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
     }
 
     #endif
+    #ifdef BLAS
 
-    int m = m1->n_rows;
-    int k = m1->n_cols;
-    int n = m2->n_cols;
+    float alpha = 1.0f;
+    float beta = 0.0f;
+
+    cblas_sgemm(
+        CblasRowMajor,
+        CblasNoTrans,
+        CblasNoTrans,
+        m1->n_rows,
+        m2->n_cols,
+        m1->n_cols,
+        alpha,
+        m1->entries,
+        m1->n_cols,
+        m2->entries,
+        m2->n_cols,
+        beta,
+        into->entries,
+        m2->n_cols
+    );
+
+    #endif
+    #ifndef BLAS
 
     matrix_zero(into);
-
-    #pragma omp parallel for collapse(3)
-    for (int ii = 0; ii < m; ii += BLOCK_SIZE) {
-        for (int jj = 0; jj < n; jj += BLOCK_SIZE) {
-            for (int kk = 0; kk < k; kk += BLOCK_SIZE) {
-
-                for (int i = ii; i < ii + BLOCK_SIZE && i < m; i++) {
-                    for (int j = jj; j < jj + BLOCK_SIZE && j < n; j++) {
-                        double sum = matrix_get(into, i, j);
-
-                        for (int l = kk; l < kk + BLOCK_SIZE && l < k; l++) {
-                            sum += matrix_get(m1, i, l) * matrix_get(m2, l, j);
-                        }
-
-                        matrix_assign(into, i, j, sum);
-                    }
-                }
-
+    #pragma omp parallel for collapse(1)
+    for (int i=0; i<m1->n_rows; i++) {
+        for (int k=0; k<m1->n_cols; k++) {
+            for (int j=0; j<m2->n_cols; j++) {
+                matrix_assign(
+                    into, 
+                    i, 
+                    j,
+                    matrix_get(into, i, j) + matrix_get(m1, i, k) * matrix_get(m2, k, j)
+                );
             }
         }
     }
+
+    #endif
 }
 
 Matrix* matrix_multiply(Matrix* m1, Matrix* m2) {
@@ -368,7 +382,7 @@ Matrix* matrix_multiply(Matrix* m1, Matrix* m2) {
     Matrix* product_matrix = matrix_new(m1->n_rows, m1->n_cols);
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double product = matrix_get(m1, i, j) * matrix_get(m2, i, j);
+            float product = matrix_get(m1, i, j) * matrix_get(m2, i, j);
             matrix_assign(product_matrix, i, j, product);
         }
     }
@@ -389,7 +403,7 @@ void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double product = matrix_get(m1, i, j) * matrix_get(m2, i, j);
+            float product = matrix_get(m1, i, j) * matrix_get(m2, i, j);
             matrix_assign(into, i, j, product);
         }
     }
@@ -409,7 +423,7 @@ Matrix* matrix_divide(Matrix* m1, Matrix* m2) {
     Matrix* quotient_mat = matrix_new(m1->n_rows, m1->n_cols);
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double quotient = matrix_get(m1, i, j) / matrix_get(m2, i, j);
+            float quotient = matrix_get(m1, i, j) / matrix_get(m2, i, j);
             matrix_assign(quotient_mat, i, j, quotient);
         }
     }
@@ -430,7 +444,7 @@ void matrix_divide_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
-            double quotient = matrix_get(m1, i, j) / matrix_get(m2, i, j);
+            float quotient = matrix_get(m1, i, j) / matrix_get(m2, i, j);
             matrix_assign(into, i, j, quotient);
         }
     }
@@ -442,7 +456,7 @@ Matrix* matrix_sum_axis(Matrix* m, int axis) {
     case 0: {
         Matrix* sum_m = matrix_new(1, m->n_rows);
         for (int i=0; i<m->n_rows; i++) {
-            double sum = 0.0;
+            float sum = 0.0;
             for (int j=0; j<m->n_cols; j++) {
                 sum += matrix_get(m, i, j);
             }
@@ -456,7 +470,7 @@ Matrix* matrix_sum_axis(Matrix* m, int axis) {
     case 1: {
         Matrix* sum_m = matrix_new(1, m->n_cols);
         for (int i=0; i<m->n_cols; i++) {
-            double sum = 0.0;
+            float sum = 0.0;
             for (int j=0; j<m->n_rows; j++) {
                 sum += matrix_get(m, j, i);
             }
@@ -479,7 +493,7 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
     {
     case 0: {
         for (int i=0; i<m->n_rows; i++) {
-            double sum = 0.0;
+            float sum = 0.0;
             for (int j=0; j<m->n_cols; j++) {
                 sum += matrix_get(m, i, j);
             }
@@ -491,7 +505,7 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
     
     case 1: {
         for (int i=0; i<m->n_cols; i++) {
-            double sum = 0.0;
+            float sum = 0.0;
             for (int j=0; j<m->n_rows; j++) {
                 sum += matrix_get(m, j, i);
             }
@@ -508,8 +522,8 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
     }
 }
 
-double matrix_sum(Matrix* m) {
-    double sum = 0;
+float matrix_sum(Matrix* m) {
+    float sum = 0;
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             sum += matrix_get(m, i, j);
@@ -519,8 +533,8 @@ double matrix_sum(Matrix* m) {
     return sum;
 }
 
-double matrix_average(Matrix* m) {
-    return matrix_sum(m) / (double)(m->n_rows * m->n_cols);
+float matrix_average(Matrix* m) {
+    return matrix_sum(m) / (float)(m->n_rows * m->n_cols);
 }
 
 Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size) {
@@ -568,7 +582,7 @@ void matrix_argmax_into(Matrix* m, Matrix* into) {
             if (matrix_get(m, i, j) > matrix_get(m, i, argmax))
                 argmax = j; 
         }
-        matrix_assign(into, 0, i, (double)argmax);
+        matrix_assign(into, 0, i, (float)argmax);
     }
 }
 
@@ -606,7 +620,7 @@ void matrix_multiplicate_into(Matrix* m, int axis, int n_size, Matrix* into) {
     }
 }
 
-Matrix* matrix_apply(double (*func)(double), Matrix* m) {
+Matrix* matrix_apply(float (*func)(float), Matrix* m) {
     Matrix* transformed_matrix = matrix_new(m->n_rows, m->n_cols);
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
@@ -617,7 +631,7 @@ Matrix* matrix_apply(double (*func)(double), Matrix* m) {
     return transformed_matrix;
 }
 
-void matrix_apply_into(double (*func)(double), Matrix* m, Matrix* into) {
+void matrix_apply_into(float (*func)(float), Matrix* m, Matrix* into) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(into, i, j, func(matrix_get(m, i, j)));
@@ -625,7 +639,7 @@ void matrix_apply_into(double (*func)(double), Matrix* m, Matrix* into) {
     }
 }
 
-void matrix_apply_inplace(double (*func)(double), Matrix* m) {
+void matrix_apply_inplace(float (*func)(float), Matrix* m) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, func(matrix_get(m, i, j)));
@@ -633,7 +647,7 @@ void matrix_apply_inplace(double (*func)(double), Matrix* m) {
     }
 }
 
-Matrix* matrix_scale(double scalar, Matrix* m) {
+Matrix* matrix_scale(float scalar, Matrix* m) {
     Matrix* scaled_matrix = matrix_new(m->n_rows, m->n_cols);
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
@@ -644,7 +658,7 @@ Matrix* matrix_scale(double scalar, Matrix* m) {
     return scaled_matrix;
 }
 
-void matrix_scale_into(double scalar, Matrix* m, Matrix* into) {
+void matrix_scale_into(float scalar, Matrix* m, Matrix* into) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(into, i, j, matrix_get(m, i, j) * scalar);
@@ -652,7 +666,7 @@ void matrix_scale_into(double scalar, Matrix* m, Matrix* into) {
     }
 }
 
-void matrix_scale_inplace(double scalar, Matrix* m) {
+void matrix_scale_inplace(float scalar, Matrix* m) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, matrix_get(m, i, j) * scalar);
@@ -660,7 +674,7 @@ void matrix_scale_inplace(double scalar, Matrix* m) {
     }
 }
 
-Matrix* matrix_add_scalar(double scalar, Matrix* m) {
+Matrix* matrix_add_scalar(float scalar, Matrix* m) {
     Matrix* scaled_matrix = matrix_new(m->n_rows, m->n_cols);
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
@@ -671,7 +685,7 @@ Matrix* matrix_add_scalar(double scalar, Matrix* m) {
     return scaled_matrix;
 }
 
-void matrix_add_scalar_into(double scalar, Matrix* m, Matrix* into) {
+void matrix_add_scalar_into(float scalar, Matrix* m, Matrix* into) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(into, i, j, matrix_get(m, i, j) + scalar);
@@ -680,7 +694,7 @@ void matrix_add_scalar_into(double scalar, Matrix* m, Matrix* into) {
     }
 }
 
-void matrix_add_scalar_inplace(double scalar, Matrix* m) {
+void matrix_add_scalar_inplace(float scalar, Matrix* m) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, matrix_get(m, i, j) + scalar);
@@ -717,7 +731,7 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
-                double sum = 0.0;
+                float sum = 0.0;
                 for (int k=0; k<kernel->n_rows; k++) {
                     for (int l=0; l<kernel->n_cols; l++) {
                         sum += matrix_get(input, i*stride+k, j*stride+l) *
@@ -735,7 +749,7 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
         int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
         int input_h_idx, input_w_idx;
         int k, k_stick_out, l, l_stick_out;
-        double sum;
+        float sum;
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
@@ -778,7 +792,7 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int strid
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
-                double sum = 0.0;
+                float sum = 0.0;
                 for (int k=0; k<kernel->n_rows; k++) {
                     for (int l=0; l<kernel->n_cols; l++) {
                         sum += matrix_get(input, i*stride+k, j*stride+l) *
@@ -796,7 +810,7 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int strid
         int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
         int input_h_idx, input_w_idx;
         int k, k_stick_out, l, l_stick_out;
-        double sum;
+        float sum;
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
@@ -835,10 +849,10 @@ void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stri
     int out_w = (input->n_cols - kernel_size)/stride + 1;
     for (int i=0; i<out_h; i++) {
         for (int j=0; j<out_w; j++) {
-            double max = matrix_get(input, i*stride, j*stride);
+            float max = matrix_get(input, i*stride, j*stride);
             for (int k=0; k<kernel_size; k++) {
                 for (int l=1; l<kernel_size; l++) {
-                    double entry = matrix_get(input, i*stride+k, j*stride+l);
+                    float entry = matrix_get(input, i*stride+k, j*stride+l);
                     if (entry > max) max = entry;
                 }
             }
