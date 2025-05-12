@@ -33,7 +33,7 @@ void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into) {
     for (int c=0; c<t->n_channels; c++) {
         for (int i=0; i<t->n_rows; i++) {
             for (int j=0; j<t->n_cols; j++) {
-                double sum = matrix_get(into, i, j);
+                float sum = matrix_get(into, i, j);
                 matrix_assign(into, i, j, sum + matrix_get(t->channels[c], i, j));
             }
         }
@@ -73,7 +73,7 @@ void matrix_into_tensor3D(Matrix* m, Tensor3D* t, bool transpose) {
     }
 }
 
-void tensor4D_fill(Tensor4D* t, double num) {
+void tensor4D_fill(Tensor4D* t, float num) {
     for (int i=0; i<t->n_filters; i++) {
         for (int j=0; j<t->n_channels; j++) {
             matrix_fill(t->filters[i]->channels[j], num);
@@ -81,7 +81,7 @@ void tensor4D_fill(Tensor4D* t, double num) {
     }
 }
 
-void tensor4D_fill_normal_distribution(Tensor4D* t, double mean, double std_deviation) {
+void tensor4D_fill_normal_distribution(Tensor4D* t, float mean, float std_deviation) {
     for (int i=0; i<t->n_filters; i++) {
         for (int j=0; j<t->n_channels; j++) {
             matrix_fill_normal_distribution(
@@ -225,7 +225,6 @@ void input_into_im2col(Tensor3D* input, Tensor4D* kernel, int stride, Matrix* in
     int ker_h = kernel->n_rows;
     int ker_w = kernel->n_cols;
 
-    #pragma omp parallel for collapse(2)
     for (int i=0; i<out_h; i++) {
         for (int j=0; j<out_w; j++) {
             for (int c=0; c<input->n_channels; c++) {

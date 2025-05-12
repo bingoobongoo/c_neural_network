@@ -12,8 +12,8 @@ typedef struct {
     CostType cost_type;
     char* name;
     Matrix* loss_m;
-    double (*cost_func)(double, double);
-    double (*dA)(double, double);
+    float (*cost_func)(float, float);
+    float (*dA)(float, float);
 } Cost;
 
 Cost* cost_new(CostType type);
@@ -23,10 +23,10 @@ Matrix* apply_cost_func(Cost* cost, Matrix* output_activation_m, Matrix* label_m
 void apply_cost_func_into(Cost* cost, Matrix* output_activation_m, Matrix* label_m, Matrix* into);
 Matrix* apply_cost_dA(Cost* cost, Matrix* output_activation_m, Matrix* label_m);
 void apply_cost_dA_into(Cost* cost, Matrix* output_activation_m, Matrix* label_m, Matrix* into);
-double get_avg_batch_loss(Cost* cost, Matrix* output_activation_m, Matrix* label_m);
+float get_avg_batch_loss(Cost* cost, Matrix* output_activation_m, Matrix* label_m);
 
-double mse(double output_activation, double label);
-double mse_dA(double output_activation, double label);
+float mse(float output_activation, float label);
+float mse_dA(float output_activation, float label);
 
-double cat_cross_entropy(double output_activation, double label);
-double cat_cross_entropy_dA(double output_activation, double label);
+float cat_cross_entropy(float output_activation, float label);
+float cat_cross_entropy_dA(float output_activation, float label);

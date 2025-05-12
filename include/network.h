@@ -101,6 +101,7 @@ struct Layer {
     Layer* prev_layer;
     Layer* next_layer;
     NeuralNet* net_backref;
+    int layer_idx;
 };
 
 struct NeuralNet {
@@ -117,13 +118,13 @@ struct NeuralNet {
     bool is_cnn;
 };
 
-NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, double act_param, CostType cost_type, int batch_size);
+NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, float act_param, CostType cost_type, int batch_size);
 void neural_net_free(NeuralNet* net);
 void neural_net_compile(NeuralNet* net);
 void neural_net_link_layers(NeuralNet* net);
 void neural_net_info(NeuralNet* net);
 
-void fit(Matrix* x_train, Matrix* y_train, int n_epochs, double validation, NeuralNet* net);
+void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, NeuralNet* net);
 void score(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void forward_prop(NeuralNet* net, bool training);
@@ -151,3 +152,19 @@ void layer_output_compile(Layer* l, NeuralNet* net);
 void layer_conv2D_compile(Layer* l, NeuralNet* net);
 void layer_flatten_compile(Layer* l, NeuralNet* net);
 void layer_max_pool_compile(Layer* l, NeuralNet* net);
+
+void layer_input_fp(Layer* l, NeuralNet* net);
+void layer_conv2D_input_fp(Layer* l, NeuralNet* net);
+void layer_deep_fp(Layer* l, NeuralNet* net);
+void layer_conv2D_fp(Layer* l, NeuralNet* net);
+void layer_flatten_fp(Layer* l, NeuralNet* net);
+void layer_max_pool_fp(Layer* l, NeuralNet* net);
+
+void layer_output_bp(Layer* l, NeuralNet* net);
+void layer_deep_bp(Layer* l, NeuralNet* net);
+void layer_conv2D_bp(Layer* l, NeuralNet* net);
+void layer_flatten_bp(Layer* l, NeuralNet* net);
+void layer_max_pool_bp(Layer* l, NeuralNet* net);
+
+void layer_deep_update_weights(Layer* l, NeuralNet* net);
+void layer_conv2D_update_weights(Layer* l, NeuralNet* net);
