@@ -1689,11 +1689,11 @@ void layer_conv2D_bp(Layer* l, NeuralNet* net) {
                         l->params.conv.stride,
                         VALID
                     );
-                    tensor3D_sum_element_wise_into(
-                        corr_t3d,
-                        filter_grad->filters[i]->channels[j]
-                    );
                 }
+                tensor3D_sum_element_wise_into(
+                    corr_t3d,
+                    filter_grad->filters[i]->channels[j]
+                );
             }
         }
         tensor3D_free(corr_t3d);
