@@ -1292,6 +1292,7 @@ void layer_conv2D_compile(Layer* l, NeuralNet* net) {
     
     kernel_into_im2col(
         l->cache.conv.filter,
+        false,
         l->cache.conv.kernel_im2col
     );
 }
@@ -1382,6 +1383,7 @@ void layer_conv2D_fp(Layer* l, NeuralNet* net) {
             input->filters[n],
             filter,
             l->params.conv.stride,
+            VALID,
             l->cache.conv.input_im2col 
         );
         im2col_correlate(
@@ -1441,6 +1443,7 @@ void layer_flatten_fp(Layer* l, NeuralNet* net) {
     tensor4D_into_matrix(
         layer_get_output_tensor4D(l->prev_layer),
         l->cache.flat.output,
+        false,
         false
     );
 }
@@ -1789,5 +1792,5 @@ void layer_conv2D_update_weights(Layer* l, NeuralNet* net) {
             l->layer_idx
         );
     }
-    kernel_into_im2col(filter, l->cache.conv.kernel_im2col);
+    kernel_into_im2col(filter, false, l->cache.conv.kernel_im2col);
 }

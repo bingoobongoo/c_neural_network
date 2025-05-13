@@ -22,11 +22,11 @@ int main() {
         optimizer_sgd_new(0.005),
         RELU, 1.0,
         CAT_CROSS_ENTROPY, 
-        128
+        64
     );
 
     add_input_layer(x_train->n_cols, net);
-    add_deep_layer(1200, net);
+    add_deep_layer(300, net);
     add_deep_layer(100, net);
     add_output_layer(y_train->n_cols, net);
 

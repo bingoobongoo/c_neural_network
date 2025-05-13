@@ -171,34 +171,84 @@ void matrix_into_tensor4D(Matrix* m, Tensor4D* t) {
     }
 }
 
-void tensor4D_into_matrix(Tensor4D* t, Matrix* m, bool transpose) {
-    if (transpose) {
+void tensor4D_into_matrix(Tensor4D* t, Matrix* m, bool transpose, bool flipped) {
+    if (transpose && !flipped) {
+        int jk, kk;
         for (int i=0; i<t->n_filters; i++) {
             Tensor3D* t3d = t->filters[i];
     
             for (int j=0; j<t->n_channels; j++) {
                 Matrix* channel_mat = t3d->channels[j];
-    
+                jk = j*t->n_rows*t->n_cols;
                 for (int k=0; k<t->n_rows; k++) {
+                    kk = k*t->n_cols;
                     for (int l=0; l<t->n_cols; l++) {
-                        int idx = j * (t->n_rows * t->n_cols) + k * t->n_cols + l;
+                        int idx = jk + kk + l;
                         matrix_assign(m, idx, i, matrix_get(channel_mat, k, l));
                     }
                 }
             }
         }
     }
-    else {
+    else if (transpose && flipped) {
+        int jk, kk;
         for (int i=0; i<t->n_filters; i++) {
             Tensor3D* t3d = t->filters[i];
     
             for (int j=0; j<t->n_channels; j++) {
                 Matrix* channel_mat = t3d->channels[j];
-    
+                jk = j*t->n_rows*t->n_cols;
                 for (int k=0; k<t->n_rows; k++) {
+                    kk = k*t->n_cols;
                     for (int l=0; l<t->n_cols; l++) {
-                        int idx = j * (t->n_rows * t->n_cols) + k * t->n_cols + l;
+                        int idx = jk + kk + l;
+                        matrix_assign(m, idx, i, matrix_get(
+                                channel_mat, 
+                                t->n_rows - k - 1, 
+                                t->n_cols - l - 1
+                            )
+                        );
+                    }
+                }
+            }
+        }
+    }
+    else if (!transpose && !flipped) {
+        int jk, kk;
+        for (int i=0; i<t->n_filters; i++) {
+            Tensor3D* t3d = t->filters[i];
+    
+            for (int j=0; j<t->n_channels; j++) {
+                Matrix* channel_mat = t3d->channels[j];
+                jk = j*t->n_rows*t->n_cols;
+                for (int k=0; k<t->n_rows; k++) {
+                    kk = k*t->n_cols;
+                    for (int l=0; l<t->n_cols; l++) {
+                        int idx = jk + kk + l;
                         matrix_assign(m, i, idx, matrix_get(channel_mat, k, l));
+                    }
+                }
+            }
+        }
+    }
+    else if (!transpose && flipped) {
+        int jk, kk;
+        for (int i=0; i<t->n_filters; i++) {
+            Tensor3D* t3d = t->filters[i];
+    
+            for (int j=0; j<t->n_channels; j++) {
+                Matrix* channel_mat = t3d->channels[j];
+                jk = j*t->n_rows*t->n_cols;
+                for (int k=0; k<t->n_rows; k++) {
+                    kk = k*t->n_cols;
+                    for (int l=0; l<t->n_cols; l++) {
+                        int idx = jk + kk + l;
+                        matrix_assign(m, i, idx, matrix_get(
+                                channel_mat, 
+                                t->n_rows - k - 1, 
+                                t->n_cols - l - 1
+                            )
+                        );
                     }
                 }
             }
@@ -215,32 +265,97 @@ void tensor4D_print_shape(Tensor4D* t) {
     );
 }
 
-void kernel_into_im2col(Tensor4D* kernel, Matrix* kernel_im2col) {
-    tensor4D_into_matrix(kernel, kernel_im2col, true);
+void kernel_into_im2col(Tensor4D* kernel, bool flipped, Matrix* kernel_im2col) {
+    tensor4D_into_matrix(kernel, kernel_im2col, true, flipped);
 }
 
-void input_into_im2col(Tensor3D* input, Tensor4D* kernel, int stride, Matrix* input_im2col) {
-    int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
-    int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
-    int ker_h = kernel->n_rows;
-    int ker_w = kernel->n_cols;
+void input_into_im2col(Tensor3D* input, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col) {
+    switch (corr_type)
+    {
+    case VALID: {
+        int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
+        int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
+        int ker_h = kernel->n_rows;
+        int ker_w = kernel->n_cols;
+        int input_h_idx, input_w_idx;
+        int dest_h_idx, dest_w_idx;
+        int ck, kk, is, js;
 
-    for (int i=0; i<out_h; i++) {
-        for (int j=0; j<out_w; j++) {
-            for (int c=0; c<input->n_channels; c++) {
-                for (int k=0; k<ker_h; k++) {
-                    for (int l=0; l<ker_w; l++) {
-                        matrix_assign(
-                            input_im2col,
-                            i*out_w + j,
-                            c*ker_h*ker_w + k*ker_w + l,
-                            matrix_get(input->channels[c], i*stride+k, j*stride+l)
-                        );
+        for (int i=0; i<out_h; i++) {
+            is = i*stride;
+            for (int j=0; j<out_w; j++) {
+                js = j*stride;
+                dest_h_idx = i*out_w + j;
+                for (int c=0; c<input->n_channels; c++) {
+                    ck = c*ker_h*ker_w;
+                    for (int k=0; k<ker_h; k++) {
+                        kk = k*ker_w;
+                        for (int l=0; l<ker_w; l++) {
+                            matrix_assign(
+                                input_im2col,
+                                dest_h_idx,
+                                ck + kk + l,
+                                matrix_get(input->channels[c], is+k, js+l)
+                            );
+                        }
                     }
                 }
             }
         }
+        break;
     }
+    
+    case FULL: {
+        int ker_h = kernel->n_rows;
+        int ker_w = kernel->n_cols;
+        int out_h = (input->n_rows + ker_h - 2 + stride)/stride;
+        int out_w = (input->n_cols + ker_w - 2 + stride)/stride;
+        int dest_h_idx, dest_w_idx;
+        int ki, lj, ck, kk, is, js;
+        int k_stick_out, l_stick_out;
+        int k_thresh, l_thresh;
+
+        matrix_zero(input_im2col);
+
+        for (int i=0; i<out_h; i++) {
+            is = i*stride;
+            ki = ker_h - is - 1;
+            if (ki<0) ki=0;
+            k_stick_out = is - input->n_rows + 1;
+            if (k_stick_out<0) k_stick_out=0;
+            k_thresh = ker_h - k_stick_out;
+            for (int j=0; j<out_w; j++) {
+                js = j*stride;
+                lj = ker_w - js - 1;
+                if (lj<0) lj=0;
+                l_stick_out = js - input->n_cols + 1;
+                if (l_stick_out<0) l_stick_out=0;
+                l_thresh = ker_w - l_stick_out;
+                dest_h_idx = i*out_w + j;
+                for (int c=0; c<input->n_channels; c++) {
+                    ck = c*ker_h*ker_w;
+                    for (int k=ki; k<k_thresh; k++) {
+                        kk = k*ker_w;
+                        for (int l=lj; l<l_thresh; l++) {
+                            matrix_assign(
+                                input_im2col,
+                                dest_h_idx,
+                                ck + kk + l,
+                                matrix_get(
+                                    input->channels[c], 
+                                    is + k - ker_h + 1, 
+                                    js + l - ker_w + 1
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        break;
+    }
+    }
+    
 }
 
 void im2col_correlate(Matrix* input_im2col, Matrix* kernel_im2col, Matrix* im2col_dot, Tensor3D* output) {
