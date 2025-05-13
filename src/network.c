@@ -378,7 +378,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, Neura
     for (int epoch=0; epoch<n_epochs; epoch++) {
         struct timeval start, end;
         gettimeofday(&start, NULL);
-        for (start_idx; start_idx<training_size - net->batch_size; start_idx+=net->batch_size, i++) {
+        for (start_idx=0, i=0; start_idx<training_size - net->batch_size; start_idx+=net->batch_size, i++) {
             if (net->is_cnn) {
                 batchify_tensor_into(x_train_split_tensor, start_idx, net->train_batch);
             }
@@ -387,7 +387,11 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, Neura
             }
             batchify_matrix_into(y_train_split, start_idx, net->label_batch);
             forward_prop(net, true);
-            avg_loss[i] = get_avg_batch_loss(net->cost, net->layers[net->n_layers-1]->cache.dense.output, net->label_batch->data.matrix);
+            avg_loss[i] = get_avg_batch_loss(
+                net->cost, 
+                net->layers[net->n_layers-1]->cache.dense.output, 
+                net->label_batch->data.matrix
+            );
             Matrix* y_pred = net->layers[net->n_layers-1]->cache.dense.output;
             Matrix* y_true = net->label_batch->data.matrix;
             score_batch(net->batch_score, y_pred, y_true);
@@ -409,8 +413,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, Neura
         }
         avg_epoch_train_acc = sum / (float)i;
 
-        i = 0;
-        for (start_idx=0; start_idx<val_size - net->batch_size; start_idx+=net->batch_size, i++) {
+        for (start_idx=0, i=0; start_idx<val_size - net->batch_size; start_idx+=net->batch_size, i++) {
             if (net->is_cnn) {
                 batchify_tensor_into(x_val_split_tensor, start_idx, net->train_batch);
             }

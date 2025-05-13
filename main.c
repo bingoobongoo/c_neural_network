@@ -22,14 +22,20 @@ int main() {
         optimizer_sgd_new(0.005),
         RELU, 1.0,
         CAT_CROSS_ENTROPY, 
-        32
+        8
     );
+
+    // add_input_layer(x_train->n_cols, net);
+    // add_deep_layer(300, net);
+    // add_deep_layer(100, net);
+    // add_output_layer(y_train->n_cols, net);
 
     add_conv_input_layer(28, 28, 1, net);
     add_conv_layer(8, 3, 1, net);
     add_max_pool_layer(2, 2, net);
     add_flatten_layer(net);
-    add_deep_layer(100, net);
+    add_deep_layer(300, net);
+    // add_deep_layer(100,net);
     add_output_layer(y_train->n_cols, net);
 
     neural_net_compile(net);
