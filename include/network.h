@@ -66,9 +66,15 @@ typedef struct {
     // auxiliary
     Tensor4D* dCost_dA;
     Tensor4D* dActivation_dZ;
-    Matrix* input_im2col;
-    Matrix* kernel_im2col;
-    Matrix* im2col_dot;
+    Matrix* fp_im2col_input;
+    Matrix* fp_im2col_kernel;
+    Matrix* fp_im2col_output;
+    Matrix* dCost_dW_im2col_input;
+    Matrix* dCost_dW_im2col_kernel;
+    Matrix* dCost_dW_im2col_output;
+    Matrix* delta_im2col_input;
+    Matrix* delta_im2col_kernel;
+    Matrix* delta_im2col_output;
 } ConvCache;
 
 typedef struct {

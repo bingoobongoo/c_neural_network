@@ -51,19 +51,19 @@ int main() {
     double conv_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
     printf("Conv time taken: %.3f seconds\n", conv_time);
 
-    // input_into_im2col(input, kernel, stride, FULL, input_im2col);
-    // matrix_print(input_im2col);
+    kernel_into_im2col_chwise(kernel, true, kernel_im2col);
+    matrix_print(kernel_im2col);
 
 
-    gettimeofday(&start, NULL);
-    kernel_into_im2col(kernel, true, kernel_im2col);
-    for (int n=0; n<10000; n++) {
-        input_into_im2col(input, kernel, stride, FULL, input_im2col);
-        im2col_correlate(input_im2col, kernel_im2col, im2col_dot, output);
-    }    
-    gettimeofday(&end, NULL);
-    double im2col_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
-    printf("im2col time taken: %.3f seconds\n", im2col_time);
+    // gettimeofday(&start, NULL);
+    // kernel_into_im2col(kernel, true, kernel_im2col);
+    // for (int n=0; n<10000; n++) {
+    //     input_into_im2col(input, kernel, stride, FULL, input_im2col);
+    //     im2col_correlate(input_im2col, kernel_im2col, im2col_dot, output);
+    // }    
+    // gettimeofday(&end, NULL);
+    // double im2col_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+    // printf("im2col time taken: %.3f seconds\n", im2col_time);
 
-    matrix_print(im2col_dot);
+    // matrix_print(im2col_dot);
 }
