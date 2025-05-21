@@ -10,28 +10,17 @@ from keras.api.utils import to_categorical
 x_train = x_train.astype("float32") / 255.0
 x_test  = x_test.astype("float32") / 255.0
 
-# x_train = x_train.reshape(-1, 784)
-# x_test  = x_test.reshape(-1, 784)
-x_train = x_train.reshape(-1, 28, 28, 1)
-x_test  = x_test.reshape(-1, 28, 28, 1)
+x_train = x_train.reshape(-1, 784)
+x_test  = x_test.reshape(-1, 784)
+# x_train = x_train.reshape(-1, 28, 28, 1)
+# x_test  = x_test.reshape(-1, 28, 28, 1)
 
 y_train = to_categorical(y_train, 10)
-y_test  = to_categorical(y_test, 10)
-
-# model = Sequential([
-#     Dense(300, activation="relu"),
-#     Dense(100, activation="relu"),
-#     Dense(10, activation="relu")
-# ])
+y_test  = to_categorical(y_test, 10) 
 
 model = Sequential([
-    MaxPooling2D((2, 2), 2),
-    Conv2D(16, (3, 3), 1, activation="relu", data_format="channels_last"),
-    MaxPooling2D((2, 2), 2),
-    Conv2D(32, (3, 3), 1, activation="relu", data_format="channels_last"),
-    MaxPooling2D((2, 2), 2),
-    Conv2D(128, (2, 2), 1, activation="relu", data_format="channels_last"),
-    Flatten(),
+    Dense(600, activation="relu"),
+    Dense(200, activation="relu"),
     Dense(10, activation="softmax")
 ])
 

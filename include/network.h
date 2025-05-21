@@ -1,6 +1,7 @@
 #pragma once
 
 #include "matrix.h"
+#include "layer.h"
 #include "tensor.h"
 #include "activation.h"
 #include "cost.h"
@@ -10,105 +11,6 @@
 #include "score.h"
 #include <time.h>
 #include <sys/time.h>
-
-typedef struct Layer Layer;
-typedef struct NeuralNet NeuralNet;
-
-typedef enum {
-    INPUT,
-    OUTPUT,
-    DEEP,
-    CONV_2D_INPUT,
-    CONV_2D,
-    MAX_POOL,
-    FLATTEN,
-    UNDEFINED
-} LayerType;
-
-
-typedef struct {
-    int n_units;
-} DenseParams;
-
-typedef struct {
-    Matrix* output;
-    Matrix* z;
-    Matrix* weight;
-    Matrix* bias;
-    Matrix* delta;
-    Matrix* weight_gradient;
-    Matrix* bias_gradient;
-    
-    // auxiliary gradients
-    Matrix* dCost_dA; 
-    Matrix* dActivation_dZ;
-    Matrix* dZ_dW_t;
-    Matrix* dZnext_dA_t;
-    Matrix* dCost_dZ_col_sum;
-} DenseCache;
-
-typedef struct {
-    int n_filters;
-    int filter_size;
-    int stride;
-    int n_units;
-} ConvParams;
-
-typedef struct {
-    Tensor4D* output;
-    Tensor4D* z;
-    Tensor4D* filter;
-    Tensor4D* bias;
-    Tensor4D* delta;
-    Tensor4D* filter_gradient;
-    Tensor4D* bias_gradient;
-
-    // auxiliary
-    Tensor4D* dCost_dA;
-    Tensor4D* dActivation_dZ;
-    Matrix* fp_im2col_input;
-    Matrix* fp_im2col_kernel;
-    Matrix* fp_im2col_output;
-    Matrix* dCost_dW_im2col_input;
-    Matrix* dCost_dW_im2col_kernel;
-    Matrix* dCost_dW_im2col_output;
-    Matrix* delta_im2col_input;
-    Matrix* delta_im2col_kernel;
-    Matrix* delta_im2col_output;
-} ConvCache;
-
-typedef struct {
-    int n_units;
-} FlattenParams;
-
-typedef struct {
-    Matrix* output;
-    Matrix* dCost_dA_matrix;
-    Matrix* dZnext_dA_t;
-} FlattenCache;
-
-typedef union {
-    DenseParams dense;
-    ConvParams conv;
-    FlattenParams flat;
-} LayerParams;
-
-typedef union {
-    DenseCache dense;
-    ConvCache conv;
-    FlattenCache flat;
-} LayerCache;
-
-struct Layer {
-    LayerType l_type;
-    LayerParams params;
-    LayerCache cache;
-    Activation* activation;
-    Layer* prev_layer;
-    Layer* next_layer;
-    NeuralNet* net_backref;
-    int layer_idx;
-};
 
 struct NeuralNet {
     int n_layers;
@@ -136,15 +38,6 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void forward_prop(NeuralNet* net, bool training);
 void back_prop(NeuralNet* net);
 
-Layer* layer_new(LayerType l_type, NeuralNet* net);
-void layer_free(Layer* layer);
-
-int layer_get_n_units(Layer* layer);
-Matrix* layer_get_output_matrix(Layer* layer);
-Tensor4D* layer_get_output_tensor4D(Layer* layer);
-Matrix* layer_get_delta_matrix(Layer* layer);
-Tensor4D* layer_get_delta_tensor4D(Layer* layer);
-
 void add_input_layer(int n_units, NeuralNet* net);
 void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net);
 void add_output_layer(int n_units, NeuralNet* net);
@@ -152,25 +45,3 @@ void add_deep_layer(int n_units, NeuralNet* net);
 void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);
 void add_flatten_layer(NeuralNet* net);
 void add_max_pool_layer(int filter_size, int stride, NeuralNet* net);
-
-void layer_deep_compile(Layer* l, NeuralNet* net);
-void layer_output_compile(Layer* l, NeuralNet* net);
-void layer_conv2D_compile(Layer* l, NeuralNet* net);
-void layer_flatten_compile(Layer* l, NeuralNet* net);
-void layer_max_pool_compile(Layer* l, NeuralNet* net);
-
-void layer_input_fp(Layer* l, NeuralNet* net);
-void layer_conv2D_input_fp(Layer* l, NeuralNet* net);
-void layer_deep_fp(Layer* l, NeuralNet* net);
-void layer_conv2D_fp(Layer* l, NeuralNet* net);
-void layer_flatten_fp(Layer* l, NeuralNet* net);
-void layer_max_pool_fp(Layer* l, NeuralNet* net);
-
-void layer_output_bp(Layer* l, NeuralNet* net);
-void layer_deep_bp(Layer* l, NeuralNet* net);
-void layer_conv2D_bp(Layer* l, NeuralNet* net);
-void layer_flatten_bp(Layer* l, NeuralNet* net);
-void layer_max_pool_bp(Layer* l, NeuralNet* net);
-
-void layer_deep_update_weights(Layer* l, NeuralNet* net);
-void layer_conv2D_update_weights(Layer* l, NeuralNet* net);
