@@ -1,6 +1,5 @@
 #include "network.h"
 #include "load_data.h"
-#include "preprocessing.h"
 
 int main() {
     openblas_set_num_threads(4);
@@ -25,16 +24,16 @@ int main() {
         32
     );
 
-    // add_input_layer(x_train->n_cols, net);
-    // add_deep_layer(300, net);
-    // add_deep_layer(100, net);
-    // add_output_layer(y_train->n_cols, net);
-
-    add_conv_input_layer(28, 28, 1, net);
-    add_conv_layer(16, 8, 1, net);
-    add_max_pool_layer(2, 2, net);
-    add_flatten_layer(net);
+    add_input_layer(x_train->n_cols, net);
+    add_deep_layer(300, net);
+    add_deep_layer(100, net);
     add_output_layer(y_train->n_cols, net);
+
+    // add_conv_input_layer(28, 28, 1, net);
+    // add_conv_layer(16, 8, 1, net);
+    // add_max_pool_layer(2, 2, net);
+    // add_flatten_layer(net);
+    // add_output_layer(y_train->n_cols, net);
 
     neural_net_compile(net);
     neural_net_info(net);

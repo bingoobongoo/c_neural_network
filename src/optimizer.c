@@ -1,6 +1,6 @@
 #include "optimizer.h"
 
-Optimizer* optimizer_sgd_new(float learning_rate) {
+Optimizer* optimizer_sgd_new(nn_float learning_rate) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_sgd;
     opt->update_bias = update_bias_sgd;
@@ -33,7 +33,7 @@ void update_bias_sgd(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int l
     matrix_subtract_into(bias, gradient, bias);
 }
 
-Optimizer* optimizer_momentum_new(float learning_rate, float beta, bool nesterov) {
+Optimizer* optimizer_momentum_new(nn_float learning_rate, nn_float beta, bool nesterov) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_momentum;
     opt->update_bias = update_bias_momentum;
@@ -96,7 +96,7 @@ void update_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optimizer, 
     matrix_add_into(bias, bias_momentum_mat, bias);
 }
 
-Optimizer* optimizer_adagrad_new(float learning_rate) {
+Optimizer* optimizer_adagrad_new(nn_float learning_rate) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_adagrad;
     opt->update_bias = update_bias_adagrad;
@@ -168,7 +168,7 @@ void update_bias_adagrad(Matrix* bias, Matrix* gradient, Optimizer* optimizer, i
     matrix_subtract_into(bias, intermediate, bias);
 }
 
-Optimizer* optimizer_adam_new(float learning_rate, float beta_m, float beta_s) {
+Optimizer* optimizer_adam_new(nn_float learning_rate, nn_float beta_m, nn_float beta_s) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_weights = update_weights_adam;
     opt->update_bias = update_bias_adam;

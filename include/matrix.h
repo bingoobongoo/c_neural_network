@@ -9,12 +9,15 @@
 #include <cblas.h>
 #include <openblas_config.h>
 
+#include "config.h"
+
+
 #define PI 3.14159265358979323846
 #define BLAS
 // #define DEBUG
 
 typedef struct {
-    float* entries;
+    nn_float* entries;
     int n_rows;
     int n_cols;
 } Matrix;
@@ -26,8 +29,8 @@ typedef enum {
 
 Matrix* matrix_new(int n_rows, int n_cols);
 void matrix_free(Matrix* m);
-float matrix_get(Matrix* m, int row, int col);
-void matrix_assign(Matrix* m, int row, int col, float num);
+nn_float matrix_get(Matrix* m, int row, int col);
+void matrix_assign(Matrix* m, int row, int col, nn_float num);
 void matrix_save(Matrix* m, char* file_path);
 Matrix* matrix_load(char* file_path);
 Matrix* matrix_copy(Matrix* m);
@@ -36,8 +39,8 @@ void matrix_assign_ptr(Matrix** to, Matrix* from);
 void matrix_print(Matrix* m);
 void matrix_print_dimensions(Matrix* m);
 void matrix_zero(Matrix* m);
-void matrix_fill(Matrix* m, float num);
-void matrix_fill_normal_distribution(Matrix* m, float mean, float std_deviation);
+void matrix_fill(Matrix* m, nn_float num);
+void matrix_fill_normal_distribution(Matrix* m, nn_float mean, nn_float std_deviation);
 Matrix* matrix_slice_rows(Matrix* m, int start_idx, int slice_size);
 void matrix_slice_rows_into(Matrix* m, int start_idx, int slice_size, Matrix* into);
 bool matrix_check_dimensions(Matrix* m1, Matrix* m2);
@@ -53,20 +56,20 @@ Matrix* matrix_divide(Matrix* m1, Matrix* m2);
 void matrix_divide_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_sum_axis(Matrix* m, int axis);
 void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into);
-float matrix_sum(Matrix* m);
-float matrix_average(Matrix* m);
+nn_float matrix_sum(Matrix* m);
+nn_float matrix_average(Matrix* m);
 void matrix_argmax_into(Matrix* m, Matrix* into);
 Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size);
 void matrix_multiplicate_into(Matrix* m, int axis, int n_size, Matrix* into);
-Matrix* matrix_apply(float (*func)(float), Matrix* m);
-void matrix_apply_into(float (*func)(float), Matrix* m, Matrix* into);
-void matrix_apply_inplace(float (*func)(float), Matrix* m);
-Matrix* matrix_scale(float scalar, Matrix* m);
-void matrix_scale_into(float scalar, Matrix* m, Matrix* into);
-void matrix_scale_inplace(float scalar, Matrix* m);
-Matrix* matrix_add_scalar(float scalar, Matrix* m);
-void matrix_add_scalar_into(float scalar, Matrix* m, Matrix* into);
-void matrix_add_scalar_inplace(float scalar, Matrix* m);
+Matrix* matrix_apply(nn_float (*func)(nn_float), Matrix* m);
+void matrix_apply_into(nn_float (*func)(nn_float), Matrix* m, Matrix* into);
+void matrix_apply_inplace(nn_float (*func)(nn_float), Matrix* m);
+Matrix* matrix_scale(nn_float scalar, Matrix* m);
+void matrix_scale_into(nn_float scalar, Matrix* m, Matrix* into);
+void matrix_scale_inplace(nn_float scalar, Matrix* m);
+Matrix* matrix_add_scalar(nn_float scalar, Matrix* m);
+void matrix_add_scalar_into(nn_float scalar, Matrix* m, Matrix* into);
+void matrix_add_scalar_inplace(nn_float scalar, Matrix* m);
 Matrix* matrix_transpose(Matrix* m);
 void matrix_transpose_into(Matrix* m, Matrix* into);
 void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type);

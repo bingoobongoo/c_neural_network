@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config.h"
 #include "dense.h"
 #include "conv2D.h"
 #include "flatten.h"

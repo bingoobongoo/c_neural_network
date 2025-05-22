@@ -1072,7 +1072,7 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
 
     // bias gradient (dCost_dB) calculation
     for (int i=0; i<filter->n_filters; i++) {
-        float sum = 0.0;
+        nn_float sum = 0.0;
         for (int n=0; n<batch_size; n++) {
             sum += matrix_sum(delta->filters[n]->channels[i]);
         }

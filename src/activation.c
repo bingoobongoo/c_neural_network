@@ -1,6 +1,6 @@
 #include "activation.h"
 
-Activation* activation_new(ActivationType type, float param) {
+Activation* activation_new(ActivationType type, nn_float param) {
     Activation* act = (Activation*)malloc(sizeof(Activation));
     act->type = type;
     act->y_true_batch = NULL;
@@ -53,8 +53,8 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
         Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                float z = matrix_get(z_m, i, j);
-                float param = activation->activation_param;
+                nn_float z = matrix_get(z_m, i, j);
+                nn_float param = activation->activation_param;
                 matrix_assign(a, i, j, activation->activation_func(z, param));
             }
         }
@@ -64,13 +64,13 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
     else if (activation->type == SOFTMAX) {
         Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
-            float max_z = matrix_get(z_m, i, 0);
+            nn_float max_z = matrix_get(z_m, i, 0);
             for (int j=0; j<z_m->n_cols; j++) {
                 if (matrix_get(z_m, i, j) > max_z)
                 max_z = matrix_get(z_m, i, j);
             }
 
-            float sum_z = 0.0;
+            nn_float sum_z = 0.0;
             for (int j=0; j<a->n_cols; j++) {
                 matrix_assign(a, i, j, exp(matrix_get(z_m, i, j) - max_z));
                 sum_z += matrix_get(a, i, j);
@@ -89,21 +89,21 @@ void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* int
     if (activation->type != SOFTMAX) {
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                float z = matrix_get(z_m, i, j);
-                float param = activation->activation_param;
+                nn_float z = matrix_get(z_m, i, j);
+                nn_float param = activation->activation_param;
                 matrix_assign(into, i, j, activation->activation_func(z, param));
             }
         }
     }
     else if (activation->type == SOFTMAX) {
         for (int i=0; i<z_m->n_rows; i++) {
-            float max_z = matrix_get(z_m, i, 0);
+            nn_float max_z = matrix_get(z_m, i, 0);
             for (int j=0; j<z_m->n_cols; j++) {
                 if (matrix_get(z_m, i, j) > max_z)
                 max_z = matrix_get(z_m, i, j);
             }
 
-            float sum_z = 0.0;
+            nn_float sum_z = 0.0;
             for (int j=0; j<into->n_cols; j++) {
                 matrix_assign(into, i, j, exp(matrix_get(z_m, i, j) - max_z));
                 sum_z += matrix_get(into, i, j);
@@ -121,8 +121,8 @@ Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m) {
         Matrix* dZ = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                float z = matrix_get(z_m, i, j);
-                float param = activation->activation_param;
+                nn_float z = matrix_get(z_m, i, j);
+                nn_float param = activation->activation_param;
                 matrix_assign(dZ, i, j, activation->dZ(z, param));
             }
         }
@@ -141,8 +141,8 @@ void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into)
     if (activation->type != SOFTMAX) {
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
-                float z = matrix_get(z_m, i, j);
-                float param = activation->activation_param;
+                nn_float z = matrix_get(z_m, i, j);
+                nn_float param = activation->activation_param;
                 matrix_assign(into, i, j, activation->dZ(z, param));
             }
         }
@@ -153,15 +153,15 @@ void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into)
     }
 }
 
-float sigmoid(float z, float param) {
+nn_float sigmoid(nn_float z, nn_float param) {
     return 1.0/(1.0 + exp(-z));
 }
 
-float sigmoid_dZ(float z, float param) {
+nn_float sigmoid_dZ(nn_float z, nn_float param) {
     return sigmoid(z, param) * (1.0 - sigmoid(z, param));
 }
 
-float relu(float z, float param) {
+nn_float relu(nn_float z, nn_float param) {
     if (z <= 0.0) {
         return 0.0;
     }
@@ -169,7 +169,7 @@ float relu(float z, float param) {
     return z;
 }
 
-float relu_dZ(float z, float param) {
+nn_float relu_dZ(nn_float z, nn_float param) {
     if (z <= 0) {
         return 0.0;
     }
@@ -177,7 +177,7 @@ float relu_dZ(float z, float param) {
     return 1.0;
 }
 
-float leaky_relu(float z, float param) {
+nn_float leaky_relu(nn_float z, nn_float param) {
     if (z <= 0.0) {
         return param * z;
     }
@@ -185,7 +185,7 @@ float leaky_relu(float z, float param) {
     return z;
 }
 
-float leaky_relu_dZ(float z, float param) {
+nn_float leaky_relu_dZ(nn_float z, nn_float param) {
     if (z <= 0) {
         return param;
     }
@@ -193,7 +193,7 @@ float leaky_relu_dZ(float z, float param) {
     return 1.0;
 }
 
-float elu(float z, float param) {
+nn_float elu(nn_float z, nn_float param) {
     if (z <= 0.0) {
         return param * (exp(z) - 1.0);
     }
@@ -201,7 +201,7 @@ float elu(float z, float param) {
     return z;
 }
 
-float elu_dZ(float z, float param) {
+nn_float elu_dZ(nn_float z, nn_float param) {
     if (z <= 0.0) {
         return elu(z, param) + param;
     }

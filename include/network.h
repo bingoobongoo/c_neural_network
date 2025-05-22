@@ -1,5 +1,9 @@
 #pragma once
 
+#include <time.h>
+#include <sys/time.h>
+
+#include "config.h"
 #include "matrix.h"
 #include "layer.h"
 #include "tensor.h"
@@ -9,8 +13,6 @@
 #include "optimizer.h"
 #include "preprocessing.h"
 #include "score.h"
-#include <time.h>
-#include <sys/time.h>
 
 struct NeuralNet {
     int n_layers;
@@ -26,13 +28,13 @@ struct NeuralNet {
     bool is_cnn;
 };
 
-NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, float act_param, CostType cost_type, int batch_size);
+NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, nn_float act_param, CostType cost_type, int batch_size);
 void neural_net_free(NeuralNet* net);
 void neural_net_compile(NeuralNet* net);
 void neural_net_link_layers(NeuralNet* net);
 void neural_net_info(NeuralNet* net);
 
-void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, NeuralNet* net);
+void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, NeuralNet* net);
 void score(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void forward_prop(NeuralNet* net, bool training);

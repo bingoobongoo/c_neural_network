@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config.h"
 #include "matrix.h"
 
 Matrix** load_csv(char* csv_file, bool header);

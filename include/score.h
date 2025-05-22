@@ -1,9 +1,10 @@
 #pragma once
 
+#include "config.h"
 #include "matrix.h"
 
 typedef struct {
-    float accuracy;
+    nn_float accuracy;
     int batch_size;
     Matrix* y_pred_argmax;
     Matrix* y_true_argmax;

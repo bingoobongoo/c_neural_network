@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config.h"
 #include "matrix.h"
 
 typedef struct {

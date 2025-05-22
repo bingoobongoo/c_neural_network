@@ -1,6 +1,6 @@
 #include "network.h"
 
-NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, float act_param, CostType cost_type, int batch_size) {
+NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, nn_float act_param, CostType cost_type, int batch_size) {
     NeuralNet* net = (NeuralNet*)malloc(sizeof(NeuralNet));
     net->n_layers = 0;
     net->activation = activation_new(act_type, act_param);
@@ -335,7 +335,7 @@ void neural_net_info(NeuralNet* net) {
     }
 }
 
-void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, NeuralNet* net) {
+void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, NeuralNet* net) {
     int training_size = (1.0 - validation) * x_train->n_rows;
     int val_size = validation * x_train->n_rows;
 
@@ -362,32 +362,32 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, Neura
             net->train_batch->data.tensor->n_channels
         );
 
-        train_batches = ceil(x_train_split_tensor->n_filters / (float)net->batch_size);
-        val_batches = ceil(x_val_split_tensor->n_filters / (float)net->batch_size);
+        train_batches = ceil(x_train_split_tensor->n_filters / (nn_float)net->batch_size);
+        val_batches = ceil(x_val_split_tensor->n_filters / (nn_float)net->batch_size);
         
         matrix_free(x_train_split_mat);
         matrix_free(x_val_split_mat);
     }
     else {
-        train_batches = ceil(x_train_split_mat->n_rows / (float)net->batch_size);
-        val_batches = ceil(x_val_split_mat->n_rows / (float)net->batch_size); 
+        train_batches = ceil(x_train_split_mat->n_rows / (nn_float)net->batch_size);
+        val_batches = ceil(x_val_split_mat->n_rows / (nn_float)net->batch_size); 
     }
     
     Matrix* y_train_split = matrix_slice_rows(y_train, 0, training_size);
     Matrix* y_val_split = matrix_slice_rows(y_train, training_size, val_size);
 
-    float* avg_loss = (float*)malloc(train_batches * sizeof(float));
-    float* train_acc = (float*)malloc(train_batches * sizeof(float));
-    float* val_acc = (float*)malloc(val_batches * sizeof(float));
+    nn_float* avg_loss = (nn_float*)malloc(train_batches * sizeof(nn_float));
+    nn_float* train_acc = (nn_float*)malloc(train_batches * sizeof(nn_float));
+    nn_float* val_acc = (nn_float*)malloc(val_batches * sizeof(nn_float));
 
     int start_idx = 0;
     int i = 0;
 
-    float epoch_time;
-    float sum;
-    float avg_epoch_loss;
-    float avg_epoch_train_acc;
-    float avg_epoch_val_acc;
+    nn_float epoch_time;
+    nn_float sum;
+    nn_float avg_epoch_loss;
+    nn_float avg_epoch_train_acc;
+    nn_float avg_epoch_val_acc;
 
     for (int epoch=0; epoch<n_epochs; epoch++) {
         struct timeval start, end;
@@ -419,13 +419,13 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, Neura
         for (int j=0; j<i; j++) {
             sum += avg_loss[j];
         }
-        avg_epoch_loss = sum / (float)i;
+        avg_epoch_loss = sum / (nn_float)i;
 
         sum=0.0;
         for (int j=0; j<i; j++) {
             sum += train_acc[j];
         }
-        avg_epoch_train_acc = sum / (float)i;
+        avg_epoch_train_acc = sum / (nn_float)i;
 
         for (start_idx=0, i=0; start_idx<val_size - net->batch_size; start_idx+=net->batch_size, i++) {
             if (net->is_cnn) {
@@ -446,7 +446,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, float validation, Neura
         for (int j=0; j<i; j++) {
             sum += val_acc[j];
         }
-        avg_epoch_val_acc = sum / (float)i;
+        avg_epoch_val_acc = sum / (nn_float)i;
 
         if (net->is_cnn) {
             shuffle_tensor4D_inplace(x_train_split_tensor, y_train_split);
@@ -488,15 +488,15 @@ void score(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
             net->train_batch->data.tensor->n_cols,
             net->train_batch->data.tensor->n_channels 
         );
-        n_batches = ceil(x_test_tensor->n_filters / (float)net->batch_size);
+        n_batches = ceil(x_test_tensor->n_filters / (nn_float)net->batch_size);
     }
     else {
-        n_batches = ceil(x_test->n_rows / (float)net->batch_size);
+        n_batches = ceil(x_test->n_rows / (nn_float)net->batch_size);
     }
 
     int start_idx = 0;
     int i = 0;
-    float* acc = (float*)malloc(n_batches * sizeof(float));
+    nn_float* acc = (nn_float*)malloc(n_batches * sizeof(nn_float));
 
     for (start_idx; start_idx<x_test->n_rows - net->batch_size; start_idx+=net->batch_size, i++) {
         if (net->is_cnn) {
@@ -513,11 +513,11 @@ void score(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
         acc[i] = net->batch_score->accuracy;
     }
 
-    float sum = 0.0;
+    nn_float sum = 0.0;
     for (int j=0; j<i; j++) {
         sum += acc[j];
     }
-    float test_acc = sum / (float)i;
+    nn_float test_acc = sum / (nn_float)i;
 
     printf("Test acc: %.3f\n", test_acc);
 
