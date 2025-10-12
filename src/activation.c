@@ -66,14 +66,20 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
         for (int i=0; i<z_m->n_rows; i++) {
             nn_float max_z = matrix_get(z_m, i, 0);
             for (int j=0; j<z_m->n_cols; j++) {
-                if (matrix_get(z_m, i, j) > max_z)
-                max_z = matrix_get(z_m, i, j);
+                nn_float z = matrix_get(z_m, i, j);
+                if (z > max_z)
+                    max_z = z;
             }
 
             nn_float sum_z = 0.0;
             for (int j=0; j<a->n_cols; j++) {
-                matrix_assign(a, i, j, exp(matrix_get(z_m, i, j) - max_z));
-                sum_z += matrix_get(a, i, j);
+                #ifdef SINGLE_PRECISION
+                nn_float e = expf(matrix_get(z_m, i, j) - max_z);
+                #elif DOUBLE_PRECISION
+                nn_float e = exp(matrix_get(z_m, i, j) - max_z);
+                #endif
+                matrix_assign(a, i, j, e);
+                sum_z += e;
             }
 
             for (int j=0; j<a->n_cols; j++) {
@@ -99,14 +105,20 @@ void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* int
         for (int i=0; i<z_m->n_rows; i++) {
             nn_float max_z = matrix_get(z_m, i, 0);
             for (int j=0; j<z_m->n_cols; j++) {
-                if (matrix_get(z_m, i, j) > max_z)
-                max_z = matrix_get(z_m, i, j);
+                nn_float z = matrix_get(z_m, i, j);
+                if (z > max_z)
+                    max_z = z;
             }
 
             nn_float sum_z = 0.0;
             for (int j=0; j<into->n_cols; j++) {
-                matrix_assign(into, i, j, exp(matrix_get(z_m, i, j) - max_z));
-                sum_z += matrix_get(into, i, j);
+                #ifdef SINGLE_PRECISION
+                nn_float e = expf(matrix_get(z_m, i, j) - max_z);
+                #elif DOUBLE_PRECISION
+                nn_float e = exp(matrix_get(z_m, i, j) - max_z);
+                #endif
+                matrix_assign(into, i, j, e);
+                sum_z += e;
             }
 
             for (int j=0; j<into->n_cols; j++) {
