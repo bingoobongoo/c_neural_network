@@ -667,6 +667,8 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
     Tensor4D* z = l->cache.conv.z;
     Tensor4D* bias = l->cache.conv.bias;
     Tensor4D* output = l->cache.conv.output;
+
+    #ifdef IM2COL_CONV
     
     for (int n=0; n<batch_size; n++) {
         input_into_im2col_fwise(
@@ -701,37 +703,41 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
         }
     }
 
-    // Tensor3D* corr_t3d = tensor3D_new(
-    //     z->n_rows,
-    //     z->n_cols,
-    //     filter->n_channels
-    // );
-    // for (int n=0; n<batch_size; n++) {
-    //     for (int i=0; i<filter->n_filters; i++) {
-    //         tensor3D_correlate_into(
-    //             input->filters[n],
-    //             filter->filters[i],
-    //             corr_t3d,
-    //             l->params.conv.stride,
-    //             VALID
-    //         );
-    //         tensor3D_sum_element_wise_into(
-    //             corr_t3d,
-    //             z->filters[n]->channels[i]
-    //         );
-    //         matrix_add_into(
-    //             z->filters[n]->channels[i],
-    //             bias->filters[i]->channels[0],
-    //             z->filters[n]->channels[i]
-    //         );
-    //         apply_activation_func_into(
-    //             l->activation,
-    //             z->filters[n]->channels[i],
-    //             output->filters[n]->channels[i]
-    //         );
-    //     }
-    // }
-    // tensor3D_free(corr_t3d);
+    #else
+
+    Tensor3D* corr_t3d = tensor3D_new(
+        z->n_rows,
+        z->n_cols,
+        filter->n_channels
+    );
+    for (int n=0; n<batch_size; n++) {
+        for (int i=0; i<filter->n_filters; i++) {
+            tensor3D_correlate_into(
+                input->filters[n],
+                filter->filters[i],
+                corr_t3d,
+                l->params.conv.stride,
+                VALID
+            );
+            tensor3D_sum_element_wise_into(
+                corr_t3d,
+                z->filters[n]->channels[i]
+            );
+            matrix_add_into(
+                z->filters[n]->channels[i],
+                bias->filters[i]->channels[0],
+                z->filters[n]->channels[i]
+            );
+            apply_activation_func_into(
+                l->activation,
+                z->filters[n]->channels[i],
+                output->filters[n]->channels[i]
+            );
+        }
+    }
+    tensor3D_free(corr_t3d);
+
+    #endif
 }
 
 void layer_flatten_fp(Layer* l, int batch_size) {
@@ -929,6 +935,8 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
         }
     }
     else if (l->next_layer->l_type == CONV_2D) {
+        #ifdef IM2COL_CONV
+
         kernel_into_im2col_chwise(
             filter_next,
             true,
@@ -967,40 +975,45 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
                 );
             }
         }
-        // Tensor3D* corr_t3d = tensor3D_new(
-        //     delta->n_rows,
-        //     delta->n_cols,
-        //     filter_next->n_filters
-        // );
-        // for (int n=0; n<batch_size; n++) {
-        //     for (int i=0; i<delta->n_channels; i++) {
-        //         for (int f=0; f<filter_next->n_filters; f++) {
-        //             matrix_convolve_into(
-        //                 delta_next->filters[n]->channels[f],
-        //                 filter_next->filters[f]->channels[i],
-        //                 corr_t3d->channels[f],
-        //                 l->params.conv.stride,
-        //                 FULL
-        //             );
-        //         }
-        //         tensor3D_sum_element_wise_into(
-        //             corr_t3d,
-        //             dCost_dA->filters[n]->channels[i]
-        //         );
-        //         apply_activation_dZ_into(
-        //             l->activation,
-        //             z->filters[n]->channels[i],
-        //             dA_dZ->filters[n]->channels[i]
-        //         );
-        //         matrix_multiply_into(
-        //             dCost_dA->filters[n]->channels[i],
-        //             dA_dZ->filters[n]->channels[i],
-        //             delta->filters[n]->channels[i]
-        //         );
 
-        //     }
-        // }
-        // tensor3D_free(corr_t3d);
+        #else
+
+        Tensor3D* corr_t3d = tensor3D_new(
+            delta->n_rows,
+            delta->n_cols,
+            filter_next->n_filters
+        );
+        for (int n=0; n<batch_size; n++) {
+            for (int i=0; i<delta->n_channels; i++) {
+                for (int f=0; f<filter_next->n_filters; f++) {
+                    matrix_convolve_into(
+                        delta_next->filters[n]->channels[f],
+                        filter_next->filters[f]->channels[i],
+                        corr_t3d->channels[f],
+                        l->params.conv.stride,
+                        FULL
+                    );
+                }
+                tensor3D_sum_element_wise_into(
+                    corr_t3d,
+                    dCost_dA->filters[n]->channels[i]
+                );
+                apply_activation_dZ_into(
+                    l->activation,
+                    z->filters[n]->channels[i],
+                    dA_dZ->filters[n]->channels[i]
+                );
+                matrix_multiply_into(
+                    dCost_dA->filters[n]->channels[i],
+                    dA_dZ->filters[n]->channels[i],
+                    delta->filters[n]->channels[i]
+                );
+
+            }
+        }
+        tensor3D_free(corr_t3d);
+
+        #endif
     }
 
 
@@ -1008,6 +1021,8 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
     {
         Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
         
+        #ifdef IM2COL_CONV
+
         kernel_into_im2col_chwise(
             delta,
             false,
@@ -1045,29 +1060,34 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
                 }
             }
         }
-        // Tensor3D* corr_t3d = tensor3D_new(
-        //     filter->n_rows,
-        //     filter->n_cols,
-        //     batch_size
-        // );
-        // for (int i=0; i<filter->n_filters; i++) {
-        //     for (int j=0; j<filter->n_channels; j++) {
-        //         for (int n=0; n<batch_size; n++) {
-        //             matrix_correlate_into(
-        //                 input->filters[n]->channels[j],
-        //                 delta->filters[n]->channels[i],
-        //                 corr_t3d->channels[n],
-        //                 l->params.conv.stride,
-        //                 VALID
-        //             );
-        //         }
-        //         tensor3D_sum_element_wise_into(
-        //             corr_t3d,
-        //             filter_grad->filters[i]->channels[j]
-        //         );
-        //     }
-        // }
-        // tensor3D_free(corr_t3d);
+
+        #else
+
+        Tensor3D* corr_t3d = tensor3D_new(
+            filter->n_rows,
+            filter->n_cols,
+            batch_size
+        );
+        for (int i=0; i<filter->n_filters; i++) {
+            for (int j=0; j<filter->n_channels; j++) {
+                for (int n=0; n<batch_size; n++) {
+                    matrix_correlate_into(
+                        input->filters[n]->channels[j],
+                        delta->filters[n]->channels[i],
+                        corr_t3d->channels[n],
+                        l->params.conv.stride,
+                        VALID
+                    );
+                }
+                tensor3D_sum_element_wise_into(
+                    corr_t3d,
+                    filter_grad->filters[i]->channels[j]
+                );
+            }
+        }
+        tensor3D_free(corr_t3d);
+
+        #endif
     }
 
     // bias gradient (dCost_dB) calculation
@@ -1103,6 +1123,8 @@ void layer_max_pool_bp(Layer* l, int batch_size) {
         Tensor4D* delta_next = layer_get_delta_tensor4D(l->next_layer);
         Tensor4D* filter_next = l->next_layer->cache.conv.filter;
 
+        #ifdef IM2COL_CONV
+
         kernel_into_im2col_chwise(
             filter_next,
             true,
@@ -1129,28 +1151,33 @@ void layer_max_pool_bp(Layer* l, int batch_size) {
                 true
             );
         }
-        // Tensor3D* corr_t3d = tensor3D_new(
-        //     delta->n_rows,
-        //     delta->n_cols,
-        //     filter_next->n_filters
-        // );
-        // for (int n=0; n<batch_size; n++) {
-        //     for (int i=0; i<delta->n_channels; i++) {
-        //         for (int f=0; f<filter_next->n_filters; f++) {
-        //             matrix_convolve_into(
-        //                 delta_next->filters[n]->channels[f],
-        //                 filter_next->filters[f]->channels[i],
-        //                 corr_t3d->channels[f],
-        //                 l->params.conv.stride,
-        //                 FULL
-        //             );
-        //         }
-        //         tensor3D_sum_element_wise_into(
-        //             corr_t3d,
-        //             delta->filters[n]->channels[i]
-        //         );
-        //     }
-        // }
+
+        #else
+
+        Tensor3D* corr_t3d = tensor3D_new(
+            delta->n_rows,
+            delta->n_cols,
+            filter_next->n_filters
+        );
+        for (int n=0; n<batch_size; n++) {
+            for (int i=0; i<delta->n_channels; i++) {
+                for (int f=0; f<filter_next->n_filters; f++) {
+                    matrix_convolve_into(
+                        delta_next->filters[n]->channels[f],
+                        filter_next->filters[f]->channels[i],
+                        corr_t3d->channels[f],
+                        l->params.conv.stride,
+                        FULL
+                    );
+                }
+                tensor3D_sum_element_wise_into(
+                    corr_t3d,
+                    delta->filters[n]->channels[i]
+                );
+            }
+        }
+
+        #endif
     }
 }
 

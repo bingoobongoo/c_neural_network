@@ -20,6 +20,11 @@ replacing custom operations with their optimized counterparts from CBLAS library
 */
 #define BLAS
 
+/*
+Enables im2col method for calculating convolution for forward and backward passes in CNN.
+*/
+// #define IM2COL_CONV
+
 // =============================================================================
 
 // TYPE ALIASES
