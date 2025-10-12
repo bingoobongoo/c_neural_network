@@ -71,7 +71,7 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
                     max_z = z;
             }
 
-            nn_float sum_z = 0.0;
+            nn_float sum_z = (nn_float)0.0;
             for (int j=0; j<a->n_cols; j++) {
                 #ifdef SINGLE_PRECISION
                 nn_float e = expf(matrix_get(z_m, i, j) - max_z);
@@ -110,7 +110,7 @@ void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* int
                     max_z = z;
             }
 
-            nn_float sum_z = 0.0;
+            nn_float sum_z = (nn_float)0.0;
             for (int j=0; j<into->n_cols; j++) {
                 #ifdef SINGLE_PRECISION
                 nn_float e = expf(matrix_get(z_m, i, j) - max_z);
@@ -166,31 +166,35 @@ void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into)
 }
 
 nn_float sigmoid(nn_float z, nn_float param) {
-    return 1.0/(1.0 + exp(-z));
+    #ifdef SINGLE_PRECISION
+    return (nn_float)1.0/((nn_float)1.0 + expf(-z));
+    #elif DOUBLE_PRECISION
+    return (nn_float)1.0/((nn_float)1.0 + exp(-z));
+    #endif
 }
 
 nn_float sigmoid_dZ(nn_float z, nn_float param) {
-    return sigmoid(z, param) * (1.0 - sigmoid(z, param));
+    return sigmoid(z, param) * ((nn_float)1.0 - sigmoid(z, param));
 }
 
 nn_float relu(nn_float z, nn_float param) {
-    if (z <= 0.0) {
-        return 0.0;
+    if (z <= (nn_float)0.0) {
+        return (nn_float)0.0;
     }
 
     return z;
 }
 
 nn_float relu_dZ(nn_float z, nn_float param) {
-    if (z <= 0) {
-        return 0.0;
+    if (z <= (nn_float)0.0) {
+        return (nn_float)0.0;
     }
 
-    return 1.0;
+    return (nn_float)1.0;
 }
 
 nn_float leaky_relu(nn_float z, nn_float param) {
-    if (z <= 0.0) {
+    if (z <= (nn_float)0.0) {
         return param * z;
     }
 
@@ -198,25 +202,29 @@ nn_float leaky_relu(nn_float z, nn_float param) {
 }
 
 nn_float leaky_relu_dZ(nn_float z, nn_float param) {
-    if (z <= 0) {
+    if (z <= (nn_float)0.0) {
         return param;
     }
 
-    return 1.0;
+    return (nn_float)1.0;
 }
 
 nn_float elu(nn_float z, nn_float param) {
-    if (z <= 0.0) {
-        return param * (exp(z) - 1.0);
+    if (z <= (nn_float)0.0) {
+        #ifdef SINGLE_PRECISION
+        return param * (expf(z) - (nn_float)1.0);
+        #elif DOUBLE_PRECISION
+        return param * (exp(z) - (nn_float)1.0);
+        #endif
     }
 
     return z;
 }
 
 nn_float elu_dZ(nn_float z, nn_float param) {
-    if (z <= 0.0) {
+    if (z <= (nn_float)0.0) {
         return elu(z, param) + param;
     }
 
-    return 1.0;
+    return (nn_float)1.0;
 }
