@@ -70,6 +70,9 @@ void layer_max_pool_fp(Layer* l, int batch_size);
 void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size);
 void layer_deep_bp(Layer* l, int batch_size);
 void layer_conv2D_bp(Layer* l, int batch_size);
+void layer_conv2D_bp_delta_from_flatten(Layer* l, int batch_size);
+void layer_conv2d_bp_delta_from_max_pool(Layer* l, int batch_size);
+void layer_conv2d_bp_delta_from_conv2d(Layer* l, int batch_size);
 void layer_flatten_bp(Layer* l, int batch_size);
 void layer_max_pool_bp(Layer* l, int batch_size);
 

@@ -870,150 +870,13 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
 
     // delta gradient (dCost_dZ) calculation
     if (l->next_layer->l_type == FLATTEN) {
-        for (int n=0; n<batch_size; n++) {
-            for (int c=0; c<l->cache.conv.dCost_dA->n_channels; c++) {
-                apply_activation_dZ_into(
-                    l->activation,
-                    z->filters[n]->channels[c],
-                    dA_dZ->filters[n]->channels[c]
-                );
-                matrix_multiply_into(
-                    dCost_dA->filters[n]->channels[c],
-                    dA_dZ->filters[n]->channels[c],
-                    delta->filters[n]->channels[c]
-                );
-            }
-        }
+        layer_conv2D_bp_delta_from_flatten(l, batch_size);
     }
     else if (l->next_layer->l_type == MAX_POOL) {
-        Tensor4D* output_next = layer_get_output_tensor4D(l->next_layer);
-        int pool_size = l->next_layer->params.conv.filter_size;
-        int stride = l->next_layer->params.conv.stride;
-        tensor4D_fill(dCost_dA, 0.0);
-
-        for (int n=0; n<batch_size; n++) {
-            for (int c=0; c<output_next->n_channels; c++) {
-                Matrix* out_next_mat = output_next->filters[n]->channels[c];
-                Matrix* out_mat = output->filters[n]->channels[c];
-                Matrix* dCost_dA_mat = dCost_dA->filters[n]->channels[c];
-                Matrix* delta_next_mat = delta_next->filters[n]->channels[c];
-                for (int i=0; i<output_next->n_rows; i++) {
-                    for (int j=0; j<output_next->n_cols; j++) {
-                        for (int k=0; k<pool_size; k++) {
-                            for (int l=0; l<pool_size; l++) {
-                                if (matrix_get(out_mat, i*stride+k, j*stride+l) ==  matrix_get(out_next_mat, i, j)) {
-                                    matrix_assign(
-                                        dCost_dA_mat,
-                                        i*stride+k,
-                                        j*stride+l,
-                                        matrix_get(dCost_dA_mat, i*stride+k, j*stride+l) + matrix_get(delta_next_mat, i, j)
-                                    );
-                                    l = pool_size;
-                                    k = pool_size;
-                                }
-                            }
-                        }
-                    }
-                }
-
-            }
-        }
-
-        for (int n=0; n<batch_size; n++) {
-            for (int c=0; c<l->cache.conv.dCost_dA->n_channels; c++) {
-                apply_activation_dZ_into(
-                    l->activation,
-                    z->filters[n]->channels[c],
-                    dA_dZ->filters[n]->channels[c]
-                );
-                matrix_multiply_into(
-                    dCost_dA->filters[n]->channels[c],
-                    dA_dZ->filters[n]->channels[c],
-                    delta->filters[n]->channels[c]
-                );
-            }
-        }
+        layer_conv2d_bp_delta_from_max_pool(l, batch_size);
     }
     else if (l->next_layer->l_type == CONV_2D) {
-        #ifdef IM2COL_CONV
-
-        kernel_into_im2col_chwise(
-            filter_next,
-            true,
-            l->next_layer->cache.conv.delta_im2col_kernel
-        );
-
-        for (int n=0; n<batch_size; n++) {
-            input_into_im2col_fwise(
-                delta_next,
-                n,
-                filter_next,
-                l->next_layer->params.conv.stride,
-                FULL,
-                l->next_layer->cache.conv.delta_im2col_input
-            );
-            matrix_dot_into(
-                l->next_layer->cache.conv.delta_im2col_input,
-                l->next_layer->cache.conv.delta_im2col_kernel,
-                l->next_layer->cache.conv.delta_im2col_output
-            );
-            matrix_into_tensor3D(
-                l->next_layer->cache.conv.delta_im2col_output,
-                dCost_dA->filters[n],
-                true
-            );
-            for (int i=0; i<delta->n_channels; i++) {
-                apply_activation_dZ_into(
-                    l->activation,
-                    z->filters[n]->channels[i],
-                    dA_dZ->filters[n]->channels[i]
-                );
-                matrix_multiply_into(
-                    dCost_dA->filters[n]->channels[i],
-                    dA_dZ->filters[n]->channels[i],
-                    delta->filters[n]->channels[i]
-                );
-            }
-        }
-
-        #else
-
-        Tensor3D* corr_t3d = tensor3D_new(
-            delta->n_rows,
-            delta->n_cols,
-            filter_next->n_filters
-        );
-        for (int n=0; n<batch_size; n++) {
-            for (int i=0; i<delta->n_channels; i++) {
-                for (int f=0; f<filter_next->n_filters; f++) {
-                    matrix_convolve_into(
-                        delta_next->filters[n]->channels[f],
-                        filter_next->filters[f]->channels[i],
-                        corr_t3d->channels[f],
-                        l->params.conv.stride,
-                        FULL
-                    );
-                }
-                tensor3D_sum_element_wise_into(
-                    corr_t3d,
-                    dCost_dA->filters[n]->channels[i]
-                );
-                apply_activation_dZ_into(
-                    l->activation,
-                    z->filters[n]->channels[i],
-                    dA_dZ->filters[n]->channels[i]
-                );
-                matrix_multiply_into(
-                    dCost_dA->filters[n]->channels[i],
-                    dA_dZ->filters[n]->channels[i],
-                    delta->filters[n]->channels[i]
-                );
-
-            }
-        }
-        tensor3D_free(corr_t3d);
-
-        #endif
+        layer_conv2d_bp_delta_from_conv2d(l, batch_size);
     }
 
 
@@ -1098,6 +961,174 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
         }
         matrix_fill(bias_grad->filters[i]->channels[0], sum);
     }
+}
+
+void layer_conv2D_bp_delta_from_flatten(Layer* l, int batch_size) {
+    Tensor4D* delta = l->cache.conv.delta;
+    Tensor4D* dA_dZ = l->cache.conv.dActivation_dZ;
+    Tensor4D* dCost_dA = l->cache.conv.dCost_dA;
+    Tensor4D* z = l->cache.conv.z;
+
+    for (int n=0; n<batch_size; n++) {
+        for (int c=0; c<l->cache.conv.dCost_dA->n_channels; c++) {
+            apply_activation_dZ_into(
+                l->activation,
+                z->filters[n]->channels[c],
+                dA_dZ->filters[n]->channels[c]
+            );
+            matrix_multiply_into(
+                dCost_dA->filters[n]->channels[c],
+                dA_dZ->filters[n]->channels[c],
+                delta->filters[n]->channels[c]
+            );
+        }
+    }
+}
+
+void layer_conv2d_bp_delta_from_max_pool(Layer* l, int batch_size) {
+    Tensor4D* delta = l->cache.conv.delta;
+    Tensor4D* dA_dZ = l->cache.conv.dActivation_dZ;
+    Tensor4D* dCost_dA = l->cache.conv.dCost_dA;
+    Tensor4D* z = l->cache.conv.z;
+    Tensor4D* delta_next = l->next_layer->cache.conv.delta;
+    Tensor4D* output = layer_get_output_tensor4D(l);    
+
+    Tensor4D* output_next = layer_get_output_tensor4D(l->next_layer);
+    int pool_size = l->next_layer->params.conv.filter_size;
+    int stride = l->next_layer->params.conv.stride;
+    tensor4D_fill(dCost_dA, 0.0);
+
+    for (int n=0; n<batch_size; n++) {
+        for (int c=0; c<output_next->n_channels; c++) {
+            Matrix* out_next_mat = output_next->filters[n]->channels[c];
+            Matrix* out_mat = output->filters[n]->channels[c];
+            Matrix* dCost_dA_mat = dCost_dA->filters[n]->channels[c];
+            Matrix* delta_next_mat = delta_next->filters[n]->channels[c];
+            for (int i=0; i<output_next->n_rows; i++) {
+                for (int j=0; j<output_next->n_cols; j++) {
+                    for (int k=0; k<pool_size; k++) {
+                        for (int l=0; l<pool_size; l++) {
+                            if (matrix_get(out_mat, i*stride+k, j*stride+l) ==  matrix_get(out_next_mat, i, j)) {
+                                matrix_assign(
+                                    dCost_dA_mat,
+                                    i*stride+k,
+                                    j*stride+l,
+                                    matrix_get(dCost_dA_mat, i*stride+k, j*stride+l) + matrix_get(delta_next_mat, i, j)
+                                );
+                                l = pool_size;
+                                k = pool_size;
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+
+    for (int n=0; n<batch_size; n++) {
+        for (int c=0; c<l->cache.conv.dCost_dA->n_channels; c++) {
+            apply_activation_dZ_into(
+                l->activation,
+                z->filters[n]->channels[c],
+                dA_dZ->filters[n]->channels[c]
+            );
+            matrix_multiply_into(
+                dCost_dA->filters[n]->channels[c],
+                dA_dZ->filters[n]->channels[c],
+                delta->filters[n]->channels[c]
+            );
+        }
+    }
+}
+
+void layer_conv2d_bp_delta_from_conv2d(Layer* l, int batch_size) {
+    Tensor4D* delta = l->cache.conv.delta;
+    Tensor4D* dA_dZ = l->cache.conv.dActivation_dZ;
+    Tensor4D* dCost_dA = l->cache.conv.dCost_dA;
+    Tensor4D* z = l->cache.conv.z;
+    Tensor4D* delta_next = l->next_layer->cache.conv.delta;
+    Tensor4D* filter_next = l->next_layer->cache.conv.filter;
+
+    #ifdef IM2COL_CONV
+
+    kernel_into_im2col_chwise(
+        filter_next,
+        true,
+        l->next_layer->cache.conv.delta_im2col_kernel
+    );
+
+    for (int n=0; n<batch_size; n++) {
+        input_into_im2col_fwise(
+            delta_next,
+            n,
+            filter_next,
+            l->next_layer->params.conv.stride,
+            FULL,
+            l->next_layer->cache.conv.delta_im2col_input
+        );
+        matrix_dot_into(
+            l->next_layer->cache.conv.delta_im2col_input,
+            l->next_layer->cache.conv.delta_im2col_kernel,
+            l->next_layer->cache.conv.delta_im2col_output
+        );
+        matrix_into_tensor3D(
+            l->next_layer->cache.conv.delta_im2col_output,
+            dCost_dA->filters[n],
+            true
+        );
+        for (int i=0; i<delta->n_channels; i++) {
+            apply_activation_dZ_into(
+                l->activation,
+                z->filters[n]->channels[i],
+                dA_dZ->filters[n]->channels[i]
+            );
+            matrix_multiply_into(
+                dCost_dA->filters[n]->channels[i],
+                dA_dZ->filters[n]->channels[i],
+                delta->filters[n]->channels[i]
+            );
+        }
+    }
+
+    #else
+
+    Tensor3D* corr_t3d = tensor3D_new(
+        delta->n_rows,
+        delta->n_cols,
+        filter_next->n_filters
+    );
+    for (int n=0; n<batch_size; n++) {
+        for (int i=0; i<delta->n_channels; i++) {
+            for (int f=0; f<filter_next->n_filters; f++) {
+                matrix_convolve_into(
+                    delta_next->filters[n]->channels[f],
+                    filter_next->filters[f]->channels[i],
+                    corr_t3d->channels[f],
+                    l->params.conv.stride,
+                    FULL
+                );
+            }
+            tensor3D_sum_element_wise_into(
+                corr_t3d,
+                dCost_dA->filters[n]->channels[i]
+            );
+            apply_activation_dZ_into(
+                l->activation,
+                z->filters[n]->channels[i],
+                dA_dZ->filters[n]->channels[i]
+            );
+            matrix_multiply_into(
+                dCost_dA->filters[n]->channels[i],
+                dA_dZ->filters[n]->channels[i],
+                delta->filters[n]->channels[i]
+            );
+
+        }
+    }
+    tensor3D_free(corr_t3d);
+
+    #endif
 }
 
 void layer_flatten_bp(Layer* l, int batch_size) {
