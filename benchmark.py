@@ -19,8 +19,8 @@ y_train = to_categorical(y_train, 10)
 y_test  = to_categorical(y_test, 10) 
 
 model = Sequential([
-    Dense(600, activation="relu"),
-    Dense(200, activation="relu"),
+    Dense(300, activation="relu"),
+    Dense(100, activation="relu"),
     Dense(10, activation="softmax")
 ])
 

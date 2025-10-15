@@ -242,7 +242,7 @@ void neural_net_info(NeuralNet* net) {
         long long non_trainable_params = 0;
 
         printf("lp  layer   n_units   output_shape  params\n");
-        printf("------------------------------------\n");
+        printf("------------------------------------------\n");
         for (int i=0; i<net->n_layers; i++) {
             Layer* layer = net->layers[i];
             int n_units = layer_get_n_units(layer);
@@ -256,7 +256,7 @@ void neural_net_info(NeuralNet* net) {
                 params = n_units;
                 non_trainable_params += params;
                 printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
-                printf("------------------------------------\n");
+                printf("------------------------------------------\n");
                 break;
             }
             case CONV_2D_INPUT: {
@@ -267,7 +267,7 @@ void neural_net_info(NeuralNet* net) {
                 params = n_units;
                 non_trainable_params += params;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
-                printf("------------------------------------\n");
+                printf("------------------------------------------\n");
                 break;
             }
             case OUTPUT: {
@@ -275,7 +275,7 @@ void neural_net_info(NeuralNet* net) {
                 params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
-                printf("------------------------------------\n");
+                printf("------------------------------------------\n");
                 break;
             }
             case DEEP: {
@@ -283,7 +283,7 @@ void neural_net_info(NeuralNet* net) {
                 params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
-                printf("------------------------------------\n");
+                printf("------------------------------------------\n");
                 break;
             }
             case CONV_2D: {
@@ -297,14 +297,14 @@ void neural_net_info(NeuralNet* net) {
                 params = n_filters * (pow(filter_size, 2) * filter_chan + 1);
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
-                printf("------------------------------------\n");
+                printf("------------------------------------------\n");
                 break;
             }
             case FLATTEN: {
                 l_name = "Flatten";
                 params = 0;
                 printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
-                printf("------------------------------------\n");
+                printf("------------------------------------------\n");
                 break;
             }
             case MAX_POOL: {
@@ -314,7 +314,7 @@ void neural_net_info(NeuralNet* net) {
                 l_name = "MaxPool";
                 params = 0;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
-                printf("------------------------------------\n");
+                printf("------------------------------------------\n");
                 break;
             }
             default:
@@ -411,6 +411,12 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             score_batch(net->batch_score, y_pred, y_true);
             train_acc[i] = net->batch_score->accuracy;
             back_prop(net);
+            #ifdef DEBUG
+            if (i==0) {
+                printf("Stats after 1 batch:\n");
+                debug_layers_info(net);
+            }
+            #endif
         }
         gettimeofday(&end, NULL);
         epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;;
@@ -456,6 +462,10 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
         }
 
         printf("Epoch: %d/%d   loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", epoch+1, n_epochs, avg_epoch_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time);
+
+        #ifdef DEBUG
+        debug_layers_info(net);
+        #endif
     }
 
     if (net->optimizer->type == ADAM) {
@@ -795,4 +805,50 @@ void add_max_pool_layer(int filter_size, int stride, NeuralNet* net) {
     net->layers[net->n_layers] = max_pool_l;
     max_pool_l->layer_idx = net->n_layers;
     net->n_layers++;
+}
+
+void debug_layers_info(NeuralNet* net) {
+    printf("lp  layer   min_grad   max_grad   mean_grad   min_weight   max_weight   mean_weight");
+    printf("   min_act   max_act   mean_act\n");
+    printf("--------------------------------------------------------------------------------------------------------------------\n");
+    nn_float min_grad, max_grad, mean_grad;
+    nn_float min_weight, max_weight, mean_weight;
+    nn_float min_act, max_act, mean_act;
+    char* l_name = NULL;
+    for (int i=0; i<net->n_layers; i++) {
+        Layer* layer = net->layers[i];
+        switch (layer->l_type)
+        {
+        case DEEP: {
+            l_name = "Dense";
+            min_grad = matrix_min(layer->cache.dense.weight_gradient);
+            max_grad = matrix_max(layer->cache.dense.weight_gradient);
+            mean_grad = matrix_average(layer->cache.dense.weight_gradient);
+            min_weight = matrix_min(layer->cache.dense.weight);
+            max_weight = matrix_max(layer->cache.dense.weight);
+            mean_weight = matrix_average(layer->cache.dense.weight);
+            min_act = matrix_min(layer->cache.dense.output);
+            max_act = matrix_max(layer->cache.dense.output);
+            mean_act = matrix_average(layer->cache.dense.output);
+            printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
+            printf("--------------------------------------------------------------------------------------------------------------------\n");
+            break;
+        }
+        case OUTPUT: {
+            l_name = "Output";
+            min_grad = matrix_min(layer->cache.dense.weight_gradient);
+            max_grad = matrix_max(layer->cache.dense.weight_gradient);
+            mean_grad = matrix_average(layer->cache.dense.weight_gradient);
+            min_weight = matrix_min(layer->cache.dense.weight);
+            max_weight = matrix_max(layer->cache.dense.weight);
+            mean_weight = matrix_average(layer->cache.dense.weight);
+            min_act = matrix_min(layer->cache.dense.output);
+            max_act = matrix_max(layer->cache.dense.output);
+            mean_act = matrix_average(layer->cache.dense.output);
+            printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
+            printf("--------------------------------------------------------------------------------------------------------------------\n");
+            break;            
+        }
+        }
+    }
 }

@@ -75,7 +75,8 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
             for (int j=0; j<a->n_cols; j++) {
                 #ifdef SINGLE_PRECISION
                 nn_float e = expf(matrix_get(z_m, i, j) - max_z);
-                #elif DOUBLE_PRECISION
+                #endif
+                #ifdef DOUBLE_PRECISION
                 nn_float e = exp(matrix_get(z_m, i, j) - max_z);
                 #endif
                 matrix_assign(a, i, j, e);
@@ -114,7 +115,8 @@ void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* int
             for (int j=0; j<into->n_cols; j++) {
                 #ifdef SINGLE_PRECISION
                 nn_float e = expf(matrix_get(z_m, i, j) - max_z);
-                #elif DOUBLE_PRECISION
+                #endif
+                #ifdef DOUBLE_PRECISION
                 nn_float e = exp(matrix_get(z_m, i, j) - max_z);
                 #endif
                 matrix_assign(into, i, j, e);
@@ -168,7 +170,8 @@ void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into)
 nn_float sigmoid(nn_float z, nn_float param) {
     #ifdef SINGLE_PRECISION
     return (nn_float)1.0/((nn_float)1.0 + expf(-z));
-    #elif DOUBLE_PRECISION
+    #endif
+    #ifdef DOUBLE_PRECISION
     return (nn_float)1.0/((nn_float)1.0 + exp(-z));
     #endif
 }
@@ -213,7 +216,8 @@ nn_float elu(nn_float z, nn_float param) {
     if (z <= (nn_float)0.0) {
         #ifdef SINGLE_PRECISION
         return param * (expf(z) - (nn_float)1.0);
-        #elif DOUBLE_PRECISION
+        #endif
+        #ifdef DOUBLE_PRECISION
         return param * (exp(z) - (nn_float)1.0);
         #endif
     }

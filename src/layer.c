@@ -332,7 +332,7 @@ void layer_deep_compile(Layer* l, ActivationType act_type, int act_param, int ba
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             0.0,
-            2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer))
+            sqrt(2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
         );
         break;
     
@@ -342,7 +342,7 @@ void layer_deep_compile(Layer* l, ActivationType act_type, int act_param, int ba
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             0.0,
-            2.0/layer_get_n_units(l->prev_layer)
+            sqrt(2.0/layer_get_n_units(l->prev_layer))
         );
         break;
     
@@ -419,7 +419,7 @@ void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             0.0,
-            2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer))
+            sqrt(2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
         );
         break;
 

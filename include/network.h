@@ -47,3 +47,5 @@ void add_deep_layer(int n_units, NeuralNet* net);
 void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);
 void add_flatten_layer(NeuralNet* net);
 void add_max_pool_layer(int filter_size, int stride, NeuralNet* net);
+
+void debug_layers_info(NeuralNet* net);

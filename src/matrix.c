@@ -326,10 +326,11 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
     #ifdef BLAS
-
-    #ifdef SINGLE_PRECISION
+    
     nn_float alpha = 1.0f;
     nn_float beta = 0.0f;
+
+    #ifdef SINGLE_PRECISION
 
     cblas_sgemm(
         CblasRowMajor,
@@ -558,6 +559,30 @@ nn_float matrix_sum(Matrix* m) {
 
 nn_float matrix_average(Matrix* m) {
     return matrix_sum(m) / (nn_float)(m->n_rows * m->n_cols);
+}
+
+nn_float matrix_min(Matrix* m) {
+    nn_float min = matrix_get(m, 0, 0);
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=1; j<m->n_cols; j++) {
+            nn_float x = matrix_get(m, i, j);
+            if (x < min) min = x;
+        }
+    }
+
+    return min;
+}
+
+nn_float matrix_max(Matrix* m) {
+    nn_float max = matrix_get(m, 0, 0);
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=1; j<m->n_cols; j++) {
+            nn_float x = matrix_get(m, i, j);
+            if (x > max) max = x;
+        }
+    }
+
+    return max;
 }
 
 Matrix* matrix_multiplicate(Matrix* m, int axis, int n_size) {
