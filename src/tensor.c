@@ -8,7 +8,7 @@ Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels) {
     t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
     for (int i=0; i<n_channels; i++) {
         t->channels[i] = matrix_new(n_rows, n_cols);
-        matrix_fill(t->channels[i], 0.0);
+        matrix_fill(t->channels[i], (nn_float)0.0);
     }
 
     return t;
@@ -29,7 +29,7 @@ void tensor3D_copy_into(Tensor3D* t, Tensor3D* into) {
 }
 
 void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into) {
-    matrix_fill(into, 0.0);
+    matrix_fill(into, (nn_float)0.0);
     for (int c=0; c<t->n_channels; c++) {
         for (int i=0; i<t->n_rows; i++) {
             for (int j=0; j<t->n_cols; j++) {

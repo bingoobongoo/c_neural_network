@@ -146,8 +146,15 @@ void update_weights_adagrad(Matrix* weights, Matrix* gradient, Optimizer* optimi
     matrix_add_into(weight_s, intermediate, weight_s);
     
     matrix_scale_inplace(ada->learning_rate, gradient);
-    matrix_add_scalar_into(1e-9, weight_s, intermediate);
+    matrix_add_scalar_into((nn_float)1e-9, weight_s, intermediate);
+
+    #ifdef SINGLE_PRECISION
     matrix_apply_inplace(sqrtf, intermediate);
+    #endif
+    #ifdef DOUBLE_PRECISION
+    matrix_apply_inplace(sqrt, intermediate);
+    #endif
+
     matrix_divide_into(gradient, intermediate, intermediate);
     matrix_subtract_into(weights, intermediate, weights);
 }
@@ -162,8 +169,15 @@ void update_bias_adagrad(Matrix* bias, Matrix* gradient, Optimizer* optimizer, i
     matrix_add_into(bias_s, intermediate, bias_s);
     
     matrix_scale_inplace(ada->learning_rate, gradient);
-    matrix_add_scalar_into(1e-9, bias_s, intermediate);
+    matrix_add_scalar_into((nn_float)1e-9, bias_s, intermediate);
+
+    #ifdef SINGLE_PRECISION
     matrix_apply_inplace(sqrtf, intermediate);
+    #endif
+    #ifdef DOUBLE_PRECISION
+    matrix_apply_inplace(sqrt, intermediate);
+    #endif
+
     matrix_divide_into(gradient, intermediate, intermediate);
     matrix_subtract_into(bias, intermediate, bias);
 }
@@ -245,19 +259,31 @@ void update_weights_adam(Matrix* weights, Matrix* gradient, Optimizer* optimizer
     Matrix* intermediate_w = adam->intermediate_w[layer_idx];
 
     matrix_scale_inplace(adam->beta_m, weight_m);
-    matrix_scale_into(1.0 - adam->beta_m, gradient, intermediate_w);
+    matrix_scale_into((nn_float)1.0 - adam->beta_m, gradient, intermediate_w);
     matrix_subtract_into(weight_m, intermediate_w, weight_m);
 
     matrix_scale_inplace(adam->beta_s, weight_s);
     matrix_multiply_into(gradient, gradient, intermediate_w);
-    matrix_scale_inplace(1.0 - adam->beta_s, intermediate_w);
+    matrix_scale_inplace((nn_float)1.0 - adam->beta_s, intermediate_w);
     matrix_add_into(weight_s, intermediate_w, weight_s);
 
-    matrix_scale_into(1.0 / (1.0 - pow(adam->beta_m, adam->ctr)), weight_m, weight_m_corr);
-    matrix_scale_into(1.0 / (1.0 - pow(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
+    #ifdef SINGLE_PRECISION
 
-    matrix_add_scalar_into(1e-9, weight_s_corr, intermediate_w);
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powf(adam->beta_m, adam->ctr)), weight_m, weight_m_corr);
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powf(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
+    matrix_add_scalar_into((nn_float)1e-9, weight_s_corr, intermediate_w);
     matrix_apply_inplace(sqrtf, intermediate_w);
+
+    #endif
+    #ifdef DOUBLE_PRECISION
+
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - pow(adam->beta_m, adam->ctr)), weight_m, weight_m_corr);
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - pow(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
+    matrix_add_scalar_into((nn_float)1e-9, weight_s_corr, intermediate_w);
+    matrix_apply_inplace(sqrt, intermediate_w);
+
+    #endif
+
     matrix_divide_into(weight_m_corr, intermediate_w, intermediate_w);
     matrix_scale_inplace(adam->learning_rate, intermediate_w);
     matrix_add_into(weights, intermediate_w, weights);
@@ -273,19 +299,31 @@ void update_bias_adam(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int 
     Matrix* intermediate_b = adam->intermediate_b[layer_idx];
 
     matrix_scale_inplace(adam->beta_m, bias_m);
-    matrix_scale_into(1.0 - adam->beta_m, gradient, intermediate_b);
+    matrix_scale_into((nn_float)1.0 - adam->beta_m, gradient, intermediate_b);
     matrix_subtract_into(bias_m, intermediate_b, bias_m);
 
     matrix_scale_inplace(adam->beta_s, bias_s);
     matrix_multiply_into(gradient, gradient, intermediate_b);
-    matrix_scale_inplace(1.0 - adam->beta_s, intermediate_b);
+    matrix_scale_inplace((nn_float)1.0 - adam->beta_s, intermediate_b);
     matrix_add_into(bias_s, intermediate_b, bias_s);
 
-    matrix_scale_into(1.0 / (1.0 - pow(adam->beta_m, adam->ctr)), bias_m, bias_m_corr);
-    matrix_scale_into(1.0 / (1.0 - pow(adam->beta_s, adam->ctr)), bias_s, bias_s_corr);
+    #ifdef SINGLE_PRECISION
 
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powf(adam->beta_m, adam->ctr)), bias_m, bias_m_corr);
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powf(adam->beta_s, adam->ctr)), bias_s, bias_s_corr);
     matrix_add_scalar_into(1e-9, bias_s_corr, intermediate_b);
     matrix_apply_inplace(sqrtf, intermediate_b);
+
+    #endif
+    #ifdef DOUBLE_PRECISION
+
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - pow(adam->beta_m, adam->ctr)), bias_m, bias_m_corr);
+    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - pow(adam->beta_s, adam->ctr)), bias_s, bias_s_corr);
+    matrix_add_scalar_into(1e-9, bias_s_corr, intermediate_b);
+    matrix_apply_inplace(sqrt, intermediate_b);
+
+    #endif
+    
     matrix_divide_into(bias_m_corr, intermediate_b, intermediate_b);
     matrix_scale_inplace(adam->learning_rate, intermediate_b);
     matrix_add_into(bias, intermediate_b, bias);

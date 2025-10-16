@@ -2,10 +2,10 @@
 
 Matrix* one_hot_encode(Matrix* column, int n_classes) {
     Matrix* one_hot = matrix_new(column->n_rows, n_classes);
-    matrix_fill(one_hot, 0.0);
+    matrix_fill(one_hot, (nn_float)0.0);
     for (int i=0; i<column->n_rows; i++) {
         int class = (int)matrix_get(column, i, 0);
-        matrix_assign(one_hot, i, class, 1.0);
+        matrix_assign(one_hot, i, class, (nn_float)1.0);
     }
 
     return one_hot;

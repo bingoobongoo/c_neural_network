@@ -2,7 +2,7 @@
 
 Score* score_new(int batch_size) {
     Score* s = (Score*)malloc(sizeof(Score));
-    s->accuracy = -1.0;
+    s->accuracy = (nn_float)-1.0;
     s->batch_size = batch_size;
     s->y_pred_argmax = matrix_new(1, batch_size);
     s->y_true_argmax = matrix_new(1, batch_size);
@@ -20,7 +20,7 @@ void score_batch(Score* self, Matrix* y_pred, Matrix* y_true) {
     matrix_argmax_into(y_pred, self->y_pred_argmax);
     matrix_argmax_into(y_true, self->y_true_argmax);
     nn_float n_samples = self->y_pred_argmax->n_cols;
-    nn_float correct_preds = 0.0;
+    nn_float correct_preds = (nn_float)0.0;
     for (int i=0; i<n_samples; i++) {
         if (matrix_get(self->y_pred_argmax,0,i) == matrix_get(self->y_true_argmax,0,i)) {
             correct_preds++;

@@ -32,7 +32,7 @@ Enables im2col method for calculating convolution for forward and backward passe
 /*
 Defined if using single precision (32-bit) float as basic primitive type.
 */
-#define SINGLE_PRECISION
+// #define SINGLE_PRECISION
 
 #ifndef SINGLE_PRECISION
 /*

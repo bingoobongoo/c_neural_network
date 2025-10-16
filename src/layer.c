@@ -329,21 +329,47 @@ void layer_deep_compile(Layer* l, ActivationType act_type, int act_param, int ba
     switch (act_type)
     {
     case SIGMOID:
+        #ifdef SINGLE_PRECISION
+
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
-            0.0,
-            sqrt(2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            (nn_float)0.0,
+            sqrtf((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
         );
+
+        #endif
+        #ifdef DOUBLE_PRECISION
+
+        matrix_fill_normal_distribution(
+            l->cache.dense.weight,
+            (nn_float)0.0,
+            sqrt((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+        );        
+
+        #endif
         break;
     
     case RELU:
     case LRELU:
     case ELU:
+        #ifdef SINGLE_PRECISION
+
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
-            0.0,
-            sqrt(2.0/layer_get_n_units(l->prev_layer))
+            (nn_float)0.0,
+            sqrtf((nn_float)2.0/layer_get_n_units(l->prev_layer))
         );
+
+        #endif
+        #ifdef DOUBLE_PRECISION
+
+        matrix_fill_normal_distribution(
+            l->cache.dense.weight,
+            (nn_float)0.0,
+            sqrt((nn_float)2.0/layer_get_n_units(l->prev_layer))
+        );        
+        
+        #endif
         break;
     
     default:
@@ -355,9 +381,9 @@ void layer_deep_compile(Layer* l, ActivationType act_type, int act_param, int ba
 
 void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
     if (layer_get_n_units(l) == 1)
-        l->activation = activation_new(SIGMOID, 0.0);
+        l->activation = activation_new(SIGMOID, (nn_float)0.0);
     if (layer_get_n_units(l) > 1)
-        l->activation = activation_new(SOFTMAX, 0.0);
+        l->activation = activation_new(SOFTMAX, (nn_float)0.0);
     l->activation->y_true_batch = batch_matrix_new(
         batch_size,
         layer_get_n_units(l)
@@ -411,16 +437,29 @@ void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
     );
     l->cache.dense.dZnext_dA_t = NULL;
 
-    matrix_fill(l->cache.dense.bias, 0.0);
+    matrix_fill(l->cache.dense.bias, (nn_float)0.0);
     switch (l->activation->type)
     {
     case SIGMOID:
     case SOFTMAX:
+        #ifdef SINGLE_PRECISION
+
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
-            0.0,
-            sqrt(2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            (nn_float)0.0,
+            sqrtf((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
         );
+
+        #endif
+        #ifdef DOUBLE_PRECISION
+
+        matrix_fill_normal_distribution(
+            l->cache.dense.weight,
+            (nn_float)0.0,
+            sqrt((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+        ); 
+
+        #endif
         break;
 
     default:
@@ -542,27 +581,53 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     
     tensor4D_fill(
         l->cache.conv.bias,
-        0.0
+        (nn_float)0.0
     );
 
     switch (l->activation->type)
     {
     case SIGMOID:
+        #ifdef SINGLE_PRECISION
+
         tensor4D_fill_normal_distribution(
             l->cache.conv.filter,
-            0.0,
-            2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer))
+            (nn_float)0.0,
+            sqrtf((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
         );
+
+        #endif
+        #ifdef DOUBLE_PRECISION
+
+        tensor4D_fill_normal_distribution(
+            l->cache.conv.filter,
+            (nn_float)0.0,
+            sqrt((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+        );
+        
+        #endif
         break;
     
     case RELU:
     case LRELU:
     case ELU:
+        #ifdef SINGLE_PRECISION
+
         tensor4D_fill_normal_distribution(
             l->cache.conv.filter,
-            0.0,
-            2.0/layer_get_n_units(l->prev_layer)
+            (nn_float)0.0,
+            sqrtf((nn_float)2.0/layer_get_n_units(l->prev_layer))
         );
+
+        #endif
+        #ifdef DOUBLE_PRECISION
+
+        tensor4D_fill_normal_distribution(
+            l->cache.conv.filter,
+            (nn_float)0.0,
+            sqrt((nn_float)2.0/layer_get_n_units(l->prev_layer))
+        );
+        
+        #endif
         break;
     
     default:
@@ -955,7 +1020,7 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
 
     // bias gradient (dCost_dB) calculation
     for (int i=0; i<filter->n_filters; i++) {
-        nn_float sum = 0.0;
+        nn_float sum = (nn_float)0.0;
         for (int n=0; n<batch_size; n++) {
             sum += matrix_sum(delta->filters[n]->channels[i]);
         }
@@ -996,7 +1061,7 @@ void layer_conv2d_bp_delta_from_max_pool(Layer* l, int batch_size) {
     Tensor4D* output_next = layer_get_output_tensor4D(l->next_layer);
     int pool_size = l->next_layer->params.conv.filter_size;
     int stride = l->next_layer->params.conv.stride;
-    tensor4D_fill(dCost_dA, 0.0);
+    tensor4D_fill(dCost_dA, (nn_float)0.0);
 
     for (int n=0; n<batch_size; n++) {
         for (int c=0; c<output_next->n_channels; c++) {

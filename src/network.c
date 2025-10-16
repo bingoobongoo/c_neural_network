@@ -105,10 +105,10 @@ void neural_net_compile(NeuralNet* net) {
                 layer_get_n_units(layer->prev_layer), 
                 layer_get_n_units(layer)
             );
-            matrix_fill(mom->weight_momentum[i], 0.0);
+            matrix_fill(mom->weight_momentum[i], (nn_float)0.0);
 
             mom->bias_momentum[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
-            matrix_fill(mom->bias_momentum[i], 0.0);
+            matrix_fill(mom->bias_momentum[i], (nn_float)0.0);
         }
         break;
     
@@ -132,22 +132,22 @@ void neural_net_compile(NeuralNet* net) {
                 layer_get_n_units(layer->prev_layer), 
                 layer_get_n_units(layer)
             );
-            matrix_fill(ada->weight_s[i], 0.0);
+            matrix_fill(ada->weight_s[i], (nn_float)0.0);
 
             ada->bias_s[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
-            matrix_fill(ada->bias_s[i], 0.0);
+            matrix_fill(ada->bias_s[i], (nn_float)0.0);
 
             ada->intermediate_w[i] = matrix_new(
                 layer_get_n_units(layer->prev_layer), 
                 layer_get_n_units(layer)
             );
-            matrix_fill(ada->intermediate_w[i], 0.0);
+            matrix_fill(ada->intermediate_w[i], (nn_float)0.0);
 
             ada->intermediate_b[i] = matrix_new(
                 net->batch_size, 
                 layer_get_n_units(layer)
             );
-            matrix_fill(ada->intermediate_b[i], 0.0);
+            matrix_fill(ada->intermediate_b[i], (nn_float)0.0);
         }
         break;
     
@@ -201,11 +201,11 @@ void neural_net_compile(NeuralNet* net) {
                 layer_get_n_units(layer)
             );
 
-            matrix_fill(adam->weight_m[i], 0.0);
-            matrix_fill(adam->weight_m_corr[i], 0.0);
-            matrix_fill(adam->weight_s[i], 0.0);
-            matrix_fill(adam->weight_s_corr[i], 0.0);
-            matrix_fill(adam->intermediate_w[i], 0.0);
+            matrix_fill(adam->weight_m[i], (nn_float)0.0);
+            matrix_fill(adam->weight_m_corr[i], (nn_float)0.0);
+            matrix_fill(adam->weight_s[i], (nn_float)0.0);
+            matrix_fill(adam->weight_s_corr[i], (nn_float)0.0);
+            matrix_fill(adam->intermediate_w[i], (nn_float)0.0);
             
             adam->bias_m[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
             adam->bias_m_corr[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
@@ -213,11 +213,11 @@ void neural_net_compile(NeuralNet* net) {
             adam->bias_s_corr[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
             adam->intermediate_b[i] = matrix_new(net->batch_size, layer_get_n_units(layer));
 
-            matrix_fill(adam->bias_m[i], 0.0);
-            matrix_fill(adam->bias_m_corr[i], 0.0);
-            matrix_fill(adam->bias_s[i], 0.0);
-            matrix_fill(adam->bias_s_corr[i], 0.0);
-            matrix_fill(adam->intermediate_b[i], 0.0);
+            matrix_fill(adam->bias_m[i], (nn_float)0.0);
+            matrix_fill(adam->bias_m_corr[i], (nn_float)0.0);
+            matrix_fill(adam->bias_s[i], (nn_float)0.0);
+            matrix_fill(adam->bias_s_corr[i], (nn_float)0.0);
+            matrix_fill(adam->intermediate_b[i], (nn_float)0.0);
         }
         break;
     }
@@ -421,13 +421,13 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
         gettimeofday(&end, NULL);
         epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;;
 
-        sum=0.0;
+        sum = (nn_float)0.0;
         for (int j=0; j<i; j++) {
             sum += avg_loss[j];
         }
         avg_epoch_loss = sum / (nn_float)i;
 
-        sum=0.0;
+        sum = (nn_float)0.0;
         for (int j=0; j<i; j++) {
             sum += train_acc[j];
         }
@@ -448,7 +448,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             val_acc[i] = net->batch_score->accuracy;
         }
 
-        sum = 0.0;
+        sum = (nn_float)0.0;
         for (int j=0; j<i; j++) {
             sum += val_acc[j];
         }
@@ -523,7 +523,7 @@ void score(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
         acc[i] = net->batch_score->accuracy;
     }
 
-    nn_float sum = 0.0;
+    nn_float sum = (nn_float)0.0;
     for (int j=0; j<i; j++) {
         sum += acc[j];
     }
@@ -551,7 +551,7 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
 
     int start_idx = 0;
     Matrix* conf_m = matrix_new(y_test->n_cols, y_test->n_cols);
-    matrix_fill(conf_m, 0.0);
+    matrix_fill(conf_m, (nn_float)0.0);
 
     for (start_idx; start_idx<x_test->n_rows - net->batch_size; start_idx += net->batch_size) {
         if (net->is_cnn) {

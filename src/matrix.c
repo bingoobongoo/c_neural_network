@@ -113,7 +113,7 @@ void matrix_print(Matrix* m) {
     for (int i=0; i<m->n_rows; i++) {
         printf("%c", '|');
         for (int j=0; j<m->n_cols; j++) {
-            if (matrix_get(m, i, j) < 0.0){
+            if (matrix_get(m, i, j) < (nn_float)0.0){
                 printf("%.3f  ", matrix_get(m, i, j));
             }
             else {
@@ -145,11 +145,17 @@ void matrix_fill_normal_distribution(Matrix* m, nn_float mean, nn_float std_devi
         for (int j=0; j<m->n_cols; j++) {
             nn_float u1, u2;
             do {
-                u1 = rand() / (RAND_MAX + 1.0);
-            } while (u1 < 1e-10);
-            u2 = rand() / (RAND_MAX + 1.0);
+                u1 = rand() / (RAND_MAX + (nn_float)1.0);
+            } while (u1 < (nn_float)1e-10);
+            u2 = rand() / (RAND_MAX + (nn_float)1.0);
         
-            nn_float z = sqrt(-2.0 * log(u1)) * cos(2.0 * PI * u2);
+            #ifdef SINGLE_PRECISION
+            nn_float z = sqrtf((nn_float)-2.0 * logf(u1)) * cosf((nn_float)2.0 * PI * u2);
+            #endif
+            #ifdef DOUBLE_PRECISION
+            nn_float z = sqrt((nn_float)-2.0 * log(u1)) * cos((nn_float)2.0 * PI * u2);
+            #endif
+
             nn_float x = mean + std_deviation * z;
             matrix_assign(m, i, j, x);
         }
@@ -327,8 +333,8 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
     #endif
     #ifdef BLAS
     
-    nn_float alpha = 1.0f;
-    nn_float beta = 0.0f;
+    nn_float alpha = (nn_float)1.0;
+    nn_float beta = (nn_float)0.0;
 
     #ifdef SINGLE_PRECISION
 
@@ -480,7 +486,7 @@ Matrix* matrix_sum_axis(Matrix* m, int axis) {
     case 0: {
         Matrix* sum_m = matrix_new(1, m->n_rows);
         for (int i=0; i<m->n_rows; i++) {
-            nn_float sum = 0.0;
+            nn_float sum = (nn_float)0.0;
             for (int j=0; j<m->n_cols; j++) {
                 sum += matrix_get(m, i, j);
             }
@@ -494,7 +500,7 @@ Matrix* matrix_sum_axis(Matrix* m, int axis) {
     case 1: {
         Matrix* sum_m = matrix_new(1, m->n_cols);
         for (int i=0; i<m->n_cols; i++) {
-            nn_float sum = 0.0;
+            nn_float sum = (nn_float)0.0;
             for (int j=0; j<m->n_rows; j++) {
                 sum += matrix_get(m, j, i);
             }
@@ -517,7 +523,7 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
     {
     case 0: {
         for (int i=0; i<m->n_rows; i++) {
-            nn_float sum = 0.0;
+            nn_float sum = (nn_float)0.0;
             for (int j=0; j<m->n_cols; j++) {
                 sum += matrix_get(m, i, j);
             }
@@ -529,7 +535,7 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
     
     case 1: {
         for (int i=0; i<m->n_cols; i++) {
-            nn_float sum = 0.0;
+            nn_float sum = (nn_float)0.0;
             for (int j=0; j<m->n_rows; j++) {
                 sum += matrix_get(m, j, i);
             }
@@ -547,7 +553,7 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
 }
 
 nn_float matrix_sum(Matrix* m) {
-    nn_float sum = 0;
+    nn_float sum = (nn_float)0.0;
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             sum += matrix_get(m, i, j);
@@ -779,7 +785,7 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
-                nn_float sum = 0.0;
+                nn_float sum = (nn_float)0.0;
                 for (int k=0; k<kernel->n_rows; k++) {
                     for (int l=0; l<kernel->n_cols; l++) {
                         sum += matrix_get(input, i*stride+k, j*stride+l) *
@@ -801,7 +807,7 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
-                sum = 0.0;
+                sum = (nn_float)0.0;
                 k = kernel->n_rows - i*stride - 1;
                 if (k<0) k=0;
                 k_stick_out = i*stride - input->n_rows + 1;
@@ -840,7 +846,7 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int strid
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
-                nn_float sum = 0.0;
+                nn_float sum = (nn_float)0.0;
                 for (int k=0; k<kernel->n_rows; k++) {
                     for (int l=0; l<kernel->n_cols; l++) {
                         sum += matrix_get(input, i*stride+k, j*stride+l) *
@@ -862,7 +868,7 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int strid
 
         for (int i=0; i<out_h; i++) {
             for (int j=0; j<out_w; j++) {
-                sum = 0.0;
+                sum = (nn_float)0.0;
                 k = kernel->n_rows - i*stride - 1;
                 if (k<0) k=0;
                 k_stick_out = i*stride - input->n_rows + 1;
