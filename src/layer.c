@@ -479,6 +479,10 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     int output_height = floor((input_height - filter_height) / stride) + 1;
     int output_width = floor((input_width - filter_width) / stride) + 1;
 
+    l->params.conv.n_filter_channels = input_channels;
+    l->params.conv.output_height = output_height;
+    l->params.conv.output_width = output_width;
+
     l->activation = activation_new(
         act_type,
         act_param
@@ -486,7 +490,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     l->cache.conv.filter = tensor4D_new(
         l->params.conv.filter_size,
         l->params.conv.filter_size,
-        input_channels,
+        l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
     l->cache.conv.bias = tensor4D_new(
@@ -516,7 +520,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     l->cache.conv.filter_gradient = tensor4D_new(
         l->params.conv.filter_size,
         l->params.conv.filter_size,
-        input_channels,
+        l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
     l->cache.conv.bias_gradient = tensor4D_new(
@@ -539,10 +543,10 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     );
     l->cache.conv.fp_im2col_input = matrix_new(
         output_height * output_width,
-        filter_height * filter_width * input_channels
+        filter_height * filter_width * l->params.conv.n_filter_channels
     );
     l->cache.conv.fp_im2col_kernel = matrix_new(
-        filter_height * filter_width * input_channels,
+        filter_height * filter_width * l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
     l->cache.conv.fp_im2col_output = matrix_new(
@@ -567,11 +571,11 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     );
     l->cache.conv.delta_im2col_kernel = matrix_new(
         filter_height * filter_width * l->params.conv.n_filters,
-        input_channels
+        l->params.conv.n_filter_channels
     );
     l->cache.conv.delta_im2col_output = matrix_new(
         input_height * input_width,
-        input_channels
+        l->params.conv.n_filter_channels
     );
 
     l->params.conv.n_units = 
@@ -671,6 +675,9 @@ void layer_max_pool_compile(Layer* l, int batch_size) {
     int stride = l->params.conv.stride;
     int output_height = floor((input_height - filter_height) / stride) + 1;
     int output_width = floor((input_width - filter_width) / stride) + 1;
+
+    l->params.conv.output_height = output_height;
+    l->params.conv.output_width = output_width;
 
     l->cache.conv.output = tensor4D_new(
         output_height,
@@ -1264,13 +1271,13 @@ void layer_max_pool_bp(Layer* l, int batch_size) {
 }
 
 void layer_deep_update_weights(Layer* l, Optimizer* opt) {
-    opt->update_weights(
+    opt->update_dense_weights(
         l->cache.dense.weight, 
         l->cache.dense.weight_gradient, 
         opt, 
         l->layer_idx
     );
-    opt->update_bias(
+    opt->update_dense_bias(
         l->cache.dense.bias, 
         l->cache.dense.bias_gradient, 
         opt, 
@@ -1283,22 +1290,20 @@ void layer_conv2D_update_weights(Layer* l, Optimizer* opt) {
     Tensor4D* bias = l->cache.conv.bias;
     Tensor4D* filter_grad = l->cache.conv.filter_gradient;
     Tensor4D* bias_grad = l->cache.conv.bias_gradient;
-    for (int i=0; i<filter->n_filters; i++) {
-        for (int j=0; j<filter->n_channels; j++) {
-            opt->update_weights(
-                filter->filters[i]->channels[j],
-                filter_grad->filters[i]->channels[j],
-                opt,
-                l->layer_idx
-            );
-        }
-        opt->update_bias(
-            bias->filters[i]->channels[0],
-            bias_grad->filters[i]->channels[0],
-            opt,
-            l->layer_idx
-        );
-    }
+    opt->update_conv_weights(
+        filter,
+        filter_grad,
+        opt,
+        l->layer_idx
+    );
+    opt->update_conv_bias(
+        bias,
+        bias_grad,
+        opt,
+        l->layer_idx
+    );
 
+    #ifdef IM2COL
     kernel_into_im2col_fwise(filter, false, l->cache.conv.fp_im2col_kernel);
+    #endif
 }

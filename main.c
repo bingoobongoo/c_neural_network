@@ -18,7 +18,7 @@ int main() {
     shuffle_matrix_inplace(x_test, y_test);
     
     NeuralNet* net = neural_net_new(
-        optimizer_sgd_new(0.001),
+        optimizer_adam_new(0.001, 0.9, 0.999),
         RELU, 0.01,
         CAT_CROSS_ENTROPY, 
         32
@@ -44,7 +44,7 @@ int main() {
     
     struct timeval start1, end1;
     gettimeofday(&start1, NULL);
-    fit(x_train, y_train, 5, 0.1, net);
+    fit(x_train, y_train, 1, 0.1, net);
     gettimeofday(&end1, NULL);
     double fit_time = (end1.tv_sec - start1.tv_sec) + (end1.tv_usec - start1.tv_usec) / 1e6;
 
