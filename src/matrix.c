@@ -240,7 +240,7 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into) {
     #ifdef DEBUG
 
     if (!matrix_check_dimensions(m1, m2)) {
-        printf("Matrices have different dimensions: ");
+        printf("(matrix_add_into):Matrices have different dimensions: ");
         matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
         exit(1); 
     }
@@ -281,7 +281,7 @@ void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into) {
     #ifdef DEBUG
 
     if (!matrix_check_dimensions(m1, m2)) {
-        printf("Matrices have different dimensions: ");
+        printf("(matrix_subtract_into):Matrices have different dimensions: ");
         matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
         exit(1); 
     }
@@ -421,10 +421,10 @@ Matrix* matrix_multiply(Matrix* m1, Matrix* m2) {
 }
 
 void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into) {
-    #ifdef DEFINE
+    #ifdef DEBUG
     
     if (!matrix_check_dimensions(m1, m2)) {
-        printf("Matrices have different dimensions: ");
+        printf("(matrix_multiply_into):Matrices have different dimensions: ");
         matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
         exit(1); 
     }
@@ -465,7 +465,7 @@ void matrix_divide_into(Matrix* m1, Matrix* m2, Matrix* into) {
     #ifdef DEBUG
     
     if (!matrix_check_dimensions(m1, m2)) {
-        printf("Matrices have different dimensions: ");
+        printf("(matrix_divide_into):Matrices have different dimensions: ");
         matrix_print_dimensions(m1); printf(" != "); matrix_print_dimensions(m2);
         exit(1); 
     }

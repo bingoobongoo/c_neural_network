@@ -12,7 +12,7 @@
 Enables debug informations for basic linear algebra operations, such us dimension
 checks, out of bounds checks etc. Very slow, use only when debugging.
 */
-// #define DEBUG
+#define DEBUG
 
 /*
 Enables optimized library for basic linear algerba operations, effectively 
