@@ -715,13 +715,13 @@ void layer_conv2D_input_fp(Layer* l, Batch* train_batch, int batch_size) {
 
 void layer_deep_fp(Layer* l, int batch_size) {
     matrix_dot_into(layer_get_output_matrix(l->prev_layer), l->cache.dense.weight, l->cache.dense.z);
-    matrix_add_into(l->cache.dense.z, l->cache.dense.bias, l->cache.dense.z);
+    bias_add_to_dense_z(l->cache.dense.bias, l->cache.dense.z);
     apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
 }
 
 void layer_output_fp(Layer* l, Batch* label_batch, int batch_size) {
     matrix_dot_into(layer_get_output_matrix(l->prev_layer), l->cache.dense.weight, l->cache.dense.z);
-    matrix_add_into(l->cache.dense.z, l->cache.dense.bias, l->cache.dense.z);
+    bias_add_to_dense_z(l->cache.dense.bias, l->cache.dense.z);
     l->activation->y_true_batch = label_batch;
     apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
 }
@@ -730,7 +730,7 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
     Tensor4D* filter = l->cache.conv.filter;
     Tensor4D* z = l->cache.conv.z;
-    Tensor4D* bias = l->cache.conv.bias;
+    Matrix* bias = l->cache.conv.bias;
     Tensor4D* output = l->cache.conv.output;
 
     #ifdef IM2COL_CONV
@@ -755,9 +755,8 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
             true
         );
         for (int i=0; i<filter->n_filters; i++) {
-            matrix_add_into(
-                z->filters[n]->channels[i],
-                bias->filters[i]->channels[0],
+            matrix_add_scalar_inplace(
+                matrix_get(bias, 0, i),
                 z->filters[n]->channels[i]
             );
             apply_activation_func_into(
@@ -788,9 +787,8 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
                 corr_t3d,
                 z->filters[n]->channels[i]
             );
-            matrix_add_into(
-                z->filters[n]->channels[i],
-                bias->filters[i]->channels[0],
+            matrix_add_scalar_inplace(
+                matrix_get(bias, 0, i),
                 z->filters[n]->channels[i]
             );
             apply_activation_func_into(
@@ -864,12 +862,6 @@ void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size) {
     matrix_sum_axis_into(
         l->cache.dense.delta, 
         1, 
-        l->cache.dense.dCost_dZ_col_sum
-    );
-    matrix_multiplicate_into(
-        l->cache.dense.dCost_dZ_col_sum, 
-        1, 
-        batch_size, 
         l->cache.dense.bias_gradient
     );
 }
@@ -911,12 +903,6 @@ void layer_deep_bp(Layer* l, int batch_size) {
     matrix_sum_axis_into(
         l->cache.dense.delta, 
         1, 
-        l->cache.dense.dCost_dZ_col_sum
-    );
-    matrix_multiplicate_into(
-        l->cache.dense.dCost_dZ_col_sum, 
-        1, 
-        batch_size, 
         l->cache.dense.bias_gradient
     );
 }
@@ -927,7 +913,7 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
     Tensor4D* output = layer_get_output_tensor4D(l);
     Tensor4D* filter = l->cache.conv.filter;
     Tensor4D* filter_grad = l->cache.conv.filter_gradient;
-    Tensor4D* bias_grad = l->cache.conv.bias_gradient;
+    Matrix* bias_grad = l->cache.conv.bias_gradient;
     Tensor4D* delta = l->cache.conv.delta;
     Tensor4D* dA_dZ = l->cache.conv.dActivation_dZ;
     Tensor4D* dCost_dA = l->cache.conv.dCost_dA;
@@ -1024,7 +1010,7 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
         for (int n=0; n<batch_size; n++) {
             sum += matrix_sum(delta->filters[n]->channels[i]);
         }
-        matrix_fill(bias_grad->filters[i]->channels[0], sum);
+        matrix_assign(bias_grad, 0, i, sum);
     }
 }
 

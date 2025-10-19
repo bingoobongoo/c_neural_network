@@ -7,6 +7,7 @@
 #include "activation.h"
 #include "optimizer.h"
 #include "cost.h"
+#include "bias.h"
 
 typedef struct Layer Layer;
 typedef struct NeuralNet NeuralNet;
