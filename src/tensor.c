@@ -93,6 +93,100 @@ void tensor4D_fill_normal_distribution(Tensor4D* t, nn_float mean, nn_float std_
     }
 }
 
+void tensor4D_apply_inplace(nn_float (*func)(nn_float), Tensor4D* t) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_apply_inplace(
+                func,
+                t->filters[i]->channels[j]
+            );
+        }
+    }
+}
+
+void tensor4D_scale_inplace(nn_float scalar, Tensor4D* t) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_scale_inplace(
+                scalar,
+                t->filters[i]->channels[j]
+            );
+        }
+    }
+}
+
+void tensor4D_scale_into(nn_float scalar, Tensor4D* t, Tensor4D* into) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_scale_into(
+                scalar,
+                t->filters[i]->channels[j],
+                into->filters[i]->channels[j]
+            );
+        }
+    }    
+}
+
+void tensor4D_add_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into) {
+    for (int i=0; i<t1->n_filters; i++) {
+        for (int j=0; j<t1->n_channels; j++) {
+            matrix_add_into(
+                t1->filters[i]->channels[j],
+                t2->filters[i]->channels[j],
+                into->filters[i]->channels[j]
+            );
+        }
+    }    
+}
+
+void tensor4D_add_scalar_into(nn_float scalar, Tensor4D* t, Tensor4D* into) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_add_scalar_into(
+                scalar,
+                t->filters[i]->channels[j],
+                into->filters[i]->channels[j]
+            );
+        }
+    }  
+}
+
+void tensor4D_subtract_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into) {
+    for (int i=0; i<t1->n_filters; i++) {
+        for (int j=0; j<t1->n_channels; j++) {
+            matrix_subtract_into(
+                t1->filters[i]->channels[j],
+                t2->filters[i]->channels[j],
+                into->filters[i]->channels[j]
+            );
+        }
+    }    
+}
+
+void tensor4D_multiply_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into) {
+    for (int i=0; i<t1->n_filters; i++) {
+        for (int j=0; j<t1->n_channels; j++) {
+            matrix_multiply_into(
+                t1->filters[i]->channels[j],
+                t2->filters[i]->channels[j],
+                into->filters[i]->channels[j]
+            );
+        }
+    }   
+}
+
+void tensor4D_divide_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into) {
+    for (int i=0; i<t1->n_filters; i++) {
+        for (int j=0; j<t1->n_channels; j++) {
+            matrix_divide_into(
+                t1->filters[i]->channels[j],
+                t2->filters[i]->channels[j],
+                into->filters[i]->channels[j]
+            );
+        }
+    }    
+}
+
 Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
     Tensor4D* t = (Tensor4D*)malloc(sizeof(Tensor4D));
     t->n_rows = n_rows;

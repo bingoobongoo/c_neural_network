@@ -6,9 +6,12 @@
 
 typedef struct {
     int n_filters;
+    int n_filter_channels;
     int filter_size;
     int stride;
     int n_units;
+    int output_width;
+    int output_height;
 } ConvParams;
 
 typedef struct {

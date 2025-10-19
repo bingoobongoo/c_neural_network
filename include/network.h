@@ -39,6 +39,7 @@ void score(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net);
 void forward_prop(NeuralNet* net, bool training);
 void back_prop(NeuralNet* net);
+void update_weights(NeuralNet* net);
 
 void add_input_layer(int n_units, NeuralNet* net);
 void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net);
