@@ -34,7 +34,7 @@ void layer_free(Layer* layer) {
             layer->cache.conv.filter = NULL;
         }
         if (layer->cache.conv.bias != NULL) {
-            tensor4D_free(layer->cache.conv.bias);
+            matrix_free(layer->cache.conv.bias);
             layer->cache.conv.bias = NULL;
         }
         if (layer->cache.conv.delta != NULL) {
@@ -46,7 +46,7 @@ void layer_free(Layer* layer) {
             layer->cache.conv.filter_gradient = NULL;
         }
         if (layer->cache.conv.bias_gradient != NULL) {
-            tensor4D_free(layer->cache.conv.bias_gradient);
+            matrix_free(layer->cache.conv.bias_gradient);
             layer->cache.conv.bias_gradient = NULL;
         }
         if (layer->cache.conv.dCost_dA != NULL) {
@@ -280,7 +280,7 @@ void layer_deep_compile(Layer* l, ActivationType act_type, int act_param, int ba
         layer_get_n_units(l)
     );
     l->cache.dense.bias = matrix_new(
-        batch_size,
+        1,
         layer_get_n_units(l)
     );
     l->cache.dense.output = matrix_new(
@@ -300,7 +300,7 @@ void layer_deep_compile(Layer* l, ActivationType act_type, int act_param, int ba
         layer_get_n_units(l)
     );
     l->cache.dense.bias_gradient = matrix_new(
-        batch_size,
+        1,
         layer_get_n_units(l)
     );
     l->cache.dense.dCost_dA = matrix_new(
@@ -396,7 +396,7 @@ void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
         layer_get_n_units(l)
     );
     l->cache.dense.bias = matrix_new(
-        batch_size,
+        1,
         layer_get_n_units(l)
     );
     l->cache.dense.output = matrix_new(
@@ -416,7 +416,7 @@ void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
         layer_get_n_units(l)
     );
     l->cache.dense.bias_gradient = matrix_new(
-        batch_size,
+        1,
         layer_get_n_units(l)
     );
     l->cache.dense.dCost_dA = matrix_new(
@@ -493,9 +493,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
-    l->cache.conv.bias = tensor4D_new(
-        output_height,
-        output_width,
+    l->cache.conv.bias = matrix_new(
         1,
         l->params.conv.n_filters
     );
@@ -523,9 +521,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
-    l->cache.conv.bias_gradient = tensor4D_new(
-        output_height,
-        output_width,
+    l->cache.conv.bias_gradient = matrix_new(
         1,
         l->params.conv.n_filters
     );
@@ -583,10 +579,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         l->cache.conv.output->n_cols *
         l->cache.conv.output->n_channels;
     
-    tensor4D_fill(
-        l->cache.conv.bias,
-        (nn_float)0.0
-    );
+    matrix_fill(l->cache.conv.bias, (nn_float)0.0);
 
     switch (l->activation->type)
     {
@@ -640,11 +633,13 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         break;
     }
     
+    #ifdef IM2COL
     kernel_into_im2col_fwise(
         l->cache.conv.filter,
         false,
         l->cache.conv.fp_im2col_kernel
     );
+    #endif
 }
 
 void layer_flatten_compile(Layer* l, int batch_size) {
@@ -1287,9 +1282,9 @@ void layer_deep_update_weights(Layer* l, Optimizer* opt) {
 
 void layer_conv2D_update_weights(Layer* l, Optimizer* opt) {
     Tensor4D* filter = l->cache.conv.filter;
-    Tensor4D* bias = l->cache.conv.bias;
+    Matrix* bias = l->cache.conv.bias;
     Tensor4D* filter_grad = l->cache.conv.filter_gradient;
-    Tensor4D* bias_grad = l->cache.conv.bias_gradient;
+    Matrix* bias_grad = l->cache.conv.bias_gradient;
     opt->update_conv_weights(
         filter,
         filter_grad,

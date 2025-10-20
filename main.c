@@ -18,7 +18,7 @@ int main() {
     shuffle_matrix_inplace(x_test, y_test);
     
     NeuralNet* net = neural_net_new(
-        optimizer_adam_new(0.001, 0.9, 0.999),
+        optimizer_sgd_new(0.001),
         RELU, 0.01,
         CAT_CROSS_ENTROPY, 
         32
@@ -27,9 +27,6 @@ int main() {
     add_input_layer(x_train->n_cols, net);
     add_deep_layer(300, net);
     add_deep_layer(100, net);
-    add_deep_layer(50, net);
-    add_deep_layer(25, net);
-    add_deep_layer(15, net);
     add_output_layer(y_train->n_cols, net);
 
     // add_conv_input_layer(28, 28, 1, net);

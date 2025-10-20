@@ -19,6 +19,20 @@ void matrix_free(Matrix* m) {
     m = NULL;
 }
 
+#ifdef INLINE
+inline nn_float matrix_get(Matrix* m, int row, int col) {
+    #ifdef DEBUG
+
+    if (col >= m->n_cols || row >= m->n_rows) {
+        printf("Out of bounds error while accessing matrix.");
+        exit(1);
+    }
+
+    #endif
+
+    return m->entries[row*m->n_cols + col];
+}
+#else
 nn_float matrix_get(Matrix* m, int row, int col) {
     #ifdef DEBUG
 
@@ -31,7 +45,22 @@ nn_float matrix_get(Matrix* m, int row, int col) {
 
     return m->entries[row*m->n_cols + col];
 }
+#endif
 
+#ifdef INLINE
+inline void matrix_assign(Matrix* m, int row, int col, nn_float num) {
+    #ifdef DEBUG
+
+    if (col >= m->n_cols || row >= m->n_rows) {
+        printf("Out of bounds error while accessing matrix.");
+        exit(1);
+    }
+
+    #endif
+
+    m->entries[row*m->n_cols + col] = num;
+}
+#else
 void matrix_assign(Matrix* m, int row, int col, nn_float num) {
     #ifdef DEBUG
 
@@ -44,6 +73,7 @@ void matrix_assign(Matrix* m, int row, int col, nn_float num) {
 
     m->entries[row*m->n_cols + col] = num;
 }
+#endif
 
 void matrix_save(Matrix* m, char* file_path) {
     FILE* file = fopen(file_path, "w");
@@ -250,7 +280,7 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into) {
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
-            matrix_assign(into, i, j, sum);;
+            matrix_assign(into, i, j, sum);
         }
     }
 }

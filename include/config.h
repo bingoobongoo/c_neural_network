@@ -12,7 +12,7 @@
 Enables debug informations for basic linear algebra operations, such us dimension
 checks, out of bounds checks etc. Very slow, use only when debugging.
 */
-#define DEBUG
+// #define DEBUG
 
 /*
 Enables optimized library for basic linear algerba operations, effectively 
@@ -32,7 +32,7 @@ Enables im2col method for calculating convolution for forward and backward passe
 /*
 Defined if using single precision (32-bit) float as basic primitive type.
 */
-// #define SINGLE_PRECISION
+#define SINGLE_PRECISION
 
 #ifndef SINGLE_PRECISION
 /*
@@ -53,5 +53,11 @@ performed. The default is 32-bit floating point (single precision).
 #define nn_float double
 #endif
 
+
+// =============================================================================
+
+// OPTIMIZATIONS
+
+// #define INLINE
 
 // =============================================================================

@@ -18,10 +18,10 @@ typedef struct {
     Tensor4D* output;
     Tensor4D* z;
     Tensor4D* filter;
-    Tensor4D* bias;
+    Matrix* bias;
     Tensor4D* delta;
     Tensor4D* filter_gradient;
-    Tensor4D* bias_gradient;
+    Matrix* bias_gradient;
 
     // auxiliary
     Tensor4D* dCost_dA;
