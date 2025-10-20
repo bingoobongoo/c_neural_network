@@ -1,6 +1,6 @@
 #include "bias.h"
 
-void bias_add_to_dense_z(Matrix* bias, Matrix* z) {
+void bias_add_to_dense_z(Matrix* restrict bias, Matrix* restrict z) {
     #ifdef DEBUG
 
     if (bias->n_cols != z->n_cols || bias->n_rows != 1) {
@@ -26,7 +26,7 @@ void bias_add_to_dense_z(Matrix* bias, Matrix* z) {
     }
 }
 
-void bias_add_to_conv_z(Matrix* bias, Tensor4D* z) {
+void bias_add_to_conv_z(Matrix* restrict bias, Tensor4D* restrict z) {
     #ifdef DEBUG
 
     // z->n_channels = filter->n_filters (filter is weights for cnn)

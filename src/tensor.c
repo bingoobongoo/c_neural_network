@@ -52,6 +52,18 @@ void tensor3D_correlate_into(Tensor3D* input, Tensor3D* kernel, Tensor3D* into, 
     }
 }
 
+void tensor3D_acc_correlate_into(Tensor3D* input, Tensor3D* kernel, Matrix* into, int stride, CorrelationType type) {
+    for (int c=0; c<input->n_channels; c++) {
+        matrix_acc_correlate_into(
+            input->channels[c],
+            kernel->channels[c],
+            into,
+            stride,
+            type
+        );
+    }
+}
+
 void matrix_into_tensor3D(Matrix* m, Tensor3D* t, bool transpose) {
     if (transpose) {
         for (int i=0; i<t->n_channels; i++) {
@@ -320,7 +332,7 @@ void tensor4D_into_matrix_fwise(Tensor4D* t, Matrix* m, bool transpose, bool fli
         int jk, kk;
         for (int i=0; i<t->n_filters; i++) {
             Tensor3D* t3d = t->filters[i];
-    
+            
             for (int j=0; j<t->n_channels; j++) {
                 Matrix* channel_mat = t3d->channels[j];
                 jk = j*t->n_rows*t->n_cols;

@@ -1,5 +1,11 @@
 #pragma once
 
+#if defined(__GNUC__) || defined(__clang__)
+  #define ASSUME_ALIGNED(p, a) (p) = (__typeof__(p))__builtin_assume_aligned((p), (a))
+#else
+  #define ASSUME_ALIGNED(p, a)
+#endif
+
 // CONSTANTS
 
 #define PI 3.14159265358979323846

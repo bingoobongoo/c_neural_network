@@ -771,23 +771,16 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
 
     #else
 
-    Tensor3D* corr_t3d = tensor3D_new(
-        z->n_rows,
-        z->n_cols,
-        filter->n_channels
-    );
+    tensor4D_fill(z, (nn_float)0.0);
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int n=0; n<batch_size; n++) {
         for (int i=0; i<filter->n_filters; i++) {
-            tensor3D_correlate_into(
+            tensor3D_acc_correlate_into(
                 input->filters[n],
                 filter->filters[i],
-                corr_t3d,
+                z->filters[n]->channels[i],
                 l->params.conv.stride,
                 VALID
-            );
-            tensor3D_sum_element_wise_into(
-                corr_t3d,
-                z->filters[n]->channels[i]
             );
             matrix_add_scalar_inplace(
                 matrix_get(bias, 0, i),
@@ -800,15 +793,16 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
             );
         }
     }
-    tensor3D_free(corr_t3d);
 
     #endif
 }
 
 void layer_flatten_fp(Layer* l, int batch_size) {
+    Tensor4D* t = layer_get_output_tensor4D(l->prev_layer);
+    Matrix* m = l->cache.flat.output;
     tensor4D_into_matrix_fwise(
-        layer_get_output_tensor4D(l->prev_layer),
-        l->cache.flat.output,
+        t,
+        m,
         false,
         false
     );
@@ -818,13 +812,17 @@ void layer_max_pool_fp(Layer* l, int batch_size) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
     Tensor4D* output = layer_get_output_tensor4D(l);
 
+    const int filter_size = l->params.conv.filter_size;
+    const int stride = l->params.conv.stride;
+
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int n=0; n<batch_size; n++) {
         for (int c=0; c<input->n_channels; c++) {
             matrix_max_pool_into(
                 input->filters[n]->channels[c],
                 output->filters[n]->channels[c],
-                l->params.conv.filter_size,
-                l->params.conv.stride
+                filter_size,
+                stride
             );
         }
     }
