@@ -351,12 +351,17 @@ Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
     return dot_matrix;
 }
 
-void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
+void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m2_trans) {
     #ifdef DEBUG
+
+    bool check_no_trans = (!m1_trans && !m2_trans) && (m1->n_cols != m2->n_rows);
+    bool check_m1_trans = m1_trans && (m1->n_rows != m2->n_rows);
+    bool check_m2_trans = m2_trans && (m1->n_cols != m2->n_cols);
     
-    if (m1->n_cols != m2->n_rows) {
+    if (check_no_trans || check_m1_trans || check_m2_trans) {
         printf("Matrices have wrong dimensions: ");
         matrix_print_dimensions(m1); printf(" and "); matrix_print_dimensions(m2);
+        printf("\nm1_trans=%d   m2_trans=%d\n", m1_trans, m2_trans);
         exit(1);
     }
 
@@ -365,24 +370,32 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
     
     nn_float alpha = (nn_float)1.0;
     nn_float beta = (nn_float)0.0;
+    CBLAS_TRANSPOSE m1_cblas_trans = (m1_trans) ? CblasTrans : CblasNoTrans;
+    CBLAS_TRANSPOSE m2_cblas_trans = (m2_trans) ? CblasTrans : CblasNoTrans;
+    const int M = m1_trans ? m1->n_cols : m1->n_rows;
+    const int N = m2_trans ? m2->n_rows : m2->n_cols;
+    const int K = m1_trans ? m1->n_rows : m1->n_cols;
+    const int lda = (m1_cblas_trans == CblasNoTrans) ? K : M;
+    const int ldb = (m2_cblas_trans == CblasNoTrans) ? N : K;
+    const int ldc = N;
 
     #ifdef SINGLE_PRECISION
 
     cblas_sgemm(
         CblasRowMajor,
-        CblasNoTrans,
-        CblasNoTrans,
-        m1->n_rows,
-        m2->n_cols,
-        m1->n_cols,
+        m1_cblas_trans,
+        m2_cblas_trans,
+        M,
+        N,
+        K,
         alpha,
         m1->entries,
-        m1->n_cols,
+        lda,
         m2->entries,
-        m2->n_cols,
+        ldb,
         beta,
         into->entries,
-        m2->n_cols
+        ldc
     );
 
     #endif
@@ -390,19 +403,19 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     cblas_dgemm(
         CblasRowMajor,
-        CblasNoTrans,
-        CblasNoTrans,
-        m1->n_rows,
-        m2->n_cols,
-        m1->n_cols,
+        m1_cblas_trans,
+        m2_cblas_trans,
+        M,
+        N,
+        K,
         alpha,
         m1->entries,
-        m1->n_cols,
+        lda,
         m2->entries,
-        m2->n_cols,
+        ldb,
         beta,
         into->entries,
-        m2->n_cols
+        ldc
     );
 
     #endif
@@ -411,18 +424,70 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
     #ifndef BLAS
 
     matrix_zero(into);
-    #pragma omp parallel for collapse(1)
-    for (int i=0; i<m1->n_rows; i++) {
-        for (int k=0; k<m1->n_cols; k++) {
-            for (int j=0; j<m2->n_cols; j++) {
-                matrix_assign(
-                    into, 
-                    i, 
-                    j,
-                    matrix_get(into, i, j) + matrix_get(m1, i, k) * matrix_get(m2, k, j)
-                );
+
+    if (!m1_trans && !m2_trans) {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_rows; i++) {
+            for (int k=0; k<m1->n_cols; k++) {
+                nn_float aik = matrix_get(m1, i, k);
+                for (int j=0; j<m2->n_cols; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
+                    );
+                }
             }
-        }
+        }      
+    }
+    else if (m1_trans && !m2_trans) {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_cols; i++) {
+            for (int k=0; k<m1->n_rows; k++) {
+                nn_float aik = matrix_get(m1, k, i);
+                for (int j=0; j<m2->n_cols; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
+                    );
+                }
+            }
+        }        
+    }
+    else if (!m1_trans && m2_trans) {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_rows; i++) {
+            for (int k=0; k<m1->n_cols; k++) {
+                nn_float aik = matrix_get(m1, i, k);
+                for (int j=0; j<m2->n_rows; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
+                    );
+                }
+            }
+        } 
+    }
+    else {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_cols; i++) {
+            for (int k=0; k<m1->n_rows; k++) {
+                nn_float aik = matrix_get(m1, k, i);
+                for (int j=0; j<m2->n_rows; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
+                    );
+                }
+            }
+        } 
     }
 
     #endif
@@ -812,13 +877,18 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
     case VALID: {
         int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
         int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
+        int i, j, k, l;
+        int is, js;
+        nn_float sum;
 
         for (int i=0; i<out_h; i++) {
+            is = i*stride;
             for (int j=0; j<out_w; j++) {
-                nn_float sum = (nn_float)0.0;
+                js = j*stride;
+                sum = (nn_float)0.0;
                 for (int k=0; k<kernel->n_rows; k++) {
                     for (int l=0; l<kernel->n_cols; l++) {
-                        sum += matrix_get(input, i*stride+k, j*stride+l) *
+                        sum += matrix_get(input, is+k, js+l) *
                                matrix_get(kernel, k, l);
                     }
                 }
@@ -832,24 +902,27 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
         int out_h = (input->n_rows + kernel->n_rows - 2 + stride)/stride;
         int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
         int input_h_idx, input_w_idx;
-        int k, k_stick_out, l, l_stick_out;
+        int i, j, k, k_stick_out, l, l_stick_out;
+        int is, js;
         nn_float sum;
 
         for (int i=0; i<out_h; i++) {
+            is = i*stride;
             for (int j=0; j<out_w; j++) {
+                js = j*stride;
                 sum = (nn_float)0.0;
-                k = kernel->n_rows - i*stride - 1;
+                k = kernel->n_rows - is - 1;
                 if (k<0) k=0;
-                k_stick_out = i*stride - input->n_rows + 1;
+                k_stick_out = is - input->n_rows + 1;
                 if (k_stick_out<0) k_stick_out=0;
                 for (k; k<kernel->n_rows - k_stick_out; k++) {
-                    l = kernel->n_cols - j*stride - 1;
+                    l = kernel->n_cols - js - 1;
+                    input_h_idx = is + k - kernel->n_rows + 1;
                     if (l<0) l=0;
-                    l_stick_out = j*stride - input->n_cols + 1;
+                    l_stick_out = js - input->n_cols + 1;
                     if (l_stick_out<0) l_stick_out=0;
                     for (l; l<kernel->n_cols - l_stick_out; l++) {
-                        input_h_idx = i*stride + k - kernel->n_rows + 1;
-                        input_w_idx = j*stride + l - kernel->n_cols + 1;
+                        input_w_idx = js + l - kernel->n_cols + 1;
                         sum += matrix_get(input, input_h_idx, input_w_idx) *
                                matrix_get(kernel, k, l);
                     }
@@ -874,15 +947,18 @@ void matrix_acc_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int 
         int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
         int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
         int i, j, k, l;
+        int is, js;
         nn_float sum, x;
 
         for (i=0; i<out_h; i++) {
+            is = i*stride;
             for (j=0; j<out_w; j++) {
+                js = j*stride;
                 sum = (nn_float)0.0;
                 x = matrix_get(into, i, j);
                 for (k=0; k<kernel->n_rows; k++) {
                     for (l=0; l<kernel->n_cols; l++) {
-                        sum += matrix_get(input, i*stride+k, j*stride+l) *
+                        sum += matrix_get(input, is+k, js+l) *
                                matrix_get(kernel, k, l);
                     }
                 }
@@ -897,24 +973,27 @@ void matrix_acc_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int 
         int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
         int input_h_idx, input_w_idx;
         int i, j, k, k_stick_out, l, l_stick_out;
+        int is, js;
         nn_float sum, x;
 
         for (i=0; i<out_h; i++) {
+            is = i*stride;
             for (j=0; j<out_w; j++) {
+                js = j*stride;
                 sum = (nn_float)0.0;
                 x = matrix_get(into, i, j);
-                k = kernel->n_rows - i*stride - 1;
+                k = kernel->n_rows - is - 1;
                 if (k<0) k=0;
-                k_stick_out = i*stride - input->n_rows + 1;
+                k_stick_out = is - input->n_rows + 1;
                 if (k_stick_out<0) k_stick_out=0;
                 for (k; k<kernel->n_rows - k_stick_out; k++) {
-                    l = kernel->n_cols - j*stride - 1;
+                    l = kernel->n_cols - js - 1;
+                    input_h_idx = is + k - kernel->n_rows + 1;
                     if (l<0) l=0;
-                    l_stick_out = j*stride - input->n_cols + 1;
+                    l_stick_out = js - input->n_cols + 1;
                     if (l_stick_out<0) l_stick_out=0;
                     for (l; l<kernel->n_cols - l_stick_out; l++) {
-                        input_h_idx = i*stride + k - kernel->n_rows + 1;
-                        input_w_idx = j*stride + l - kernel->n_cols + 1;
+                        input_w_idx = js + l - kernel->n_cols + 1;
                         sum += matrix_get(input, input_h_idx, input_w_idx) *
                                matrix_get(kernel, k, l);
                     }
@@ -996,12 +1075,15 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int strid
 void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stride) {
     int out_h = (input->n_rows - kernel_size)/stride + 1;
     int out_w = (input->n_cols - kernel_size)/stride + 1;
+    int is, js;
     for (int i=0; i<out_h; i++) {
+        is = i*stride;
         for (int j=0; j<out_w; j++) {
+            js = j*stride;
             nn_float max = -INFINITY;
             for (int k=0; k<kernel_size; k++) {
                 for (int l=0; l<kernel_size; l++) {
-                    nn_float entry = matrix_get(input, i*stride+k, j*stride+l);
+                    nn_float entry = matrix_get(input, is+k, js+l);
                     if (entry > max) max = entry;
                 }
             }

@@ -716,13 +716,25 @@ void layer_conv2D_input_fp(Layer* l, Batch* train_batch, int batch_size) {
 }
 
 void layer_deep_fp(Layer* l, int batch_size) {
-    matrix_dot_into(layer_get_output_matrix(l->prev_layer), l->cache.dense.weight, l->cache.dense.z);
+    matrix_dot_into(layer_get_output_matrix(
+        l->prev_layer), 
+        l->cache.dense.weight, 
+        l->cache.dense.z,
+        false,
+        false
+    );
     bias_add_to_dense_z(l->cache.dense.bias, l->cache.dense.z);
     apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
 }
 
 void layer_output_fp(Layer* l, Batch* label_batch, int batch_size) {
-    matrix_dot_into(layer_get_output_matrix(l->prev_layer), l->cache.dense.weight, l->cache.dense.z);
+    matrix_dot_into(layer_get_output_matrix(
+        l->prev_layer), 
+        l->cache.dense.weight, 
+        l->cache.dense.z,
+        false,
+        false
+    );
     bias_add_to_dense_z(l->cache.dense.bias, l->cache.dense.z);
     l->activation->y_true_batch = label_batch;
     apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
@@ -749,7 +761,9 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
         matrix_dot_into(
             l->cache.conv.fp_im2col_input,
             l->cache.conv.fp_im2col_kernel,
-            l->cache.conv.fp_im2col_output
+            l->cache.conv.fp_im2col_output,
+            false,
+            false
         );
         matrix_into_tensor3D(
             l->cache.conv.fp_im2col_output,
@@ -848,14 +862,16 @@ void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size) {
     );
 
     // weight gradient (dCost_dW) calculations:
-    matrix_transpose_into(
-        layer_get_output_matrix(l->prev_layer), 
-        l->cache.dense.dZ_dW_t
-    );
+    // matrix_transpose_into(
+    //     layer_get_output_matrix(l->prev_layer), 
+    //     l->cache.dense.dZ_dW_t
+    // );
     matrix_dot_into(
-        l->cache.dense.dZ_dW_t, 
+        layer_get_output_matrix(l->prev_layer), 
         l->cache.dense.delta, 
-        l->cache.dense.weight_gradient
+        l->cache.dense.weight_gradient,
+        true,
+        false
     );
 
     // bias gradient (dCost_dB) calculations:
@@ -868,14 +884,16 @@ void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size) {
 
 void layer_deep_bp(Layer* l, int batch_size) {
     // delta gradient (dCost_dZ) calculations:
-    matrix_transpose_into(
-        l->next_layer->cache.dense.weight, 
-        l->cache.dense.dZnext_dA_t
-    ); 
+    // matrix_transpose_into(
+    //     l->next_layer->cache.dense.weight, 
+    //     l->cache.dense.dZnext_dA_t
+    // ); 
     matrix_dot_into(
         l->next_layer->cache.dense.delta, 
-        l->cache.dense.dZnext_dA_t, 
-        l->cache.dense.dCost_dA
+        l->next_layer->cache.dense.weight, 
+        l->cache.dense.dCost_dA,
+        false,
+        true
     );
     apply_activation_dZ_into(
         l->activation, 
@@ -889,14 +907,16 @@ void layer_deep_bp(Layer* l, int batch_size) {
     );
 
     // weight gradient (dCost_dW) calculations:
-    matrix_transpose_into(
-        layer_get_output_matrix(l->prev_layer), 
-        l->cache.dense.dZ_dW_t
-    );
+    // matrix_transpose_into(
+    //     layer_get_output_matrix(l->prev_layer), 
+    //     l->cache.dense.dZ_dW_t
+    // );
     matrix_dot_into(
-        l->cache.dense.dZ_dW_t, 
+        layer_get_output_matrix(l->prev_layer), 
         l->cache.dense.delta, 
-        l->cache.dense.weight_gradient
+        l->cache.dense.weight_gradient,
+        true,
+        false
     );
 
     // bias gradient (dCost_dB) calculations:
@@ -954,7 +974,9 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
             matrix_dot_into(
                 l->cache.conv.dCost_dW_im2col_input,
                 l->cache.conv.dCost_dW_im2col_kernel,
-                l->cache.conv.dCost_dW_im2col_output
+                l->cache.conv.dCost_dW_im2col_output,
+                false,
+                false
             );
             
             int n_out_rows = l->cache.conv.dCost_dW_im2col_output->n_rows;
@@ -1121,7 +1143,9 @@ void layer_conv2d_bp_delta_from_conv2d(Layer* l, int batch_size) {
         matrix_dot_into(
             l->next_layer->cache.conv.delta_im2col_input,
             l->next_layer->cache.conv.delta_im2col_kernel,
-            l->next_layer->cache.conv.delta_im2col_output
+            l->next_layer->cache.conv.delta_im2col_output,
+            false,
+            false
         );
         matrix_into_tensor3D(
             l->next_layer->cache.conv.delta_im2col_output,
@@ -1183,14 +1207,16 @@ void layer_conv2d_bp_delta_from_conv2d(Layer* l, int batch_size) {
 }
 
 void layer_flatten_bp(Layer* l, int batch_size) {
-    matrix_transpose_into(
-        l->next_layer->cache.dense.weight, 
-        l->cache.flat.dZnext_dA_t
-    ); 
+    // matrix_transpose_into(
+    //     l->next_layer->cache.dense.weight, 
+    //     l->cache.flat.dZnext_dA_t
+    // ); 
     matrix_dot_into(
         l->next_layer->cache.dense.delta,
-        l->cache.flat.dZnext_dA_t,
-        l->cache.flat.dCost_dA_matrix
+        l->next_layer->cache.dense.weight,
+        l->cache.flat.dCost_dA_matrix,
+        false,
+        true
     );
     matrix_into_tensor4D(
         l->cache.flat.dCost_dA_matrix,
@@ -1225,7 +1251,9 @@ void layer_max_pool_bp(Layer* l, int batch_size) {
             matrix_dot_into(
                 l->next_layer->cache.conv.delta_im2col_input,
                 l->next_layer->cache.conv.delta_im2col_kernel,
-                l->next_layer->cache.conv.delta_im2col_output
+                l->next_layer->cache.conv.delta_im2col_output,
+                false,
+                false
             );
             matrix_into_tensor3D(
                 l->next_layer->cache.conv.delta_im2col_output,

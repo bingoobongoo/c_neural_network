@@ -53,6 +53,7 @@ void tensor3D_correlate_into(Tensor3D* input, Tensor3D* kernel, Tensor3D* into, 
 }
 
 void tensor3D_acc_correlate_into(Tensor3D* input, Tensor3D* kernel, Matrix* into, int stride, CorrelationType type) {
+    #pragma omp parallel for schedule(static)
     for (int c=0; c<input->n_channels; c++) {
         matrix_acc_correlate_into(
             input->channels[c],
@@ -467,6 +468,7 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
         int input_h_idx, input_w_idx;
         int dest_h_idx, dest_w_idx;
         int ck, kk, is, js;
+        Matrix* in;
 
         for (int i=0; i<out_h; i++) {
             is = i*stride;
@@ -475,6 +477,7 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
                 dest_h_idx = i*out_w + j;
                 for (int c=0; c<input->n_channels; c++) {
                     ck = c*ker_h*ker_w;
+                    in = input->filters[filter_idx]->channels[c];
                     for (int k=0; k<ker_h; k++) {
                         kk = k*ker_w;
                         for (int l=0; l<ker_w; l++) {
@@ -483,7 +486,7 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
                                 dest_h_idx,
                                 ck + kk + l,
                                 matrix_get(
-                                    input->filters[filter_idx]->channels[c], 
+                                    in, 
                                     is+k, 
                                     js+l
                                 )
@@ -505,6 +508,7 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
         int ki, lj, ck, kk, is, js;
         int k_stick_out, l_stick_out;
         int k_thresh, l_thresh;
+        Matrix* in;
 
         matrix_zero(input_im2col);
 
@@ -525,6 +529,7 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
                 dest_h_idx = i*out_w + j;
                 for (int c=0; c<input->n_channels; c++) {
                     ck = c*ker_h*ker_w;
+                    in = input->filters[filter_idx]->channels[c];
                     for (int k=ki; k<k_thresh; k++) {
                         kk = k*ker_w;
                         for (int l=lj; l<l_thresh; l++) {
@@ -533,7 +538,7 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
                                 dest_h_idx,
                                 ck + kk + l,
                                 matrix_get(
-                                    input->filters[filter_idx]->channels[c], 
+                                    in, 
                                     is + k - ker_h + 1, 
                                     js + l - ker_w + 1
                                 )
@@ -559,6 +564,7 @@ void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel
         int input_h_idx, input_w_idx;
         int dest_h_idx, dest_w_idx;
         int nk, kk, is, js;
+        Matrix* in;
 
         for (int i=0; i<out_h; i++) {
             is = i*stride;
@@ -567,6 +573,7 @@ void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel
                 dest_h_idx = i*out_w + j;
                 for (int n=0; n<input->n_filters; n++) {
                     nk = n*ker_h*ker_w;
+                    in = input->filters[n]->channels[channel_idx];
                     for (int k=0; k<ker_w; k++) {
                         kk = k*ker_w;
                         for (int l=0; l<ker_w; l++) {
@@ -575,7 +582,7 @@ void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel
                                 dest_h_idx,
                                 nk + kk + l,
                                 matrix_get(
-                                    input->filters[n]->channels[channel_idx],
+                                    in,
                                     is+k,
                                     js+l
                                 )
@@ -597,6 +604,7 @@ void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel
         int ki, lj, nk, kk, is, js;
         int k_stick_out, l_stick_out;
         int k_thresh, l_thresh;
+        Matrix* in;
 
         matrix_zero(input_im2col);
 
@@ -617,6 +625,7 @@ void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel
                 dest_h_idx = i*out_w + j;
                 for (int n=0; n<input->n_filters; n++) {
                     nk = n*ker_h*ker_w;
+                    in = input->filters[n]->channels[channel_idx];
                     for (int k=ki; k<k_thresh; k++) {
                         kk = k*ker_w;
                         for (int l=lj; l<l_thresh; l++) {
@@ -625,7 +634,7 @@ void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel
                                 dest_h_idx,
                                 nk + kk + l,
                                 matrix_get(
-                                    input->filters[n]->channels[channel_idx], 
+                                    in, 
                                     is + k - ker_h + 1, 
                                     js + l - ker_w + 1
                                 )

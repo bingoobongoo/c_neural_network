@@ -11,11 +11,6 @@
 
 #include "config.h"
 
-
-#define PI 3.14159265358979323846
-#define BLAS
-// #define DEBUG
-
 typedef struct {
     nn_float* entries;
     int n_rows;
@@ -49,7 +44,7 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_subtract(Matrix* m1, Matrix* m2);
 void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_dot(Matrix* m1, Matrix* m2);
-void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into);
+void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m2_trans);
 Matrix* matrix_multiply(Matrix* m1, Matrix* m2);
 void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_divide(Matrix* m1, Matrix* m2);
