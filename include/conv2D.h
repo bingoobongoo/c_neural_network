@@ -18,6 +18,7 @@ typedef struct {
     Tensor4D* output;
     Tensor4D* z;
     Tensor4D* filter;
+    Tensor4D* filter_flip;
     Matrix* bias;
     Tensor4D* delta;
     Tensor4D* filter_gradient;
@@ -26,6 +27,7 @@ typedef struct {
     // auxiliary
     Tensor4D* dCost_dA;
     Tensor4D* dActivation_dZ;
+    Tensor4D* padding;
     Matrix* fp_im2col_input;
     Matrix* fp_im2col_kernel;
     Matrix* fp_im2col_output;

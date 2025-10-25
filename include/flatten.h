@@ -10,5 +10,4 @@ typedef struct {
 typedef struct {
     Matrix* output;
     Matrix* dCost_dA_matrix;
-    Matrix* dZnext_dA_t;
 } FlattenCache;

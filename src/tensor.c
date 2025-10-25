@@ -8,7 +8,7 @@ Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels) {
     t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
     for (int i=0; i<n_channels; i++) {
         t->channels[i] = matrix_new(n_rows, n_cols);
-        matrix_fill(t->channels[i], (nn_float)0.0);
+        matrix_zero(t->channels[i]);
     }
 
     return t;
@@ -29,7 +29,7 @@ void tensor3D_copy_into(Tensor3D* t, Tensor3D* into) {
 }
 
 void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into) {
-    matrix_fill(into, (nn_float)0.0);
+    matrix_zero(into);
     for (int c=0; c<t->n_channels; c++) {
         for (int i=0; i<t->n_rows; i++) {
             for (int j=0; j<t->n_cols; j++) {
@@ -92,6 +92,14 @@ void tensor4D_fill(Tensor4D* t, nn_float num) {
             matrix_fill(t->filters[i]->channels[j], num);
         }
     }
+}
+
+void tensor4D_zero(Tensor4D* t) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_zero(t->filters[i]->channels[j]);
+        }
+    }    
 }
 
 void tensor4D_fill_normal_distribution(Tensor4D* t, nn_float mean, nn_float std_deviation) {
@@ -238,6 +246,17 @@ void tensor4D_slice_into(Tensor4D* t, int start_idx, int slice_size, Tensor4D* i
     }
     for (int i=0; i<slice_size; i++) {
         tensor3D_copy_into(t->filters[i+start_idx], into->filters[i]);
+    }
+}
+
+void tensor4D_flip_into(Tensor4D* t, Tensor4D* flipped) {
+    for (int i=0; i<t->n_filters; i++) {
+        for (int j=0; j<t->n_channels; j++) {
+            matrix_flip_into(
+                t->filters[i]->channels[j],
+                flipped->filters[i]->channels[j]
+            );
+        }
     }
 }
 
@@ -648,4 +667,48 @@ void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel
         break;
     }
     }
+}
+
+Tensor3D_uint16* tensor3D_uint16_new(int n_rows, int n_cols, int n_channels) {
+    Tensor3D_uint16* t = (Tensor3D_uint16*)malloc(sizeof(Tensor3D_uint16));
+    t->n_rows = n_rows;
+    t->n_cols = n_cols;
+    t->n_channels = n_channels;
+    t->channels = (Matrix_uint16**)malloc(n_channels * sizeof(Matrix_uint16*));
+    for (int i=0; i<n_channels; i++) {
+        t->channels[i] = matrix_uint16_new(n_rows, n_cols);
+        matrix_uint16_fill(t->channels[i], (uint16_t)0);
+    }
+
+    return t;  
+}
+
+void tensor3D_uint16_free(Tensor3D_uint16* t) {
+    for (int i=0; i<t->n_channels; i++) {
+        matrix_uint16_free(t->channels[i]);
+    }
+    free(t->channels);
+    free(t);
+}
+
+Tensor4D_uint16* tensor4D_uint16_new(int n_rows, int n_cols, int n_channels, int n_filters) {
+    Tensor4D_uint16* t = (Tensor4D_uint16*)malloc(sizeof(Tensor4D_uint16));
+    t->n_rows = n_rows;
+    t->n_cols = n_cols;
+    t->n_channels = n_channels;
+    t->n_filters = n_filters;
+    t->filters = (Tensor3D_uint16**)malloc(n_filters * sizeof(Tensor3D_uint16*));
+    for (int i=0; i<n_filters; i++) {
+        t->filters[i] = tensor3D_uint16_new(n_rows, n_cols, n_channels);
+    }
+
+    return t;
+}
+
+void tensor4D_uint16_free(Tensor4D_uint16* t) {
+    for (int i=0; i<t->n_filters; i++) {
+        tensor3D_uint16_free(t->filters[i]);
+    }
+    free(t->filters);
+    free(t);
 }

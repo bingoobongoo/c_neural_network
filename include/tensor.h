@@ -18,6 +18,21 @@ typedef struct {
     Tensor3D** filters;
 } Tensor4D;
 
+typedef struct {
+    int n_rows;
+    int n_cols;
+    int n_channels;
+    Matrix_uint16** channels;
+} Tensor3D_uint16;
+
+typedef struct {
+    int n_rows;
+    int n_cols;
+    int n_channels;
+    int n_filters;
+    Tensor3D_uint16** filters;
+} Tensor4D_uint16;
+
 Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels);
 void tensor3D_free(Tensor3D* t);
 void tensor3D_copy_into(Tensor3D* from, Tensor3D* to);
@@ -30,7 +45,9 @@ Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters);
 void tensor4D_free(Tensor4D* t);
 void tensor4D_copy_into(Tensor4D* t, Tensor4D* into);
 void tensor4D_slice_into(Tensor4D* t, int start_idx, int slice_size, Tensor4D* into);
+void tensor4D_flip_into(Tensor4D* t, Tensor4D* flipped);
 void tensor4D_fill(Tensor4D* t, nn_float num);
+void tensor4D_zero(Tensor4D* t);
 void tensor4D_fill_normal_distribution(Tensor4D* t, nn_float mean, nn_float std_deviation);
 void tensor4D_apply_inplace(nn_float (*func)(nn_float), Tensor4D* t);
 void tensor4D_scale_inplace(nn_float scalar, Tensor4D* t);
@@ -49,3 +66,9 @@ void kernel_into_im2col_fwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2
 void kernel_into_im2col_chwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2col);
 void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col);
 void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col);
+
+Tensor3D_uint16* tensor3D_uint16_new(int n_rows, int n_cols, int n_channels);
+void tensor3D_uint16_free(Tensor3D_uint16* t);
+
+Tensor4D_uint16* tensor4D_uint16_new(int n_rows, int n_cols, int n_channels, int n_filters);
+void tensor4D_uint16_free(Tensor4D_uint16* t);

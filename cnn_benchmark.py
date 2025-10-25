@@ -28,14 +28,21 @@ y_test  = keras.utils.to_categorical(y_test,  num_classes)
 
 inputs = layers.Input(shape=(28, 28, 1))  # channels_last
 x = layers.Conv2D(
-    filters=16, kernel_size=(8, 8), strides=(1, 1), padding="valid",
+    filters=16, kernel_size=(4, 4), strides=(1, 1), padding="valid",
     activation="relu", kernel_initializer="he_normal", bias_initializer="zeros"
 )(inputs)                                   # -> (None, 21, 21, 16)
 
 x = layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding="valid")(x)  # -> (10,10,16)
 
 x = layers.Conv2D(
-    filters=4, kernel_size=(4, 4), strides=(1, 1), padding="valid",
+    filters=32, kernel_size=(4, 4), strides=(1, 1), padding="valid",
+    activation="relu", kernel_initializer="he_normal", bias_initializer="zeros"
+)(x)                                      # -> (7,7,4)
+
+x = layers.MaxPool2D(pool_size=(2, 2), strides=(2, 2), padding="valid")(x)  # -> (10,10,16)
+
+x = layers.Conv2D(
+    filters=64, kernel_size=(4, 4), strides=(1, 1), padding="valid",
     activation="relu", kernel_initializer="he_normal", bias_initializer="zeros"
 )(x)                                      # -> (7,7,4)
 

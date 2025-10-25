@@ -4,6 +4,7 @@
 #include "dense.h"
 #include "conv2D.h"
 #include "flatten.h"
+#include "max_pool.h"
 #include "activation.h"
 #include "optimizer.h"
 #include "cost.h"
@@ -27,12 +28,14 @@ typedef union {
     DenseParams dense;
     ConvParams conv;
     FlattenParams flat;
+    MaxPoolParams max_pool;
 } LayerParams;
 
 typedef union {
     DenseCache dense;
     ConvCache conv;
     FlattenCache flat;
+    MaxPoolCache max_pool;
 } LayerCache;
 
 struct Layer{

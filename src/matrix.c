@@ -862,6 +862,18 @@ Matrix* matrix_transpose(Matrix* m) {
     return transposed_matrix;
 }
 
+void matrix_flip_into(Matrix* m, Matrix* into) {
+    int ker_h = m->n_rows;
+    int ker_w = m->n_cols;
+    for (int i=0; i<ker_h; i++) {
+        nn_float* src_row = m->entries + i*ker_w;
+        nn_float* dst_row = into->entries + (ker_h - 1 - i)*ker_w;
+        for (int j=0; j<ker_w; j++) {
+            dst_row[ker_w - 1 - j] = src_row[j];
+        }
+    }
+}
+
 void matrix_transpose_into(Matrix* m, Matrix* into) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
@@ -1072,7 +1084,55 @@ void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int strid
     }
 }
 
-void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stride) {
+void matrix_acc_convolve_valid_into(Matrix* input, Matrix* kflip, Matrix* into, int stride) {
+    int in_h = input->n_rows;
+    int in_w = input->n_cols;
+    int ker_h = kflip->n_rows;
+    int ker_w = kflip->n_cols;
+    int out_h = (input->n_rows - ker_h)/stride + 1;
+    int out_w = (input->n_cols - ker_w)/stride + 1;
+    nn_float sum, x;
+
+    for (int i=0; i<out_h; i++) {
+        int is = i*stride;
+        nn_float* out_row_ptr = into->entries + i*out_w;
+
+        for (int j=0; j<out_w; j++) {
+            int js = j*stride;
+            sum = (nn_float)0.0;
+
+            for (int k=0; k<ker_h; k++) {
+                nn_float* in_row_ptr = input->entries + (is+k)*in_w + js;
+                nn_float* ker_row_ptr = kflip->entries + k*ker_w;
+
+                for (int l=0; l<ker_w; l++) {
+                    sum += in_row_ptr[l] * ker_row_ptr[l];
+                }
+            }
+            out_row_ptr[j] += sum;
+        }
+    }
+}
+
+void matrix_acc_convolve_full_into(Matrix* input, Matrix* kflip, Matrix* into, Matrix* padding) {
+    int in_h = input->n_rows;
+    int in_w = input->n_cols;
+    int ker_h = kflip->n_rows;
+    int ker_w = kflip->n_cols;
+    int pad_h = in_h + 2*(ker_h-1);
+    int pad_w = in_w + 2*(ker_w-1);;
+    matrix_zero(padding);
+
+    for (int i=0; i<in_h; i++) {
+        nn_float* src = input->entries + i*in_w;
+        nn_float* dst = padding->entries + (i+ker_h-1)*pad_w + ker_w - 1;
+        memcpy(dst, src, in_w*sizeof(nn_float));
+    }
+
+    matrix_acc_convolve_valid_into(padding, kflip, into, 1);
+}
+
+void matrix_max_pool_into(Matrix* input, Matrix* into, Matrix_uint16* argmax, int kernel_size, int stride) {
     int out_h = (input->n_rows - kernel_size)/stride + 1;
     int out_w = (input->n_cols - kernel_size)/stride + 1;
     int is, js;
@@ -1081,13 +1141,45 @@ void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stri
         for (int j=0; j<out_w; j++) {
             js = j*stride;
             nn_float max = -INFINITY;
+            uint16_t max_idx = 0;
             for (int k=0; k<kernel_size; k++) {
                 for (int l=0; l<kernel_size; l++) {
                     nn_float entry = matrix_get(input, is+k, js+l);
-                    if (entry > max) max = entry;
+                    if (entry > max) {
+                        max = entry;
+                        max_idx = k*kernel_size + l;
+                    }
                 }
             }
             matrix_assign(into, i, j, max);
+            argmax->entries[i*argmax->n_cols + j] = max_idx;
         }
     }
+}
+
+Matrix_uint16* matrix_uint16_new(int n_rows, int n_cols) {
+    Matrix_uint16* m = (Matrix_uint16*)malloc(sizeof(Matrix_uint16));
+    m->n_rows = n_rows;
+    m->n_cols = n_cols;
+    m->entries = (uint16_t*)malloc(n_rows * n_cols * sizeof(uint16_t));
+
+    return m;
+}
+
+void matrix_uint16_free(Matrix_uint16* m) {
+    if (m == NULL) return;
+
+    free(m->entries);
+    m->entries = NULL;
+
+    free(m);
+    m = NULL;
+}
+
+void matrix_uint16_fill(Matrix_uint16* m, uint16_t num) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            m->entries[i*m->n_cols+j] = num;
+        }
+    }   
 }

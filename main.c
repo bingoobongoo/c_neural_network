@@ -30,9 +30,11 @@ int main() {
     // add_output_layer(y_train->n_cols, net);
 
     add_conv_input_layer(28, 28, 1, net);
-    add_conv_layer(16, 8, 1, net);
+    add_conv_layer(8, 4, 1, net);
     add_max_pool_layer(2, 2, net);
-    add_conv_layer(4, 4, 1, net);
+    add_conv_layer(16, 4, 1, net);
+    add_max_pool_layer(2, 2, net);
+    add_conv_layer(32, 4, 1, net);
     add_flatten_layer(net);
     add_output_layer(y_train->n_cols, net);
 
