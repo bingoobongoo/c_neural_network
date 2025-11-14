@@ -551,7 +551,6 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         filter_height * filter_width * l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
-    // flipped shape due to (trans, trans) GEMM operation in main loop
     l->cache.conv.fp_im2col_output = tensor3D_new(
         l->params.conv.n_filters,
         output_height * output_width,
@@ -763,15 +762,8 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
         int out_h = z->filters[n]->n_rows;
         int out_w = z->filters[n]->n_cols;
         int out_size = out_h * out_w;
-        // input_into_im2col_fwise(
-        //     input,
-        //     n,
-        //     filter,
-        //     l->params.conv.stride,
-        //     VALID,
-        //     l->cache.conv.fp_im2col_input 
-        // );
-        input_into_im2col_fwise_fast(
+
+        input_into_im2col_fwise(
             input,
             n,
             filter,
@@ -786,11 +778,7 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
             true,
             true
         );
-        // matrix_into_tensor3D(
-        //     l->cache.conv.fp_im2col_output,
-        //     z->filters[n],
-        //     true
-        // );
+
         for (int i=0; i<filter->n_filters; i++) {
             nn_float* src = im2col_output->entries + i*out_size;
             nn_float* dst = z->filters[n]->channels[i]->entries;
@@ -976,7 +964,7 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
             Matrix* kernel_mat = l->cache.conv.dCost_dW_im2col_kernel->channels[n];
             Matrix* output_mat = l->cache.conv.dCost_dW_im2col_output->channels[n];
 
-            input_into_im2col_fwise_fast(
+            input_into_im2col_fwise(
                 input,
                 n,
                 filter,
@@ -1012,41 +1000,6 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
                 memcpy(dst, src, filter->n_rows * filter->n_cols * sizeof(nn_float));
             }
         }
-
-        // for (int i=0; i<filter->n_channels; i++) {
-        //     input_into_im2col_chwise(
-        //         input,
-        //         i,
-        //         delta,
-        //         l->params.conv.stride,
-        //         VALID,
-        //         l->cache.conv.dCost_dW_im2col_input
-        //     );
-        //     matrix_dot_into(
-        //         l->cache.conv.dCost_dW_im2col_input,
-        //         l->cache.conv.dCost_dW_im2col_kernel,
-        //         l->cache.conv.dCost_dW_im2col_output,
-        //         false,
-        //         false
-        //     );
-            
-        //     int n_out_rows = l->cache.conv.dCost_dW_im2col_output->n_rows;
-        //     int n_out_cols = l->cache.conv.dCost_dW_im2col_output->n_cols;
-        //     for (int a=0; a<n_out_rows; a++) {
-        //         for (int b=0; b<n_out_cols; b++) {
-        //             matrix_assign(
-        //                 filter_grad->filters[b]->channels[i],
-        //                 a / filter->n_cols,
-        //                 a % filter->n_cols,
-        //                 matrix_get(
-        //                     l->cache.conv.dCost_dW_im2col_output,
-        //                     a,
-        //                     b
-        //                 )
-        //             );
-        //         }
-        //     }
-        // }
 
         #else
 
@@ -1177,7 +1130,7 @@ void layer_conv2d_bp_delta_from_conv2d(Layer* l, int batch_size) {
 
     #pragma omp parallel for schedule(static)
     for (int n=0; n<batch_size; n++) {
-        input_into_im2col_fwise_fast(
+        input_into_im2col_fwise(
             delta_next,
             n,
             filter_next,
@@ -1286,7 +1239,7 @@ void layer_max_pool_bp(Layer* l, int batch_size) {
 
         #pragma omp parallel for schedule(static)
         for (int n=0; n<batch_size; n++) {
-            input_into_im2col_fwise_fast(
+            input_into_im2col_fwise(
                 delta_next,
                 n,
                 filter_next,
@@ -1309,35 +1262,6 @@ void layer_max_pool_bp(Layer* l, int batch_size) {
                 memcpy(dst, src, delta->n_rows * delta->n_cols * sizeof(nn_float));
             }
         }
-
-        // kernel_into_im2col_chwise(
-        //     filter_next,
-        //     true,
-        //     l->next_layer->cache.conv.delta_im2col_kernel
-        // );
-
-        // for (int n=0; n<batch_size; n++) {
-        //     input_into_im2col_fwise(
-        //         delta_next,
-        //         n,
-        //         filter_next,
-        //         l->next_layer->params.conv.stride,
-        //         FULL,
-        //         l->next_layer->cache.conv.delta_im2col_input
-        //     );
-        //     matrix_dot_into(
-        //         l->next_layer->cache.conv.delta_im2col_input,
-        //         l->next_layer->cache.conv.delta_im2col_kernel,
-        //         l->next_layer->cache.conv.delta_im2col_output,
-        //         false,
-        //         false
-        //     );
-        //     matrix_into_tensor3D(
-        //         l->next_layer->cache.conv.delta_im2col_output,
-        //         delta->filters[n],
-        //         true
-        //     );
-        // }
 
         #else
         

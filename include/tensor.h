@@ -37,9 +37,7 @@ Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels);
 void tensor3D_free(Tensor3D* t);
 void tensor3D_copy_into(Tensor3D* from, Tensor3D* to);
 void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into);
-void tensor3D_correlate_into(Tensor3D* input, Tensor3D* kernel, Tensor3D* into,  int stride, CorrelationType type);
 void tensor3D_acc_correlate_into(Tensor3D* input, Tensor3D* kernel, Matrix* into,  int stride, CorrelationType type);
-void matrix_into_tensor3D(Matrix* m, Tensor3D* t, bool transpose);
 
 Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters);
 void tensor4D_free(Tensor4D* t);
@@ -65,9 +63,7 @@ void tensor4D_into_matrix_chwise(Tensor4D* t, Matrix* m, bool transpose, bool fl
 void kernel_into_im2col_fwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2col);
 void kernel_into_im2col_chwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2col);
 void delta_into_im2col_fwise(Tensor4D* delta, int filter_idx, Matrix* im2col);
-void input_into_im2col_fwise_fast(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, int padding, Matrix* im2col);
-void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col);
-void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col);
+void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, int padding, Matrix* im2col);
 
 Tensor3D_uint16* tensor3D_uint16_new(int n_rows, int n_cols, int n_channels);
 void tensor3D_uint16_free(Tensor3D_uint16* t);
