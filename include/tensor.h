@@ -64,6 +64,8 @@ void tensor4D_into_matrix_fwise(Tensor4D* t, Matrix* m, bool transpose, bool fli
 void tensor4D_into_matrix_chwise(Tensor4D* t, Matrix* m, bool transpose, bool flipped);
 void kernel_into_im2col_fwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2col);
 void kernel_into_im2col_chwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2col);
+void delta_into_im2col_fwise(Tensor4D* delta, int filter_idx, Matrix* im2col);
+void input_into_im2col_fwise_fast(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, int padding, Matrix* im2col);
 void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col);
 void input_into_im2col_chwise(Tensor4D* input, int channel_idx, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col);
 

@@ -476,6 +476,73 @@ void kernel_into_im2col_chwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im
     tensor4D_into_matrix_chwise(kernel, kernel_im2col, true, flipped);
 }
 
+void delta_into_im2col_fwise(Tensor4D* delta, int filter_idx, Matrix* im2col) {
+    int delta_c = delta->n_channels;
+    int out_h = delta->n_rows;
+    int out_w = delta->n_cols;
+    int hw = out_h * out_w;
+
+    nn_float* srcs[delta_c];
+    for (int c=0; c<delta_c; c++) {
+        srcs[c] = delta->filters[filter_idx]->channels[c]->entries;
+    }
+
+    for (int i=0; i<hw; i++) {
+        nn_float* row = im2col->entries + i*delta_c;
+        
+        for (int c=0; c<delta_c; c++) {
+            row[c] = srcs[c][i];
+        }
+    }
+}
+
+void input_into_im2col_fwise_fast(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, int padding, Matrix* im2col) {
+    int in_h = input->n_rows;
+    int in_w = input->n_cols;
+    int in_c = input->n_channels;
+
+    int ker_h = kernel->n_rows;
+    int ker_w = kernel->n_cols;
+
+    int out_h = (in_h + 2*padding - ker_h) / stride + 1;
+    int out_w = (in_w + 2*padding - ker_w) / stride + 1;
+
+    for (int i=0; i<out_h; i++) {
+        int is = i*stride - padding;
+        for (int j=0; j<out_w; j++) {
+            int js = j*stride - padding;
+
+            nn_float* im2col_row = im2col->entries + (i*out_w + j)*im2col->n_cols;
+            int col = 0;
+
+            for (int k=0; k<in_c; k++) {
+                Matrix* cm = input->filters[filter_idx]->channels[k];
+                if (is>=0 && js>=0 && is+ker_h<=in_h && js+ker_w<=in_w) {
+                    for (int l=0; l<ker_h; l++) {
+                        nn_float* src = cm->entries + (is+l)*cm->n_cols + js;
+                        nn_float* dst = im2col_row + col + l*ker_w;
+                        memcpy(dst, src, ker_w*sizeof(nn_float));
+                    }
+                    col += ker_h*ker_w;
+                }
+                else {
+                    for (int l=0; l<ker_h; l++) {
+                        int isl = is + l;
+                        bool cond = (isl>=0 && isl<in_h);
+                        for (int m=0; m<ker_w; m++, col++) {
+                            int jsm = js + m;
+                            if (cond && jsm>=0 && jsm<in_w)
+                                im2col_row[col] = cm->entries[isl*cm->n_cols + jsm];
+                            else
+                                im2col_row[col] = (nn_float)0.0;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, CorrelationType corr_type,  Matrix* input_im2col) {
     switch (corr_type)
     {

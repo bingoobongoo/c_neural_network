@@ -355,8 +355,8 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
     #ifdef DEBUG
 
     bool check_no_trans = (!m1_trans && !m2_trans) && (m1->n_cols != m2->n_rows);
-    bool check_m1_trans = m1_trans && (m1->n_rows != m2->n_rows);
-    bool check_m2_trans = m2_trans && (m1->n_cols != m2->n_cols);
+    bool check_m1_trans = m1_trans && !m2_trans && (m1->n_rows != m2->n_rows);
+    bool check_m2_trans = m2_trans && !m1_trans && (m1->n_cols != m2->n_cols);
     
     if (check_no_trans || check_m1_trans || check_m2_trans) {
         printf("Matrices have wrong dimensions: ");
