@@ -11,16 +11,17 @@
 
 #include "config.h"
 
-
-#define PI 3.14159265358979323846
-#define BLAS
-// #define DEBUG
-
 typedef struct {
     nn_float* entries;
     int n_rows;
     int n_cols;
 } Matrix;
+
+typedef struct {
+    uint16_t* entries;
+    int n_rows;
+    int n_cols;
+} Matrix_uint16;
 
 typedef enum {
     VALID,
@@ -49,7 +50,7 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_subtract(Matrix* m1, Matrix* m2);
 void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_dot(Matrix* m1, Matrix* m2);
-void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into);
+void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m2_trans);
 Matrix* matrix_multiply(Matrix* m1, Matrix* m2);
 void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_divide(Matrix* m1, Matrix* m2);
@@ -74,6 +75,13 @@ void matrix_add_scalar_into(nn_float scalar, Matrix* m, Matrix* into);
 void matrix_add_scalar_inplace(nn_float scalar, Matrix* m);
 Matrix* matrix_transpose(Matrix* m);
 void matrix_transpose_into(Matrix* m, Matrix* into);
-void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type);
-void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type);
-void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stride);
+void matrix_flip_into(Matrix* m, Matrix* into);
+void matrix_acc_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type);
+void matrix_acc_convolve_valid_into(Matrix* input, Matrix* kflip, Matrix* into, int stride);
+void matrix_acc_convolve_full_into(Matrix* input, Matrix* kflip, Matrix* into, Matrix* padding);
+void matrix_max_pool_into(Matrix* input, Matrix* into, Matrix_uint16* argmax, int kernel_size, int stride);
+unsigned long matrix_get_sizeof_mem_allocated(Matrix* m);
+
+Matrix_uint16* matrix_uint16_new(int n_rows, int n_cols);
+void matrix_uint16_free(Matrix_uint16* m);
+void matrix_uint16_fill(Matrix_uint16* m, uint16_t num);

@@ -29,7 +29,6 @@ void neural_net_free(NeuralNet* net) {
     score_free(net->batch_score);
     batch_free(net->train_batch);
     batch_free(net->label_batch);
-    batch_free(net->layers[net->n_layers-1]->activation->y_true_batch);
     free(net);
 }
 
@@ -44,12 +43,12 @@ void neural_net_compile(NeuralNet* net) {
     neural_net_link_layers(net);
 
     for (int i=1; i<net->n_layers; i++) {
-        Layer* layer = net->layers[i];
-        switch (layer->l_type)
+        Layer* l = net->layers[i];
+        switch (l->l_type)
         {
-        case DEEP:
-            layer_deep_compile(
-                layer,
+        case DENSE:
+            layer_dense_compile(
+                l,
                 net->activation->type,
                 net->activation->activation_param,
                 net->batch_size
@@ -58,7 +57,7 @@ void neural_net_compile(NeuralNet* net) {
 
         case OUTPUT: 
             layer_output_compile(
-                layer,
+                l,
                 net->cost,
                 net->batch_size
             );
@@ -66,7 +65,7 @@ void neural_net_compile(NeuralNet* net) {
 
         case CONV_2D: 
             layer_conv2D_compile(
-                layer,
+                l,
                 net->activation->type,
                 net->activation->activation_param,
                 net->batch_size
@@ -74,18 +73,16 @@ void neural_net_compile(NeuralNet* net) {
             break;
 
         case FLATTEN: 
-            layer_flatten_compile(layer, net->batch_size);
+            layer_flatten_compile(l, net->batch_size);
             break;
 
         case MAX_POOL: 
-            layer_max_pool_compile(layer, net->batch_size);
+            layer_max_pool_compile(l, net->batch_size);
             break;
         }
     }
 
     // optimizer compilation
-    // for conv layers, need to change optimizer cache to store
-    // tensor3D instead of matrix 
     switch (net->optimizer->type)
     {
     case MOMENTUM:
@@ -94,53 +91,50 @@ void neural_net_compile(NeuralNet* net) {
         mom->n_layers = net->n_layers;
 
         mom->weight_momentum = (Tensor4D**)malloc(mom->n_layers * sizeof(Tensor4D*));
-        mom->bias_momentum = (Tensor4D**)malloc(mom->n_layers * sizeof(Tensor4D*));
+        mom->bias_momentum = (Matrix**)malloc(mom->n_layers * sizeof(Matrix*));
 
-        mom->weight_momentum[0] = NULL;
-        mom->bias_momentum[0] = NULL;
-
-        for (int i=1; i<mom->n_layers; i++) {
-            Layer* layer = net->layers[i];
-            switch (layer->l_type)
+        for (int i=0; i<mom->n_layers; i++) {
+            Layer* l = net->layers[i];
+            switch (l->l_type)
             {
-                case DEEP:
+                case DENSE:
                 case OUTPUT: {
                     mom->weight_momentum[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
-                    tensor4D_fill(mom->weight_momentum[i], (nn_float)0.0);
+                    tensor4D_zero(mom->weight_momentum[i]);
 
-                    mom->bias_momentum[i] = tensor4D_new(
-                        net->batch_size,
-                        layer_get_n_units(layer),
+                    mom->bias_momentum[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
-                    tensor4D_fill(mom->bias_momentum[i], (nn_float)0.0);  
+                    matrix_zero(mom->bias_momentum[i]);  
                     break;                  
                 }
                 case CONV_2D: {
                     mom->weight_momentum[i] = tensor4D_new(
-                        layer->params.conv.filter_size,
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size,
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
-                    tensor4D_fill(mom->weight_momentum[i], (nn_float)0.0);
+                    tensor4D_zero(mom->weight_momentum[i]);
 
-                    mom->bias_momentum[i] = tensor4D_new(
-                        layer->params.conv.output_height,
-                        layer->params.conv.output_width,
+                    mom->bias_momentum[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
-                    tensor4D_fill(mom->bias_momentum[i], (nn_float)0.0);
+                    matrix_zero(mom->bias_momentum[i]);
                     break;
                 }
-
+                default: {
+                    mom->weight_momentum[i] = NULL;
+                    mom->bias_momentum[i] = NULL;
+                    break;
+                }
             }
         }
         break;
@@ -149,86 +143,80 @@ void neural_net_compile(NeuralNet* net) {
         AdaGradConfig* ada = (AdaGradConfig*)net->optimizer->settings;
         ada->n_layers = net->n_layers;
         ada->weight_s = (Tensor4D**)malloc(ada->n_layers * sizeof(Tensor4D*));
-        ada->bias_s = (Tensor4D**)malloc(ada->n_layers * sizeof(Tensor4D*));
+        ada->bias_s = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
         ada->intermediate_w = (Tensor4D**)malloc(ada->n_layers * sizeof(Tensor4D*));
-        ada->intermediate_b = (Tensor4D**)malloc(ada->n_layers * sizeof(Tensor4D*));
+        ada->intermediate_b = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
 
-        ada->weight_s[0] = NULL;
-        ada->bias_s[0] = NULL;
-        ada->intermediate_w[0] = NULL;
-        ada->intermediate_b[0] = NULL;
-
-        for (int i=1; i<ada->n_layers; i++) {
-            Layer* layer = net->layers[i];
-            switch(layer->l_type)
+        for (int i=0; i<ada->n_layers; i++) {
+            Layer* l = net->layers[i];
+            switch(l->l_type)
             {
-                case DEEP:
+                case DENSE:
                 case OUTPUT: {
                     ada->weight_s[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
-                    tensor4D_fill(ada->weight_s[i], (nn_float)0.0);
+                    tensor4D_zero(ada->weight_s[i]);
 
-                    ada->bias_s[i] = tensor4D_new(
-                        net->batch_size,
-                        layer_get_n_units(layer),
+                    ada->bias_s[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
-                    tensor4D_fill(ada->bias_s[i], (nn_float)0.0);
+                    matrix_zero(ada->bias_s[i]);
 
                     ada->intermediate_w[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
-                    tensor4D_fill(ada->intermediate_w[i], (nn_float)0.0);
+                    tensor4D_zero(ada->intermediate_w[i]);
 
-                    ada->intermediate_b[i] = tensor4D_new(
-                        net->batch_size, 
-                        layer_get_n_units(layer),
+                    ada->intermediate_b[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
-                    tensor4D_fill(ada->intermediate_b[i], (nn_float)0.0);
+                    matrix_zero(ada->intermediate_b[i]);
                     break;
                 }
                 case CONV_2D: {
                     ada->weight_s[i] = tensor4D_new(
-                        layer->params.conv.filter_size,
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size,
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
-                    tensor4D_fill(ada->weight_s[i], (nn_float)0.0);
+                    tensor4D_zero(ada->weight_s[i]);
                     
-                    ada->bias_s[i] = tensor4D_new(
-                        layer->params.conv.output_height,
-                        layer->params.conv.output_width,
+                    ada->bias_s[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
-                    tensor4D_fill(ada->bias_s[i], (nn_float)0.0);
+                    matrix_zero(ada->bias_s[i]);
 
                     ada->intermediate_w[i] = tensor4D_new(
-                        layer->params.conv.filter_size,
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size,
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
-                    tensor4D_fill(ada->intermediate_w[i], (nn_float)0.0);
+                    tensor4D_zero(ada->intermediate_w[i]);
 
-                    ada->intermediate_b[i] = tensor4D_new(
-                        layer->params.conv.output_height,
-                        layer->params.conv.output_width,
+                    ada->intermediate_b[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
-                    tensor4D_fill(ada->intermediate_b[i], (nn_float)0.0);
+                    matrix_zero(ada->intermediate_b[i]);
+                    break;
+                }
+                default: {
+                    ada->weight_s[i] = NULL;
+                    ada->bias_s[i] = NULL;
+                    ada->intermediate_w[i] = NULL;
+                    ada->intermediate_b[i] = NULL;
                     break;
                 }
             }
@@ -244,178 +232,160 @@ void neural_net_compile(NeuralNet* net) {
         adam->weight_s = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
         adam->weight_s_corr = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
         adam->intermediate_w = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->bias_m = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->bias_m_corr = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->bias_s = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->bias_s_corr = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->intermediate_b = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
+        adam->bias_m = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->bias_m_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->bias_s = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->bias_s_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
+        adam->intermediate_b = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
 
-        adam->weight_m[0] = NULL;
-        adam->weight_m_corr[0] = NULL;
-        adam->weight_s[0] = NULL;
-        adam->weight_s_corr[0] = NULL;
-        adam->intermediate_w[0] = NULL;
-        adam->bias_m[0] = NULL;
-        adam->bias_m_corr[0] = NULL;
-        adam->bias_s[0] = NULL;
-        adam->bias_s_corr[0] = NULL;
-        adam->intermediate_b[0] = NULL;
-
-        for (int i=1; i<adam->n_layers; i++) {
-            Layer* layer = net->layers[i];
-            switch(layer->l_type)
+        for (int i=0; i<adam->n_layers; i++) {
+            Layer* l = net->layers[i];
+            switch(l->l_type)
             {
-                case DEEP:
+                case DENSE:
                 case OUTPUT: {
                     adam->weight_m[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
                     adam->weight_m_corr[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
                     adam->weight_s[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
                     adam->weight_s_corr[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
                     adam->intermediate_w[i] = tensor4D_new(
-                        layer_get_n_units(layer->prev_layer), 
-                        layer_get_n_units(layer),
+                        layer_get_n_units(l->prev_layer), 
+                        layer_get_n_units(l),
                         1,
                         1
                     );
 
-                    tensor4D_fill(adam->weight_m[i], (nn_float)0.0);
-                    tensor4D_fill(adam->weight_m_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->weight_s[i], (nn_float)0.0);
-                    tensor4D_fill(adam->weight_s_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->intermediate_w[i], (nn_float)0.0);
+                    tensor4D_zero(adam->weight_m[i]);
+                    tensor4D_zero(adam->weight_m_corr[i]);
+                    tensor4D_zero(adam->weight_s[i]);
+                    tensor4D_zero(adam->weight_s_corr[i]);
+                    tensor4D_zero(adam->intermediate_w[i]);
                     
-                    adam->bias_m[i] = tensor4D_new(
-                        net->batch_size, 
-                        layer_get_n_units(layer),
+                    adam->bias_m[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
-                    adam->bias_m_corr[i] = tensor4D_new(
-                        net->batch_size, 
-                        layer_get_n_units(layer),
+                    adam->bias_m_corr[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
-                    adam->bias_s[i] = tensor4D_new(
-                        net->batch_size, 
-                        layer_get_n_units(layer),
+                    adam->bias_s[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
-                    adam->bias_s_corr[i] = tensor4D_new(
-                        net->batch_size, 
-                        layer_get_n_units(layer),
+                    adam->bias_s_corr[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
-                    adam->intermediate_b[i] = tensor4D_new(
-                        net->batch_size, 
-                        layer_get_n_units(layer),
+                    adam->intermediate_b[i] = matrix_new(
                         1,
-                        1
+                        layer_get_n_units(l)
                     );
 
-                    tensor4D_fill(adam->bias_m[i], (nn_float)0.0);
-                    tensor4D_fill(adam->bias_m_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->bias_s[i], (nn_float)0.0);
-                    tensor4D_fill(adam->bias_s_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->intermediate_b[i], (nn_float)0.0);
+                    matrix_zero(adam->bias_m[i]);
+                    matrix_zero(adam->bias_m_corr[i]);
+                    matrix_zero(adam->bias_s[i]);
+                    matrix_zero(adam->bias_s_corr[i]);
+                    matrix_zero(adam->intermediate_b[i]);
                     break;
                 }
                 case CONV_2D: {
                     adam->weight_m[i] = tensor4D_new(
-                        layer->params.conv.filter_size, 
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size, 
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
                     adam->weight_m_corr[i] = tensor4D_new(
-                        layer->params.conv.filter_size, 
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size, 
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
                     adam->weight_s[i] = tensor4D_new(
-                        layer->params.conv.filter_size, 
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size, 
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
                     adam->weight_s_corr[i] = tensor4D_new(
-                        layer->params.conv.filter_size, 
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size, 
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
                     adam->intermediate_w[i] = tensor4D_new(
-                        layer->params.conv.filter_size, 
-                        layer->params.conv.filter_size,
-                        layer->params.conv.n_filter_channels,
-                        layer->params.conv.n_filters
+                        l->params.conv.filter_size, 
+                        l->params.conv.filter_size,
+                        l->params.conv.n_filter_channels,
+                        l->params.conv.n_filters
                     );
 
-                    tensor4D_fill(adam->weight_m[i], (nn_float)0.0);
-                    tensor4D_fill(adam->weight_m_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->weight_s[i], (nn_float)0.0);
-                    tensor4D_fill(adam->weight_s_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->intermediate_w[i], (nn_float)0.0);
+                    tensor4D_zero(adam->weight_m[i]);
+                    tensor4D_zero(adam->weight_m_corr[i]);
+                    tensor4D_zero(adam->weight_s[i]);
+                    tensor4D_zero(adam->weight_s_corr[i]);
+                    tensor4D_zero(adam->intermediate_w[i]);
                     
-                    adam->bias_m[i] = tensor4D_new(
-                        layer->params.conv.output_height, 
-                        layer->params.conv.output_width,
+                    adam->bias_m[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
-                    adam->bias_m_corr[i] = tensor4D_new(
-                        layer->params.conv.output_height, 
-                        layer->params.conv.output_width,
+                    adam->bias_m_corr[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
-                    adam->bias_s[i] = tensor4D_new(
-                        layer->params.conv.output_height, 
-                        layer->params.conv.output_width,
+                    adam->bias_s[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
-                    adam->bias_s_corr[i] = tensor4D_new(
-                        layer->params.conv.output_height, 
-                        layer->params.conv.output_width,
+                    adam->bias_s_corr[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
-                    adam->intermediate_b[i] = tensor4D_new(
-                        layer->params.conv.output_height, 
-                        layer->params.conv.output_width,
+                    adam->intermediate_b[i] = matrix_new(
                         1,
-                        layer->params.conv.n_filters
+                        l->params.conv.n_filters
                     );
 
-                    tensor4D_fill(adam->bias_m[i], (nn_float)0.0);
-                    tensor4D_fill(adam->bias_m_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->bias_s[i], (nn_float)0.0);
-                    tensor4D_fill(adam->bias_s_corr[i], (nn_float)0.0);
-                    tensor4D_fill(adam->intermediate_b[i], (nn_float)0.0);
+                    matrix_zero(adam->bias_m[i]);
+                    matrix_zero(adam->bias_m_corr[i]);
+                    matrix_zero(adam->bias_s[i]);
+                    matrix_zero(adam->bias_s_corr[i]);
+                    matrix_zero(adam->intermediate_b[i]);
+                    break;
+                }
+                default: {
+                    adam->weight_m[i] = NULL;
+                    adam->weight_m_corr[i] = NULL;
+                    adam->weight_s[i] = NULL;
+                    adam->weight_s_corr[i] = NULL;
+                    adam->intermediate_w[i] = NULL;
+                    adam->bias_m[i] = NULL;
+                    adam->bias_m_corr[i] = NULL;
+                    adam->bias_s[i] = NULL;
+                    adam->bias_s_corr[i] = NULL;
+                    adam->intermediate_b[i] = NULL;
                     break;
                 }
             } 
@@ -441,16 +411,18 @@ void neural_net_info(NeuralNet* net) {
     if (net->compiled) {
         long long trainable_params = 0;
         long long non_trainable_params = 0;
+        long long total_layer_mem_allocated = 0;
 
         printf("lp  layer   n_units   output_shape  params\n");
         printf("------------------------------------------\n");
         for (int i=0; i<net->n_layers; i++) {
-            Layer* layer = net->layers[i];
-            int n_units = layer_get_n_units(layer);
+            Layer* l = net->layers[i];
+            int n_units = layer_get_n_units(l);
             int batch_size = net->batch_size;
             long long params = 0;
             char* l_name = NULL;
-            switch (layer->l_type)
+            total_layer_mem_allocated += layer_get_sizeof_mem_allocated(l);
+            switch (l->l_type)
             {
             case INPUT: {
                 l_name = "InputDense";
@@ -462,9 +434,9 @@ void neural_net_info(NeuralNet* net) {
             }
             case CONV_2D_INPUT: {
                 l_name = "InputConv2D";
-                int out_chan = layer->cache.conv.output->n_channels;
-                int out_rows = layer->cache.conv.output->n_rows;
-                int out_cols = layer->cache.conv.output->n_cols;
+                int out_chan = l->cache.conv.output->n_channels;
+                int out_rows = l->cache.conv.output->n_rows;
+                int out_cols = l->cache.conv.output->n_cols;
                 params = n_units;
                 non_trainable_params += params;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
@@ -473,15 +445,15 @@ void neural_net_info(NeuralNet* net) {
             }
             case OUTPUT: {
                 l_name = "Output";
-                params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
+                params = n_units * layer_get_n_units(l->prev_layer) + n_units;
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
                 printf("------------------------------------------\n");
                 break;
             }
-            case DEEP: {
-                l_name = "Deep";
-                params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
+            case DENSE: {
+                l_name = "Dense";
+                params = n_units * layer_get_n_units(l->prev_layer) + n_units;
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
                 printf("------------------------------------------\n");
@@ -489,12 +461,12 @@ void neural_net_info(NeuralNet* net) {
             }
             case CONV_2D: {
                 l_name = "Conv2D";
-                int out_chan = layer->cache.conv.output->n_channels;
-                int out_rows = layer->cache.conv.output->n_rows;
-                int out_cols = layer->cache.conv.output->n_cols;
-                int filter_size = layer->params.conv.filter_size;
-                int filter_chan = layer->cache.conv.filter->n_channels;
-                int n_filters = layer->params.conv.n_filters;
+                int out_chan = l->cache.conv.output->n_channels;
+                int out_rows = l->cache.conv.output->n_rows;
+                int out_cols = l->cache.conv.output->n_cols;
+                int filter_size = l->params.conv.filter_size;
+                int filter_chan = l->cache.conv.filter->n_channels;
+                int n_filters = l->params.conv.n_filters;
                 params = n_filters * (pow(filter_size, 2) * filter_chan + 1);
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
@@ -509,9 +481,9 @@ void neural_net_info(NeuralNet* net) {
                 break;
             }
             case MAX_POOL: {
-                int out_chan = layer->cache.conv.output->n_channels;
-                int out_rows = layer->cache.conv.output->n_rows;
-                int out_cols = layer->cache.conv.output->n_cols;
+                int out_chan = l->cache.conv.output->n_channels;
+                int out_rows = l->cache.conv.output->n_rows;
+                int out_cols = l->cache.conv.output->n_cols;
                 l_name = "MaxPool";
                 params = 0;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
@@ -528,8 +500,9 @@ void neural_net_info(NeuralNet* net) {
         printf("Activation function: %s\n", net->activation->name);
         printf("Output activation: %s\n", net->layers[net->n_layers-1]->activation->name);
         printf("Cost function: %s\n", net->cost->name);
-        printf("Optimizer: %s\n", net->optimizer->name);
-        printf("------------------------------------\n\n");
+        printf("Layer memory allocated: %lld B\n", total_layer_mem_allocated);
+        printf("------------------------------------\n");
+        net->optimizer->optimizer_print_info(net->optimizer);
     }
     else {
         printf("Model has not been compiled. Please compile before running \"neural_net_info\".");
@@ -612,6 +585,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             score_batch(net->batch_score, y_pred, y_true);
             train_acc[i] = net->batch_score->accuracy;
             back_prop(net);
+
             #ifdef DEBUG
             if (i==0) {
                 printf("Stats after 1 batch:\n");
@@ -671,7 +645,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
 
     if (net->optimizer->type == ADAM) {
         AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
-        adam->ctr = 1;
+        adam->ctr = 0;
     }
 
     if (net->is_cnn) {
@@ -752,7 +726,7 @@ void confusion_matrix(Matrix* x_test, Matrix* y_test, NeuralNet* net) {
 
     int start_idx = 0;
     Matrix* conf_m = matrix_new(y_test->n_cols, y_test->n_cols);
-    matrix_fill(conf_m, (nn_float)0.0);
+    matrix_zero(conf_m);
 
     for (start_idx; start_idx<x_test->n_rows - net->batch_size; start_idx += net->batch_size) {
         if (net->is_cnn) {
@@ -813,7 +787,7 @@ void forward_prop(NeuralNet* net, bool training) {
             );
             break;
 
-        case DEEP:
+        case DENSE:
             if (net->optimizer->type == NESTEROV && training) {
                 MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
                 matrix_add_into(
@@ -823,11 +797,11 @@ void forward_prop(NeuralNet* net, bool training) {
                 );
                 matrix_add_into(
                     l->cache.dense.bias, 
-                    mom->bias_momentum[i]->filters[0]->channels[0], 
+                    mom->bias_momentum[i], 
                     l->cache.dense.bias
                 );
             }
-            layer_deep_fp(l, net->batch_size);
+            layer_dense_fp(l, net->batch_size);
             break;
 
         case OUTPUT:
@@ -840,7 +814,7 @@ void forward_prop(NeuralNet* net, bool training) {
                 );
                 matrix_add_into(
                     l->cache.dense.bias, 
-                    mom->bias_momentum[i]->filters[0]->channels[0], 
+                    mom->bias_momentum[i], 
                     l->cache.dense.bias
                 );
             }
@@ -855,7 +829,7 @@ void forward_prop(NeuralNet* net, bool training) {
                     mom->weight_momentum[i],
                     l->cache.conv.filter
                 );
-                tensor4D_add_into(
+                matrix_add_into(
                     l->cache.conv.bias,
                     mom->bias_momentum[i],
                     l->cache.conv.bias
@@ -890,8 +864,8 @@ void back_prop(NeuralNet* net) {
             );
             break;
         
-        case DEEP:
-            layer_deep_bp(l, net->batch_size);
+        case DENSE:
+            layer_dense_bp(l, net->batch_size);
             break;
 
         case CONV_2D:
@@ -916,50 +890,20 @@ void back_prop(NeuralNet* net) {
 }
 
 void update_weights(NeuralNet* net) {
+    if (net->optimizer->type == ADAM) {
+        AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
+        adam->ctr++;
+    }
     for (int j=1; j<net->n_layers; j++) {
         Layer* l = net->layers[j];
         switch(l->l_type)
         {
-            case DEEP:
+            case DENSE:
             case OUTPUT: {
-                if (net->optimizer->type == NESTEROV) {
-                    MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                    matrix_subtract_into(
-                        l->cache.dense.weight, 
-                        mom->weight_momentum[j]->filters[0]->channels[0], 
-                        l->cache.dense.weight
-                    );
-                    matrix_subtract_into(
-                        l->cache.dense.bias, 
-                        mom->bias_momentum[j]->filters[0]->channels[0], 
-                        l->cache.dense.bias
-                    );
-                }
-                if (net->optimizer->type == ADAM) {
-                    AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
-                    adam->ctr++;
-                }
-                layer_deep_update_weights(l, net->optimizer);
+                layer_dense_update_weights(l, net->optimizer);
                 break;
             }
             case CONV_2D: {
-                if (net->optimizer->type == NESTEROV) {
-                    MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                    tensor4D_subtract_into(
-                        l->cache.conv.filter, 
-                        mom->weight_momentum[j], 
-                        l->cache.conv.filter
-                    );
-                    tensor4D_subtract_into(
-                        l->cache.conv.bias, 
-                        mom->bias_momentum[j], 
-                        l->cache.conv.bias
-                    );
-                }
-                if (net->optimizer->type == ADAM) {
-                    AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
-                    adam->ctr++;
-                }
                 layer_conv2D_update_weights(l, net->optimizer);
                 break;                        
             }
@@ -1021,8 +965,8 @@ void add_output_layer(int n_units, NeuralNet* net) {
     net->n_layers++;
 }
 
-void add_deep_layer(int n_units, NeuralNet* net) {
-    Layer* deep_l = layer_new(DEEP, net);
+void add_dense_layer(int n_units, NeuralNet* net) {
+    Layer* deep_l = layer_new(DENSE, net);
     deep_l->params.dense.n_units = n_units;
     net->layers[net->n_layers] = deep_l;
     deep_l->layer_idx = net->n_layers;
@@ -1052,12 +996,11 @@ void add_flatten_layer(NeuralNet* net) {
 
 void add_max_pool_layer(int filter_size, int stride, NeuralNet* net) {
     Layer* max_pool_l = layer_new(MAX_POOL, net);
-    max_pool_l->params.conv.n_filters = 1;
-    max_pool_l->params.conv.filter_size = filter_size;
-    max_pool_l->params.conv.stride = stride;
-    max_pool_l->params.conv.n_units = -1;
-    max_pool_l->params.conv.output_height = -1;
-    max_pool_l->params.conv.output_width = -1;
+    max_pool_l->params.max_pool.filter_size = filter_size;
+    max_pool_l->params.max_pool.stride = stride;
+    max_pool_l->params.max_pool.n_units = -1;
+    max_pool_l->params.max_pool.output_width = -1;
+    max_pool_l->params.max_pool.output_height = -1;
     net->layers[net->n_layers] = max_pool_l;
     max_pool_l->layer_idx = net->n_layers;
     net->n_layers++;
@@ -1072,38 +1015,53 @@ void debug_layers_info(NeuralNet* net) {
     nn_float min_act, max_act, mean_act;
     char* l_name = NULL;
     for (int i=0; i<net->n_layers; i++) {
-        Layer* layer = net->layers[i];
-        switch (layer->l_type)
+        Layer* l = net->layers[i];
+        switch (l->l_type)
         {
-        case DEEP: {
+        case DENSE: {
             l_name = "Dense";
-            min_grad = matrix_min(layer->cache.dense.weight_gradient);
-            max_grad = matrix_max(layer->cache.dense.weight_gradient);
-            mean_grad = matrix_average(layer->cache.dense.weight_gradient);
-            min_weight = matrix_min(layer->cache.dense.weight);
-            max_weight = matrix_max(layer->cache.dense.weight);
-            mean_weight = matrix_average(layer->cache.dense.weight);
-            min_act = matrix_min(layer->cache.dense.output);
-            max_act = matrix_max(layer->cache.dense.output);
-            mean_act = matrix_average(layer->cache.dense.output);
+            min_grad = matrix_min(l->cache.dense.weight_gradient);
+            max_grad = matrix_max(l->cache.dense.weight_gradient);
+            mean_grad = matrix_average(l->cache.dense.weight_gradient);
+            min_weight = matrix_min(l->cache.dense.weight);
+            max_weight = matrix_max(l->cache.dense.weight);
+            mean_weight = matrix_average(l->cache.dense.weight);
+            min_act = matrix_min(l->cache.dense.output);
+            max_act = matrix_max(l->cache.dense.output);
+            mean_act = matrix_average(l->cache.dense.output);
             printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
             printf("--------------------------------------------------------------------------------------------------------------------\n");
             break;
         }
         case OUTPUT: {
             l_name = "Output";
-            min_grad = matrix_min(layer->cache.dense.weight_gradient);
-            max_grad = matrix_max(layer->cache.dense.weight_gradient);
-            mean_grad = matrix_average(layer->cache.dense.weight_gradient);
-            min_weight = matrix_min(layer->cache.dense.weight);
-            max_weight = matrix_max(layer->cache.dense.weight);
-            mean_weight = matrix_average(layer->cache.dense.weight);
-            min_act = matrix_min(layer->cache.dense.output);
-            max_act = matrix_max(layer->cache.dense.output);
-            mean_act = matrix_average(layer->cache.dense.output);
+            min_grad = matrix_min(l->cache.dense.weight_gradient);
+            max_grad = matrix_max(l->cache.dense.weight_gradient);
+            mean_grad = matrix_average(l->cache.dense.weight_gradient);
+            min_weight = matrix_min(l->cache.dense.weight);
+            max_weight = matrix_max(l->cache.dense.weight);
+            mean_weight = matrix_average(l->cache.dense.weight);
+            min_act = matrix_min(l->cache.dense.output);
+            max_act = matrix_max(l->cache.dense.output);
+            mean_act = matrix_average(l->cache.dense.output);
             printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
             printf("--------------------------------------------------------------------------------------------------------------------\n");
             break;            
+        }
+        case CONV_2D: {
+            l_name = "Conv2D";
+            min_grad = tensor4D_min(l->cache.conv.filter_gradient);
+            max_grad = tensor4D_max(l->cache.conv.filter_gradient);
+            mean_grad = tensor4D_average(l->cache.conv.filter_gradient);
+            min_weight = tensor4D_min(l->cache.conv.filter);
+            max_weight = tensor4D_max(l->cache.conv.filter);
+            mean_weight = tensor4D_average(l->cache.conv.filter);
+            min_act = tensor4D_min(l->cache.conv.output);
+            max_act = tensor4D_max(l->cache.conv.output);
+            mean_act = tensor4D_average(l->cache.conv.output);
+            printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
+            printf("--------------------------------------------------------------------------------------------------------------------\n");
+            break;  
         }
         }
     }

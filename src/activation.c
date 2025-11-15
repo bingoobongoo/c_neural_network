@@ -94,10 +94,10 @@ Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
 
 void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* into) {
     if (activation->type != SOFTMAX) {
+        nn_float param = activation->activation_param;
         for (int i=0; i<z_m->n_rows; i++) {
             for (int j=0; j<z_m->n_cols; j++) {
                 nn_float z = matrix_get(z_m, i, j);
-                nn_float param = activation->activation_param;
                 matrix_assign(into, i, j, activation->activation_func(z, param));
             }
         }

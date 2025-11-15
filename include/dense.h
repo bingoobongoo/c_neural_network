@@ -20,7 +20,4 @@ typedef struct {
     // auxiliary gradients
     Matrix* dCost_dA; 
     Matrix* dActivation_dZ;
-    Matrix* dZ_dW_t;
-    Matrix* dZnext_dA_t;
-    Matrix* dCost_dZ_col_sum;
 } DenseCache;

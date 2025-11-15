@@ -19,6 +19,20 @@ void matrix_free(Matrix* m) {
     m = NULL;
 }
 
+#ifdef INLINE
+inline nn_float matrix_get(Matrix* m, int row, int col) {
+    #ifdef DEBUG
+
+    if (col >= m->n_cols || row >= m->n_rows) {
+        printf("Out of bounds error while accessing matrix.");
+        exit(1);
+    }
+
+    #endif
+
+    return m->entries[row*m->n_cols + col];
+}
+#else
 nn_float matrix_get(Matrix* m, int row, int col) {
     #ifdef DEBUG
 
@@ -31,7 +45,22 @@ nn_float matrix_get(Matrix* m, int row, int col) {
 
     return m->entries[row*m->n_cols + col];
 }
+#endif
 
+#ifdef INLINE
+inline void matrix_assign(Matrix* m, int row, int col, nn_float num) {
+    #ifdef DEBUG
+
+    if (col >= m->n_cols || row >= m->n_rows) {
+        printf("Out of bounds error while accessing matrix.");
+        exit(1);
+    }
+
+    #endif
+
+    m->entries[row*m->n_cols + col] = num;
+}
+#else
 void matrix_assign(Matrix* m, int row, int col, nn_float num) {
     #ifdef DEBUG
 
@@ -44,6 +73,7 @@ void matrix_assign(Matrix* m, int row, int col, nn_float num) {
 
     m->entries[row*m->n_cols + col] = num;
 }
+#endif
 
 void matrix_save(Matrix* m, char* file_path) {
     FILE* file = fopen(file_path, "w");
@@ -250,7 +280,7 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into) {
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
-            matrix_assign(into, i, j, sum);;
+            matrix_assign(into, i, j, sum);
         }
     }
 }
@@ -321,12 +351,17 @@ Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
     return dot_matrix;
 }
 
-void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
+void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m2_trans) {
     #ifdef DEBUG
+
+    bool check_no_trans = (!m1_trans && !m2_trans) && (m1->n_cols != m2->n_rows);
+    bool check_m1_trans = m1_trans && !m2_trans && (m1->n_rows != m2->n_rows);
+    bool check_m2_trans = m2_trans && !m1_trans && (m1->n_cols != m2->n_cols);
     
-    if (m1->n_cols != m2->n_rows) {
+    if (check_no_trans || check_m1_trans || check_m2_trans) {
         printf("Matrices have wrong dimensions: ");
         matrix_print_dimensions(m1); printf(" and "); matrix_print_dimensions(m2);
+        printf("\nm1_trans=%d   m2_trans=%d\n", m1_trans, m2_trans);
         exit(1);
     }
 
@@ -335,24 +370,32 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
     
     nn_float alpha = (nn_float)1.0;
     nn_float beta = (nn_float)0.0;
+    CBLAS_TRANSPOSE m1_cblas_trans = (m1_trans) ? CblasTrans : CblasNoTrans;
+    CBLAS_TRANSPOSE m2_cblas_trans = (m2_trans) ? CblasTrans : CblasNoTrans;
+    const int M = m1_trans ? m1->n_cols : m1->n_rows;
+    const int N = m2_trans ? m2->n_rows : m2->n_cols;
+    const int K = m1_trans ? m1->n_rows : m1->n_cols;
+    const int lda = (m1_cblas_trans == CblasNoTrans) ? K : M;
+    const int ldb = (m2_cblas_trans == CblasNoTrans) ? N : K;
+    const int ldc = N;
 
     #ifdef SINGLE_PRECISION
 
     cblas_sgemm(
         CblasRowMajor,
-        CblasNoTrans,
-        CblasNoTrans,
-        m1->n_rows,
-        m2->n_cols,
-        m1->n_cols,
+        m1_cblas_trans,
+        m2_cblas_trans,
+        M,
+        N,
+        K,
         alpha,
         m1->entries,
-        m1->n_cols,
+        lda,
         m2->entries,
-        m2->n_cols,
+        ldb,
         beta,
         into->entries,
-        m2->n_cols
+        ldc
     );
 
     #endif
@@ -360,19 +403,19 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     cblas_dgemm(
         CblasRowMajor,
-        CblasNoTrans,
-        CblasNoTrans,
-        m1->n_rows,
-        m2->n_cols,
-        m1->n_cols,
+        m1_cblas_trans,
+        m2_cblas_trans,
+        M,
+        N,
+        K,
         alpha,
         m1->entries,
-        m1->n_cols,
+        lda,
         m2->entries,
-        m2->n_cols,
+        ldb,
         beta,
         into->entries,
-        m2->n_cols
+        ldc
     );
 
     #endif
@@ -381,18 +424,70 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into) {
     #ifndef BLAS
 
     matrix_zero(into);
-    #pragma omp parallel for collapse(1)
-    for (int i=0; i<m1->n_rows; i++) {
-        for (int k=0; k<m1->n_cols; k++) {
-            for (int j=0; j<m2->n_cols; j++) {
-                matrix_assign(
-                    into, 
-                    i, 
-                    j,
-                    matrix_get(into, i, j) + matrix_get(m1, i, k) * matrix_get(m2, k, j)
-                );
+
+    if (!m1_trans && !m2_trans) {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_rows; i++) {
+            for (int k=0; k<m1->n_cols; k++) {
+                nn_float aik = matrix_get(m1, i, k);
+                for (int j=0; j<m2->n_cols; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
+                    );
+                }
             }
-        }
+        }      
+    }
+    else if (m1_trans && !m2_trans) {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_cols; i++) {
+            for (int k=0; k<m1->n_rows; k++) {
+                nn_float aik = matrix_get(m1, k, i);
+                for (int j=0; j<m2->n_cols; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
+                    );
+                }
+            }
+        }        
+    }
+    else if (!m1_trans && m2_trans) {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_rows; i++) {
+            for (int k=0; k<m1->n_cols; k++) {
+                nn_float aik = matrix_get(m1, i, k);
+                for (int j=0; j<m2->n_rows; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
+                    );
+                }
+            }
+        } 
+    }
+    else {
+        #pragma omp parallel for
+        for (int i=0; i<m1->n_cols; i++) {
+            for (int k=0; k<m1->n_rows; k++) {
+                nn_float aik = matrix_get(m1, k, i);
+                for (int j=0; j<m2->n_rows; j++) {
+                    matrix_assign(
+                        into, 
+                        i, 
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
+                    );
+                }
+            }
+        } 
     }
 
     #endif
@@ -767,6 +862,18 @@ Matrix* matrix_transpose(Matrix* m) {
     return transposed_matrix;
 }
 
+void matrix_flip_into(Matrix* m, Matrix* into) {
+    int ker_h = m->n_rows;
+    int ker_w = m->n_cols;
+    for (int i=0; i<ker_h; i++) {
+        nn_float* src_row = m->entries + i*ker_w;
+        nn_float* dst_row = into->entries + (ker_h - 1 - i)*ker_w;
+        for (int j=0; j<ker_w; j++) {
+            dst_row[ker_w - 1 - j] = src_row[j];
+        }
+    }
+}
+
 void matrix_transpose_into(Matrix* m, Matrix* into) {
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
@@ -776,23 +883,29 @@ void matrix_transpose_into(Matrix* m, Matrix* into) {
     }
 }
 
-void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type) {
+void matrix_acc_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type) {
     switch (type)
     {
     case VALID: {
         int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
         int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
+        int i, j, k, l;
+        int is, js;
+        nn_float sum, x;
 
-        for (int i=0; i<out_h; i++) {
-            for (int j=0; j<out_w; j++) {
-                nn_float sum = (nn_float)0.0;
-                for (int k=0; k<kernel->n_rows; k++) {
-                    for (int l=0; l<kernel->n_cols; l++) {
-                        sum += matrix_get(input, i*stride+k, j*stride+l) *
+        for (i=0; i<out_h; i++) {
+            is = i*stride;
+            for (j=0; j<out_w; j++) {
+                js = j*stride;
+                sum = (nn_float)0.0;
+                x = matrix_get(into, i, j);
+                for (k=0; k<kernel->n_rows; k++) {
+                    for (l=0; l<kernel->n_cols; l++) {
+                        sum += matrix_get(input, is+k, js+l) *
                                matrix_get(kernel, k, l);
                     }
                 }
-                matrix_assign(into, i, j, sum);
+                matrix_assign(into, i, j, x+sum);
             }
         }
         break;
@@ -802,29 +915,33 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
         int out_h = (input->n_rows + kernel->n_rows - 2 + stride)/stride;
         int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
         int input_h_idx, input_w_idx;
-        int k, k_stick_out, l, l_stick_out;
-        nn_float sum;
+        int i, j, k, k_stick_out, l, l_stick_out;
+        int is, js;
+        nn_float sum, x;
 
-        for (int i=0; i<out_h; i++) {
-            for (int j=0; j<out_w; j++) {
+        for (i=0; i<out_h; i++) {
+            is = i*stride;
+            for (j=0; j<out_w; j++) {
+                js = j*stride;
                 sum = (nn_float)0.0;
-                k = kernel->n_rows - i*stride - 1;
+                x = matrix_get(into, i, j);
+                k = kernel->n_rows - is - 1;
                 if (k<0) k=0;
-                k_stick_out = i*stride - input->n_rows + 1;
+                k_stick_out = is - input->n_rows + 1;
                 if (k_stick_out<0) k_stick_out=0;
                 for (k; k<kernel->n_rows - k_stick_out; k++) {
-                    l = kernel->n_cols - j*stride - 1;
+                    l = kernel->n_cols - js - 1;
+                    input_h_idx = is + k - kernel->n_rows + 1;
                     if (l<0) l=0;
-                    l_stick_out = j*stride - input->n_cols + 1;
+                    l_stick_out = js - input->n_cols + 1;
                     if (l_stick_out<0) l_stick_out=0;
                     for (l; l<kernel->n_cols - l_stick_out; l++) {
-                        input_h_idx = i*stride + k - kernel->n_rows + 1;
-                        input_w_idx = j*stride + l - kernel->n_cols + 1;
+                        input_w_idx = js + l - kernel->n_cols + 1;
                         sum += matrix_get(input, input_h_idx, input_w_idx) *
                                matrix_get(kernel, k, l);
                     }
                 }
-                matrix_assign(into, i, j, sum);
+                matrix_assign(into, i, j, x+sum);
             }
         }
         break;
@@ -837,80 +954,110 @@ void matrix_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int stri
     }
 }
 
-void matrix_convolve_into(Matrix* input, Matrix* kernel, Matrix* into, int stride, CorrelationType type) {
-    switch (type)
-    {
-    case VALID: {
-        int out_h = (input->n_rows - kernel->n_rows)/stride + 1;
-        int out_w = (input->n_cols - kernel->n_cols)/stride + 1;
+void matrix_acc_convolve_valid_into(Matrix* input, Matrix* kflip, Matrix* into, int stride) {
+    int in_h = input->n_rows;
+    int in_w = input->n_cols;
+    int ker_h = kflip->n_rows;
+    int ker_w = kflip->n_cols;
+    int out_h = (input->n_rows - ker_h)/stride + 1;
+    int out_w = (input->n_cols - ker_w)/stride + 1;
+    nn_float sum, x;
 
-        for (int i=0; i<out_h; i++) {
-            for (int j=0; j<out_w; j++) {
-                nn_float sum = (nn_float)0.0;
-                for (int k=0; k<kernel->n_rows; k++) {
-                    for (int l=0; l<kernel->n_cols; l++) {
-                        sum += matrix_get(input, i*stride+k, j*stride+l) *
-                               matrix_get(kernel, kernel->n_rows-k-1, kernel->n_cols-l-1);
-                    }
-                }
-                matrix_assign(into, i, j, sum);
-            }
-        }
-        break;
-    }
-    
-    case FULL: {
-        int out_h = (input->n_rows + kernel->n_rows - 2 + stride)/stride;
-        int out_w = (input->n_cols + kernel->n_cols - 2 + stride)/stride;
-        int input_h_idx, input_w_idx;
-        int k, k_stick_out, l, l_stick_out;
-        nn_float sum;
+    for (int i=0; i<out_h; i++) {
+        int is = i*stride;
+        nn_float* out_row_ptr = into->entries + i*out_w;
 
-        for (int i=0; i<out_h; i++) {
-            for (int j=0; j<out_w; j++) {
-                sum = (nn_float)0.0;
-                k = kernel->n_rows - i*stride - 1;
-                if (k<0) k=0;
-                k_stick_out = i*stride - input->n_rows + 1;
-                if (k_stick_out<0) k_stick_out=0;
-                for (k; k<kernel->n_rows - k_stick_out; k++) {
-                    l = kernel->n_cols - j*stride - 1;
-                    if (l<0) l=0;
-                    l_stick_out = j*stride - input->n_cols + 1;
-                    if (l_stick_out<0) l_stick_out=0;
-                    for (l; l<kernel->n_cols - l_stick_out; l++) {
-                        input_h_idx = i*stride + k - kernel->n_rows + 1;
-                        input_w_idx = j*stride + l - kernel->n_cols + 1;
-                        sum += matrix_get(input, input_h_idx, input_w_idx) *
-                               matrix_get(kernel, kernel->n_rows-k-1, kernel->n_cols-l-1);
-                    }
+        for (int j=0; j<out_w; j++) {
+            int js = j*stride;
+            sum = (nn_float)0.0;
+
+            for (int k=0; k<ker_h; k++) {
+                nn_float* in_row_ptr = input->entries + (is+k)*in_w + js;
+                nn_float* ker_row_ptr = kflip->entries + k*ker_w;
+
+                for (int l=0; l<ker_w; l++) {
+                    sum += in_row_ptr[l] * ker_row_ptr[l];
                 }
-                matrix_assign(into, i, j, sum);
             }
+            out_row_ptr[j] += sum;
         }
-        break;
-    }
-    
-    default:
-        printf("Correlation type doesn't exist.");
-        exit(1);
-        break;
     }
 }
 
-void matrix_max_pool_into(Matrix* input, Matrix* into, int kernel_size, int stride) {
+void matrix_acc_convolve_full_into(Matrix* input, Matrix* kflip, Matrix* into, Matrix* padding) {
+    int in_h = input->n_rows;
+    int in_w = input->n_cols;
+    int ker_h = kflip->n_rows;
+    int ker_w = kflip->n_cols;
+    int pad_h = in_h + 2*(ker_h-1);
+    int pad_w = in_w + 2*(ker_w-1);;
+    matrix_zero(padding);
+
+    for (int i=0; i<in_h; i++) {
+        nn_float* src = input->entries + i*in_w;
+        nn_float* dst = padding->entries + (i+ker_h-1)*pad_w + ker_w - 1;
+        memcpy(dst, src, in_w*sizeof(nn_float));
+    }
+
+    matrix_acc_convolve_valid_into(padding, kflip, into, 1);
+}
+
+void matrix_max_pool_into(Matrix* input, Matrix* into, Matrix_uint16* argmax, int kernel_size, int stride) {
     int out_h = (input->n_rows - kernel_size)/stride + 1;
     int out_w = (input->n_cols - kernel_size)/stride + 1;
+    int is, js;
     for (int i=0; i<out_h; i++) {
+        is = i*stride;
         for (int j=0; j<out_w; j++) {
-            nn_float max = matrix_get(input, i*stride, j*stride);
+            js = j*stride;
+            nn_float max = -INFINITY;
+            uint16_t max_idx = 0;
             for (int k=0; k<kernel_size; k++) {
-                for (int l=1; l<kernel_size; l++) {
-                    nn_float entry = matrix_get(input, i*stride+k, j*stride+l);
-                    if (entry > max) max = entry;
+                for (int l=0; l<kernel_size; l++) {
+                    nn_float entry = matrix_get(input, is+k, js+l);
+                    if (entry > max) {
+                        max = entry;
+                        max_idx = k*kernel_size + l;
+                    }
                 }
             }
             matrix_assign(into, i, j, max);
+            argmax->entries[i*argmax->n_cols + j] = max_idx;
         }
     }
+}
+
+unsigned long matrix_get_sizeof_mem_allocated(Matrix* m) {
+    unsigned long size = 0;
+    size += sizeof(m);
+    size += m->n_rows * m->n_cols * sizeof(nn_float);
+
+    return size;
+}
+
+Matrix_uint16* matrix_uint16_new(int n_rows, int n_cols) {
+    Matrix_uint16* m = (Matrix_uint16*)malloc(sizeof(Matrix_uint16));
+    m->n_rows = n_rows;
+    m->n_cols = n_cols;
+    m->entries = (uint16_t*)malloc(n_rows * n_cols * sizeof(uint16_t));
+
+    return m;
+}
+
+void matrix_uint16_free(Matrix_uint16* m) {
+    if (m == NULL) return;
+
+    free(m->entries);
+    m->entries = NULL;
+
+    free(m);
+    m = NULL;
+}
+
+void matrix_uint16_fill(Matrix_uint16* m, uint16_t num) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            m->entries[i*m->n_cols+j] = num;
+        }
+    }   
 }
