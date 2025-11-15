@@ -46,8 +46,8 @@ void neural_net_compile(NeuralNet* net) {
         Layer* layer = net->layers[i];
         switch (layer->l_type)
         {
-        case DEEP:
-            layer_deep_compile(
+        case DENSE:
+            layer_dense_compile(
                 layer,
                 net->activation->type,
                 net->activation->activation_param,
@@ -100,7 +100,7 @@ void neural_net_compile(NeuralNet* net) {
             Layer* layer = net->layers[i];
             switch (layer->l_type)
             {
-                case DEEP:
+                case DENSE:
                 case OUTPUT: {
                     mom->weight_momentum[i] = tensor4D_new(
                         layer_get_n_units(layer->prev_layer), 
@@ -155,7 +155,7 @@ void neural_net_compile(NeuralNet* net) {
             Layer* layer = net->layers[i];
             switch(layer->l_type)
             {
-                case DEEP:
+                case DENSE:
                 case OUTPUT: {
                     ada->weight_s[i] = tensor4D_new(
                         layer_get_n_units(layer->prev_layer), 
@@ -250,7 +250,7 @@ void neural_net_compile(NeuralNet* net) {
             Layer* layer = net->layers[i];
             switch(layer->l_type)
             {
-                case DEEP:
+                case DENSE:
                 case OUTPUT: {
                     adam->weight_m[i] = tensor4D_new(
                         layer_get_n_units(layer->prev_layer), 
@@ -444,8 +444,8 @@ void neural_net_info(NeuralNet* net) {
                 printf("------------------------------------------\n");
                 break;
             }
-            case DEEP: {
-                l_name = "Deep";
+            case DENSE: {
+                l_name = "Dense";
                 params = n_units * layer_get_n_units(layer->prev_layer) + n_units;
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
@@ -779,7 +779,7 @@ void forward_prop(NeuralNet* net, bool training) {
             );
             break;
 
-        case DEEP:
+        case DENSE:
             if (net->optimizer->type == NESTEROV && training) {
                 MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
                 matrix_add_into(
@@ -793,7 +793,7 @@ void forward_prop(NeuralNet* net, bool training) {
                     l->cache.dense.bias
                 );
             }
-            layer_deep_fp(l, net->batch_size);
+            layer_dense_fp(l, net->batch_size);
             break;
 
         case OUTPUT:
@@ -856,8 +856,8 @@ void back_prop(NeuralNet* net) {
             );
             break;
         
-        case DEEP:
-            layer_deep_bp(l, net->batch_size);
+        case DENSE:
+            layer_dense_bp(l, net->batch_size);
             break;
 
         case CONV_2D:
@@ -890,9 +890,9 @@ void update_weights(NeuralNet* net) {
         Layer* l = net->layers[j];
         switch(l->l_type)
         {
-            case DEEP:
+            case DENSE:
             case OUTPUT: {
-                layer_deep_update_weights(l, net->optimizer);
+                layer_dense_update_weights(l, net->optimizer);
                 break;
             }
             case CONV_2D: {
@@ -957,8 +957,8 @@ void add_output_layer(int n_units, NeuralNet* net) {
     net->n_layers++;
 }
 
-void add_deep_layer(int n_units, NeuralNet* net) {
-    Layer* deep_l = layer_new(DEEP, net);
+void add_dense_layer(int n_units, NeuralNet* net) {
+    Layer* deep_l = layer_new(DENSE, net);
     deep_l->params.dense.n_units = n_units;
     net->layers[net->n_layers] = deep_l;
     deep_l->layer_idx = net->n_layers;
@@ -1010,7 +1010,7 @@ void debug_layers_info(NeuralNet* net) {
         Layer* layer = net->layers[i];
         switch (layer->l_type)
         {
-        case DEEP: {
+        case DENSE: {
             l_name = "Dense";
             min_grad = matrix_min(layer->cache.dense.weight_gradient);
             max_grad = matrix_max(layer->cache.dense.weight_gradient);

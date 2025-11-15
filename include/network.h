@@ -44,7 +44,7 @@ void update_weights(NeuralNet* net);
 void add_input_layer(int n_units, NeuralNet* net);
 void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net);
 void add_output_layer(int n_units, NeuralNet* net);
-void add_deep_layer(int n_units, NeuralNet* net);
+void add_dense_layer(int n_units, NeuralNet* net);
 void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);
 void add_flatten_layer(NeuralNet* net);
 void add_max_pool_layer(int filter_size, int stride, NeuralNet* net);

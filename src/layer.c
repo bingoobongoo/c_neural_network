@@ -107,7 +107,7 @@ void layer_free(Layer* layer) {
         }
         break;
         
-    case DEEP:
+    case DENSE:
     case OUTPUT:
         if (layer->cache.dense.output != NULL) {
             matrix_free(layer->cache.dense.output);
@@ -186,7 +186,7 @@ int layer_get_n_units(Layer* layer) {
     switch (layer->l_type)
     {
     case INPUT:
-    case DEEP:
+    case DENSE:
     case OUTPUT:
         return layer->params.dense.n_units;
         break;
@@ -212,7 +212,7 @@ Matrix* layer_get_output_matrix(Layer* layer) {
     switch (layer->l_type)
     {
     case INPUT:
-    case DEEP:
+    case DENSE:
     case OUTPUT:
         return layer->cache.dense.output;
         break;
@@ -248,7 +248,7 @@ Tensor4D* layer_get_output_tensor4D(Layer* layer) {
 Matrix* layer_get_delta_matrix(Layer* layer) {
     switch (layer->l_type)
     {
-    case DEEP:
+    case DENSE:
     case OUTPUT:
         return layer->cache.dense.delta;
         break;
@@ -279,7 +279,7 @@ Tensor4D* layer_get_delta_tensor4D(Layer* layer) {
     }
 }
 
-void layer_deep_compile(Layer* l, ActivationType act_type, int act_param, int batch_size) {
+void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int batch_size) {
     l->activation = activation_new(
         act_type,
         act_param
@@ -721,7 +721,7 @@ void layer_conv2D_input_fp(Layer* l, Batch* train_batch, int batch_size) {
     l->cache.conv.output = train_batch->data.tensor;
 }
 
-void layer_deep_fp(Layer* l, int batch_size) {
+void layer_dense_fp(Layer* l, int batch_size) {
     matrix_dot_into(layer_get_output_matrix(
         l->prev_layer), 
         l->cache.dense.weight, 
@@ -894,7 +894,7 @@ void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size) {
     );
 }
 
-void layer_deep_bp(Layer* l, int batch_size) {
+void layer_dense_bp(Layer* l, int batch_size) {
     // delta gradient (dCost_dZ) calculations:
     matrix_dot_into(
         l->next_layer->cache.dense.delta, 
@@ -1284,7 +1284,7 @@ void layer_max_pool_bp(Layer* l, int batch_size) {
     }
 }
 
-void layer_deep_update_weights(Layer* l, Optimizer* opt) {
+void layer_dense_update_weights(Layer* l, Optimizer* opt) {
     opt->update_dense_weights(
         l->cache.dense.weight, 
         l->cache.dense.weight_gradient, 

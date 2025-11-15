@@ -30,8 +30,8 @@ int main() {
     );
 
     add_input_layer(x_train->n_cols, net);
-    add_deep_layer(300, net);
-    add_deep_layer(100, net);
+    add_dense_layer(300, net);
+    add_dense_layer(100, net);
     add_output_layer(y_train->n_cols, net);
 
     // add_conv_input_layer(28, 28, 1, net);
