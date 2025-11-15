@@ -7,6 +7,7 @@ int main() {
     #else
     openblas_set_num_threads(4);
     #endif
+    
     srand(time(NULL));
     Matrix* x_train = load_ubyte_images("data/fashion_mnist/train-images-idx3-ubyte");
     Matrix* x_test = load_ubyte_images("data/fashion_mnist/test-images-idx3-ubyte");
@@ -22,24 +23,24 @@ int main() {
     shuffle_matrix_inplace(x_test, y_test);
     
     NeuralNet* net = neural_net_new(
-        optimizer_sgd_new(0.001),
+        optimizer_momentum_new(0.001, 0.9, false),
         RELU, 0.01,
         CAT_CROSS_ENTROPY, 
         32
     );
 
-    // add_input_layer(x_train->n_cols, net);
-    // add_deep_layer(300, net);
-    // add_deep_layer(100, net);
-    // add_output_layer(y_train->n_cols, net);
-
-    add_conv_input_layer(28, 28, 1, net);
-    add_conv_layer(8, 8, 1, net);
-    add_conv_layer(8, 8, 1, net);
-    add_conv_layer(16, 4, 1, net);
-    add_conv_layer(16, 4, 1, net);
-    add_flatten_layer(net);
+    add_input_layer(x_train->n_cols, net);
+    add_deep_layer(300, net);
+    add_deep_layer(100, net);
     add_output_layer(y_train->n_cols, net);
+
+    // add_conv_input_layer(28, 28, 1, net);
+    // add_conv_layer(8, 8, 1, net);
+    // add_conv_layer(8, 8, 1, net);
+    // add_conv_layer(16, 4, 1, net);
+    // add_conv_layer(16, 4, 1, net);
+    // add_flatten_layer(net);
+    // add_output_layer(y_train->n_cols, net);
 
     neural_net_compile(net);
     neural_net_info(net);

@@ -882,50 +882,20 @@ void back_prop(NeuralNet* net) {
 }
 
 void update_weights(NeuralNet* net) {
+    if (net->optimizer->type == ADAM) {
+        AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
+        adam->ctr++;
+    }
     for (int j=1; j<net->n_layers; j++) {
         Layer* l = net->layers[j];
         switch(l->l_type)
         {
             case DEEP:
             case OUTPUT: {
-                if (net->optimizer->type == NESTEROV) {
-                    MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                    matrix_subtract_into(
-                        l->cache.dense.weight, 
-                        mom->weight_momentum[j]->filters[0]->channels[0], 
-                        l->cache.dense.weight
-                    );
-                    matrix_subtract_into(
-                        l->cache.dense.bias, 
-                        mom->bias_momentum[j], 
-                        l->cache.dense.bias
-                    );
-                }
-                if (net->optimizer->type == ADAM) {
-                    AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
-                    adam->ctr++;
-                }
                 layer_deep_update_weights(l, net->optimizer);
                 break;
             }
             case CONV_2D: {
-                if (net->optimizer->type == NESTEROV) {
-                    MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                    tensor4D_subtract_into(
-                        l->cache.conv.filter, 
-                        mom->weight_momentum[j], 
-                        l->cache.conv.filter
-                    );
-                    matrix_subtract_into(
-                        l->cache.conv.bias, 
-                        mom->bias_momentum[j], 
-                        l->cache.conv.bias
-                    );
-                }
-                if (net->optimizer->type == ADAM) {
-                    AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
-                    adam->ctr++;
-                }
                 layer_conv2D_update_weights(l, net->optimizer);
                 break;                        
             }

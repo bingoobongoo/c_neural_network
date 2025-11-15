@@ -95,6 +95,14 @@ void update_dense_weights_momentum(Matrix* weights, Matrix* gradient, Optimizer*
 
     Matrix* weight_momentum = mom->weight_momentum[layer_idx]->filters[0]->channels[0];
 
+    if (optimizer->type == NESTEROV) {
+        matrix_subtract_into(
+            weights, 
+            weight_momentum, 
+            weights
+        );
+    }
+
     matrix_scale_inplace(mom->beta, weight_momentum);
     matrix_scale_inplace(mom->learning_rate, gradient);
     matrix_subtract_into(weight_momentum, gradient, weight_momentum);
@@ -105,6 +113,14 @@ void update_dense_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optim
     MomentumConfig* mom = (MomentumConfig*)optimizer->settings;
 
     Matrix* bias_momentum = mom->bias_momentum[layer_idx];
+
+    if (optimizer->type == NESTEROV) {
+        matrix_subtract_into(
+            bias, 
+            bias_momentum, 
+            bias
+        );
+    }
 
     matrix_scale_inplace(mom->beta, bias_momentum);
     matrix_scale_inplace(mom->learning_rate, gradient);
@@ -117,6 +133,14 @@ void update_conv_weights_momentum(Tensor4D* weights, Tensor4D* gradient, Optimiz
 
     Tensor4D* weight_momentum = mom->weight_momentum[layer_idx];
 
+    if (optimizer->type == NESTEROV) {
+        tensor4D_subtract_into(
+            weights, 
+            weight_momentum, 
+            weights
+        );
+    }
+
     tensor4D_scale_inplace(mom->beta, weight_momentum);
     tensor4D_scale_inplace(mom->learning_rate, gradient);
     tensor4D_subtract_into(weight_momentum, gradient, weight_momentum);
@@ -127,6 +151,14 @@ void update_conv_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optimi
     MomentumConfig* mom = (MomentumConfig*)optimizer->settings;
 
     Matrix* bias_momentum = mom->bias_momentum[layer_idx];
+
+    if (optimizer->type == NESTEROV) {
+        matrix_subtract_into(
+            bias, 
+            bias_momentum, 
+            bias
+        );
+    }
 
     matrix_scale_inplace(mom->beta, bias_momentum);
     matrix_scale_inplace(mom->learning_rate, gradient);
@@ -283,7 +315,7 @@ Optimizer* optimizer_adam_new(nn_float learning_rate, nn_float beta_m, nn_float 
     adam->beta_m = beta_m;
     adam->beta_s = beta_s;
     adam->n_layers = -1;
-    adam->ctr = 1;
+    adam->ctr = 0;
 
     adam->weight_m = NULL;
     adam->bias_m = NULL;
