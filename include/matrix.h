@@ -80,6 +80,7 @@ void matrix_acc_correlate_into(Matrix* input, Matrix* kernel, Matrix* into, int 
 void matrix_acc_convolve_valid_into(Matrix* input, Matrix* kflip, Matrix* into, int stride);
 void matrix_acc_convolve_full_into(Matrix* input, Matrix* kflip, Matrix* into, Matrix* padding);
 void matrix_max_pool_into(Matrix* input, Matrix* into, Matrix_uint16* argmax, int kernel_size, int stride);
+unsigned long matrix_get_sizeof_mem_allocated(Matrix* m);
 
 Matrix_uint16* matrix_uint16_new(int n_rows, int n_cols);
 void matrix_uint16_free(Matrix_uint16* m);

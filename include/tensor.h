@@ -55,6 +55,10 @@ void tensor4D_add_scalar_into(nn_float scalar, Tensor4D* t, Tensor4D* into);
 void tensor4D_subtract_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into);
 void tensor4D_multiply_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into);
 void tensor4D_divide_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into);
+nn_float tensor4D_sum(Tensor4D* t);
+nn_float tensor4D_max(Tensor4D* t);
+nn_float tensor4D_min(Tensor4D* t);
+nn_float tensor4D_average(Tensor4D* t);
 void tensor4D_print_shape(Tensor4D* t);
 Tensor4D* matrix_to_tensor4D(Matrix* m, int n_rows, int n_cols, int n_channels);
 void matrix_into_tensor4D(Matrix* m, Tensor4D* t);
@@ -64,6 +68,9 @@ void kernel_into_im2col_fwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2
 void kernel_into_im2col_chwise(Tensor4D* kernel, bool flipped, Matrix* kernel_im2col);
 void delta_into_im2col_fwise(Tensor4D* delta, int filter_idx, Matrix* im2col);
 void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, int stride, int padding, Matrix* im2col);
+unsigned long tensor3D_get_sizeof_mem_allocated(Tensor3D* t);
+unsigned long tensor4D_get_sizeof_mem_allocated(Tensor4D* t);
+unsigned long tensor4D_uint16_get_sizeof_mem_allocated(Tensor4D_uint16* t);
 
 Tensor3D_uint16* tensor3D_uint16_new(int n_rows, int n_cols, int n_channels);
 void tensor3D_uint16_free(Tensor3D_uint16* t);

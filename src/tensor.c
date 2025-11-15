@@ -175,6 +175,45 @@ void tensor4D_divide_into(Tensor4D* t1, Tensor4D* t2, Tensor4D* into) {
     }    
 }
 
+nn_float tensor4D_sum(Tensor4D* t) {
+    nn_float sum = (nn_float)0.0;
+    for (int f=0; f<t->n_filters; f++) {
+        for (int c=0; c<t->n_channels; c++) {
+            sum += matrix_sum(t->filters[f]->channels[c]);
+        }
+    }
+
+    return sum;
+}
+
+nn_float tensor4D_max(Tensor4D* t) {
+    nn_float max = matrix_get(t->filters[0]->channels[0], 0, 0);
+    for (int f=0; f<t->n_filters; f++) {
+        for (int c=0; c<t->n_channels; c++) {
+            nn_float x = matrix_max(t->filters[f]->channels[c]);
+            if (x > max) max = x;
+        }
+    }
+
+    return max;
+}
+
+nn_float tensor4D_min(Tensor4D* t) {
+    nn_float min = matrix_get(t->filters[0]->channels[0], 0, 0);
+    for (int f=0; f<t->n_filters; f++) {
+        for (int c=0; c<t->n_channels; c++) {
+            nn_float x = matrix_max(t->filters[f]->channels[c]);
+            if (x < min) min = x;
+        }
+    }
+
+    return min;
+}
+
+nn_float tensor4D_average(Tensor4D* t) {
+    return tensor4D_sum(t) / (t->n_filters * t->n_channels * t->n_rows * t->n_cols);
+}
+
 Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
     Tensor4D* t = (Tensor4D*)malloc(sizeof(Tensor4D));
     t->n_rows = n_rows;
@@ -508,6 +547,30 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
             }
         }
     }
+}
+
+unsigned long tensor3D_get_sizeof_mem_allocated(Tensor3D* t) {
+    unsigned long size = 0;
+    size += sizeof(t);
+    size += t->n_channels * t->n_rows * t->n_cols * sizeof(nn_float);
+
+    return size;
+}
+
+unsigned long tensor4D_get_sizeof_mem_allocated(Tensor4D* t) {
+    unsigned long size = 0;
+    size += sizeof(t);
+    size += t->n_filters * t->n_channels * t->n_rows * t->n_cols * sizeof(nn_float);
+
+    return size;
+}
+
+unsigned long tensor4D_uint16_get_sizeof_mem_allocated(Tensor4D_uint16* t) {
+    unsigned long size = 0;
+    size += sizeof(t);
+    t->n_filters * t->n_channels * t->n_rows * t->n_cols * sizeof(uint16_t);
+
+    return size;
 }
 
 Tensor3D_uint16* tensor3D_uint16_new(int n_rows, int n_cols, int n_channels) {

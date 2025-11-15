@@ -7,6 +7,8 @@ Optimizer* optimizer_sgd_new(nn_float learning_rate) {
     opt->update_conv_weights = update_conv_weights_sgd;
     opt->update_conv_bias = update_conv_bias_sgd;
     opt->optimizer_free = optimizer_sgd_free;
+    opt->optimizer_print_info = optimizer_sgd_print_info;
+    opt->optimizer_get_mem_allocated = optimizer_sgd_get_mem_allocated;
     opt->type = SGD;
     opt->name = "Stochastic Gradient Descent (SGD)";
 
@@ -47,6 +49,27 @@ void update_conv_bias_sgd(Matrix* bias, Matrix* gradient, Optimizer* optimizer, 
     matrix_subtract_into(bias, gradient, bias);
 }
 
+void optimizer_sgd_print_info(Optimizer* optimizer) {
+    SGDConfig* sgd = (SGDConfig*)optimizer->settings;
+    printf("Optimizer: %s\n", optimizer->name);
+    printf("Learning rate: %f\n", sgd->learning_rate);
+    printf(
+        "Optimizer memory allocated: %d B\n", 
+        optimizer->optimizer_get_mem_allocated(optimizer)
+    );
+    printf("------------------------------------\n\n");
+}
+
+unsigned int optimizer_sgd_get_mem_allocated(Optimizer* optimizer) {
+    unsigned int size = 0;
+    size += sizeof(optimizer);
+
+    SGDConfig* sgd = (SGDConfig*)optimizer->settings;
+    size += sizeof(sgd);
+
+    return size;
+}
+
 Optimizer* optimizer_momentum_new(nn_float learning_rate, nn_float beta, bool nesterov) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_dense_weights = update_dense_weights_momentum;
@@ -54,6 +77,9 @@ Optimizer* optimizer_momentum_new(nn_float learning_rate, nn_float beta, bool ne
     opt->update_conv_weights = update_conv_weights_momentum;
     opt->update_conv_bias = update_conv_bias_momentum;
     opt->optimizer_free = optimizer_momentum_free;
+    opt->optimizer_print_info = optimizer_momentum_print_info;
+    opt->optimizer_get_mem_allocated = optimizer_momentum_get_mem_allocated;
+
     if (nesterov) {
         opt->type = NESTEROV;
         opt->name = "Nesterov Accelerated Gradient (NAG)";
@@ -166,6 +192,39 @@ void update_conv_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optimi
     matrix_add_into(bias, bias_momentum, bias);
 }
 
+void optimizer_momentum_print_info(Optimizer* optimizer) {
+    MomentumConfig* mom = (MomentumConfig*)optimizer->settings;
+    printf("Optimizer: %s\n", optimizer->name);
+    printf("Learning rate: %f\n", mom->learning_rate);
+    printf("Beta (momentum coefficient): %f\n", mom->beta);
+    printf(
+        "Optimizer memory allocated: %d B\n",
+        optimizer->optimizer_get_mem_allocated(optimizer)
+    );
+    printf("------------------------------------\n\n");
+}
+
+unsigned int optimizer_momentum_get_mem_allocated(Optimizer* optimizer) {
+    unsigned int size = 0;
+    size += sizeof(optimizer);
+
+    MomentumConfig* mom = (MomentumConfig*)optimizer->settings;
+    size += sizeof(mom);
+    size += mom->n_layers * sizeof(mom->weight_momentum);
+    size += mom->n_layers * sizeof(mom->bias_momentum);
+
+    for (int i=0; i<mom->n_layers; i++) {
+        if (mom->weight_momentum[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(mom->weight_momentum[i]);
+        }
+        if (mom->bias_momentum[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(mom->bias_momentum[i]);
+        }
+    }
+
+    return size;
+}
+
 Optimizer* optimizer_adagrad_new(nn_float learning_rate) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_dense_weights = update_dense_weights_adagrad;
@@ -173,6 +232,8 @@ Optimizer* optimizer_adagrad_new(nn_float learning_rate) {
     opt->update_conv_weights = update_conv_weights_adagrad;
     opt->update_conv_bias = update_conv_bias_adagrad;
     opt->optimizer_free = optimizer_adagrad_free;
+    opt->optimizer_print_info = optimizer_adagrad_print_info;
+    opt->optimizer_get_mem_allocated = optimizer_adagrad_get_mem_allocated;
     opt->type = ADAGRAD;
     opt->name = "AdaGrad";
 
@@ -300,6 +361,46 @@ void update_conv_bias_adagrad(Matrix* bias, Matrix* gradient, Optimizer* optimiz
     matrix_subtract_into(bias, intermediate, bias);
 }
 
+void optimizer_adagrad_print_info(Optimizer* optimizer) {
+    AdaGradConfig* ada = (AdaGradConfig*)optimizer->settings;
+    printf("Optimizer: %s\n", optimizer->name);
+    printf("Learning rate: %f\n", ada->learning_rate);
+    printf(
+        "Optimizer memory allocated: %d B\n",
+        optimizer->optimizer_get_mem_allocated(optimizer)
+    );
+    printf("------------------------------------\n\n");
+}
+
+unsigned int optimizer_adagrad_get_mem_allocated(Optimizer* optimizer) {
+    unsigned int size = 0;
+    size += sizeof(optimizer);
+
+    AdaGradConfig* ada = (AdaGradConfig*)optimizer->settings;
+    size += sizeof(ada);
+    size += ada->n_layers * sizeof(ada->weight_s);
+    size += ada->n_layers * sizeof(ada->bias_s);
+    size += ada->n_layers * sizeof(ada->intermediate_w);
+    size += ada->n_layers * sizeof(ada->intermediate_b);
+
+    for (int i=0; i<ada->n_layers; i++) {
+        if (ada->weight_s[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(ada->weight_s[i]);
+        }
+        if (ada->bias_s[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(ada->bias_s[i]);
+        }
+        if (ada->intermediate_w[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(ada->intermediate_w[i]);
+        }
+        if (ada->intermediate_b[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(ada->intermediate_b[i]);
+        }
+    }
+
+    return size;
+}
+
 Optimizer* optimizer_adam_new(nn_float learning_rate, nn_float beta_m, nn_float beta_s) {
     Optimizer* opt = (Optimizer*)malloc(sizeof(Optimizer));
     opt->update_dense_weights = update_dense_weights_adam;
@@ -307,6 +408,8 @@ Optimizer* optimizer_adam_new(nn_float learning_rate, nn_float beta_m, nn_float 
     opt->update_conv_weights = update_conv_weights_adam;
     opt->update_conv_bias = update_conv_bias_adam;
     opt->optimizer_free = optimizer_adam_free;
+    opt->optimizer_print_info = optimizer_adam_print_info;
+    opt->optimizer_get_mem_allocated = optimizer_adam_get_mem_allocated;
     opt->type = ADAM;
     opt->name = "Adam";
 
@@ -527,4 +630,72 @@ void update_conv_bias_adam(Matrix* bias, Matrix* gradient, Optimizer* optimizer,
     matrix_divide_into(bias_m_corr, intermediate_b, intermediate_b);
     matrix_scale_inplace(adam->learning_rate, intermediate_b);
     matrix_add_into(bias, intermediate_b, bias);
+}
+
+void optimizer_adam_print_info(Optimizer* optimizer) {
+    AdamConfig* adam = (AdamConfig*)optimizer->settings;
+    printf("Optimizer: %s\n", optimizer->name);
+    printf("Learning rate: %f\n", adam->learning_rate);
+    printf("Beta_m (first momentum decay): %f\n", adam->beta_m);
+    printf("Beta_s (second momentum decay): %f\n", adam->beta_s);
+    printf(
+        "Optimizer memory allocated: %d B\n",
+        optimizer->optimizer_get_mem_allocated(optimizer)
+    );
+    printf("------------------------------------\n\n");
+}
+
+unsigned int optimizer_adam_get_mem_allocated(Optimizer* optimizer) {
+    unsigned int size = 0;
+    size += sizeof(optimizer);
+
+    AdamConfig* adam = (AdamConfig*)optimizer->settings;
+    size += sizeof(adam);
+    size += adam->n_layers * sizeof(adam->weight_m);
+    size += adam->n_layers * sizeof(adam->weight_m_corr);
+    size += adam->n_layers * sizeof(adam->weight_s);
+    size += adam->n_layers * sizeof(adam->weight_s_corr);
+    size += adam->n_layers * sizeof(adam->intermediate_w);
+
+    size += adam->n_layers * sizeof(adam->bias_m);
+    size += adam->n_layers * sizeof(adam->bias_m_corr);
+    size += adam->n_layers * sizeof(adam->bias_s);
+    size += adam->n_layers * sizeof(adam->bias_s_corr);
+    size += adam->n_layers * sizeof(adam->intermediate_b);
+
+    for (int i=0; i<adam->n_layers; i++) {
+        if (adam->weight_m[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(adam->weight_m[i]);
+        }
+        if (adam->weight_m_corr[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(adam->weight_m_corr[i]);
+        }
+        if (adam->weight_s[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(adam->weight_s[i]);
+        }
+        if (adam->weight_s_corr[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(adam->weight_s_corr[i]);
+        }
+        if (adam->intermediate_w[i] != NULL) {
+            size += tensor4D_get_sizeof_mem_allocated(adam->intermediate_w[i]);
+        }
+
+        if (adam->bias_m[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(adam->bias_m[i]);
+        }
+        if (adam->bias_m_corr[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(adam->bias_m_corr[i]);
+        }
+        if (adam->bias_s[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(adam->bias_s[i]);
+        }
+        if (adam->bias_s_corr[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(adam->bias_s_corr[i]);
+        }
+        if (adam->intermediate_b[i] != NULL) {
+            size += matrix_get_sizeof_mem_allocated(adam->intermediate_b[i]);
+        }
+    }
+
+    return size;
 }
