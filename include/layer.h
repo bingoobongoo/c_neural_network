@@ -81,11 +81,13 @@ void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training);
 void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size);
 void layer_dense_bp(Layer* l, int batch_size);
 void layer_conv2D_bp(Layer* l, int batch_size);
-void layer_conv2D_bp_delta_from_flatten(Layer* l, int batch_size);
-void layer_conv2d_bp_delta_from_max_pool(Layer* l, int batch_size);
-void layer_conv2d_bp_delta_from_conv2d(Layer* l, int batch_size);
-void layer_flatten_bp(Layer* l, int batch_size);
 void layer_max_pool_bp(Layer* l, int batch_size);
+void layer_flatten_bp(Layer* l, int batch_size);
+
+void bp_delta_from_dense(Layer* from, Matrix* to, int batch_size);
+void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size);
+void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size);
+void bp_delta_from_flatten(Layer* from, Tensor4D* to, int batch_size);
 
 void layer_dense_update_weights(Layer* l, Optimizer* opt);
 void layer_conv2D_update_weights(Layer* l, Optimizer* opt);
