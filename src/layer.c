@@ -172,6 +172,49 @@ void layer_free(Layer* l) {
             l->cache.max_pool.argmax = NULL;
         }
         break;
+
+    case BATCH_NORM_CONV2D:
+        if (l->cache.batch_norm_conv.output != NULL) {
+            tensor4D_free(l->cache.batch_norm_conv.output);
+            l->cache.batch_norm_conv.output = NULL;
+        }
+        if (l->cache.batch_norm_conv.x_normalized != NULL) {
+            tensor4D_free(l->cache.batch_norm_conv.x_normalized);
+            l->cache.batch_norm_conv.x_normalized = NULL;
+        }
+        if (l->cache.batch_norm_conv.mean != NULL) {
+            matrix_free(l->cache.batch_norm_conv.mean);
+            l->cache.batch_norm_conv.mean = NULL;
+        }
+        if (l->cache.batch_norm_conv.variance != NULL) {
+            matrix_free(l->cache.batch_norm_conv.variance);
+            l->cache.batch_norm_conv.variance = NULL;
+        }
+        if (l->cache.batch_norm_conv.running_mean != NULL) {
+            matrix_free(l->cache.batch_norm_conv.running_mean);
+            l->cache.batch_norm_conv.running_mean = NULL;
+        }
+        if (l->cache.batch_norm_conv.running_variance != NULL) {
+            matrix_free(l->cache.batch_norm_conv.running_variance);
+            l->cache.batch_norm_conv.running_variance = NULL;
+        }
+        if (l->cache.batch_norm_conv.gamma != NULL) {
+            matrix_free(l->cache.batch_norm_conv.gamma);
+            l->cache.batch_norm_conv.gamma = NULL;
+        }
+        if (l->cache.batch_norm_conv.beta != NULL) {
+            matrix_free(l->cache.batch_norm_conv.beta);
+            l->cache.batch_norm_conv.beta = NULL;
+        }
+        if (l->cache.batch_norm_conv.gamma_grad != NULL) {
+            matrix_free(l->cache.batch_norm_conv.gamma_grad);
+            l->cache.batch_norm_conv.gamma_grad = NULL;
+        }
+        if (l->cache.batch_norm_conv.beta_grad != NULL) {
+            matrix_free(l->cache.batch_norm_conv.beta_grad);
+            l->cache.batch_norm_conv.beta_grad = NULL;
+        }
+        break;
     }
     
     if (l->activation != NULL) {
@@ -202,6 +245,10 @@ int layer_get_n_units(Layer* l) {
     
     case FLATTEN:
         return l->params.flat.n_units;
+        break;
+
+    case BATCH_NORM_CONV2D:
+        return l->params.batch_norm_conv.n_units;
         break;
     }
 
@@ -237,6 +284,10 @@ Tensor4D* layer_get_output_tensor4D(Layer* l) {
 
     case MAX_POOL:
         return l->cache.max_pool.output;
+        break;
+    
+    case BATCH_NORM_CONV2D:
+        return l->cache.batch_norm_conv.output;
         break;
     
     default:
@@ -301,6 +352,10 @@ unsigned int layer_get_sizeof_mem_allocated(Layer* l) {
 
         case MAX_POOL:
             size = layer_max_pool_get_sizeof_mem_allocated(l);
+            break;
+
+        case BATCH_NORM_CONV2D:
+            size = layer_batch_norm_conv2D_get_sizeof_mem_allocated(l);
             break;
     }
 
@@ -741,6 +796,74 @@ void layer_max_pool_compile(Layer* l, int batch_size) {
         l->cache.max_pool.output->n_channels;
 }
 
+void layer_batch_norm_conv2D_compile(Layer* l, int batch_size) {
+    int input_height = layer_get_output_tensor4D(l->prev_layer)->n_rows;
+    int input_width = layer_get_output_tensor4D(l->prev_layer)->n_cols;
+    int input_channels = layer_get_output_tensor4D(l->prev_layer)->n_channels;
+    int output_height = input_height;
+    int output_width = input_width;
+    int output_channels = input_channels;
+    int output_filters = batch_size;
+
+    l->params.batch_norm_conv.output_height = output_height;
+    l->params.batch_norm_conv.output_width = output_width;
+    l->params.batch_norm_conv.output_channels = output_channels;
+    l->params.batch_norm_conv.output_filters = output_filters;
+    l->params.batch_norm_conv.n_units = output_height * output_width * output_channels;
+
+    l->cache.batch_norm_conv.output = tensor4D_new(
+        output_height,
+        output_width,
+        output_channels,
+        output_filters
+    );
+    l->cache.batch_norm_conv.delta = tensor4D_new(
+        output_height,
+        output_width,
+        output_channels,
+        output_filters
+    );
+    l->cache.batch_norm_conv.x_normalized = tensor4D_new(
+        input_height,
+        input_width,
+        input_channels,
+        batch_size
+    );
+    l->cache.batch_norm_conv.mean = matrix_new(
+        1,
+        input_channels
+    );
+    l->cache.batch_norm_conv.variance = matrix_new(
+        1,
+        input_channels
+    );
+    l->cache.batch_norm_conv.running_mean = matrix_new(
+        1,
+        input_channels
+    );
+    l->cache.batch_norm_conv.running_variance = matrix_new(
+        1,
+        input_channels
+    );
+    l->cache.batch_norm_conv.gamma = matrix_new(
+        1,
+        input_channels
+    );
+    l->cache.batch_norm_conv.beta = matrix_new(
+        1,
+        input_channels
+    );
+    l->cache.batch_norm_conv.gamma_grad = matrix_new(
+        1,
+        input_channels
+    );
+    l->cache.batch_norm_conv.beta_grad = matrix_new(
+        1,
+        input_channels
+    );
+
+}
+
 void layer_input_fp(Layer* l, Batch* train_batch, int batch_size) {
     l->cache.dense.output = train_batch->data.matrix;
 }
@@ -882,6 +1005,92 @@ void layer_max_pool_fp(Layer* l, int batch_size) {
                 filter_size,
                 stride
             );
+        }
+    }
+}
+
+void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
+    Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
+    Tensor4D* input_normalized = l->cache.batch_norm_conv.x_normalized;
+    Tensor4D* output = l->cache.batch_norm_conv.output;
+    nn_float momentum = l->params.batch_norm_conv.momentum;
+
+    if (training) {
+        // per-channel mean calculations
+        for (int c=0; c<input->n_channels; c++) {
+            nn_float sum = (nn_float)0.0;
+
+            for (int n=0; n<input->n_filters; n++) {
+                sum += matrix_sum(input->filters[n]->channels[c]);
+            }
+
+            nn_float mean = sum / (input->n_filters * input->n_rows * input->n_cols);
+            matrix_assign(l->cache.batch_norm_conv.mean, 0, c, mean);
+
+            // running mean calculations
+            nn_float running_mean = matrix_get(l->cache.batch_norm_conv.running_mean, 0, c);
+            running_mean = momentum * mean + ((nn_float)1.0 - momentum) * running_mean;
+            matrix_assign(l->cache.batch_norm_conv.running_mean, 0, c, running_mean);
+        }
+
+        // per-channel variance calculations
+        for (int c=0; c<input->n_channels; c++) {
+            nn_float mean = matrix_get(l->cache.batch_norm_conv.mean, 0, c);
+            nn_float sum = (nn_float)0.0;
+
+            for (int n=0; n<input->n_filters; n++) {
+                nn_float* channel = input->filters[n]->channels[c]->entries;
+
+                for (int i=0; i<input->n_rows * input->n_cols; i++) {
+                    nn_float var = channel[i] - mean;
+                    sum += var * var;
+                }
+            }
+
+            nn_float channel_var = sum / (input->n_filters * input->n_rows * input->n_cols);
+            matrix_assign(l->cache.batch_norm_conv.variance, 0, c, channel_var);
+
+            // running variance calculations
+            nn_float running_var = matrix_get(l->cache.batch_norm_conv.running_variance, 0, c);
+            running_var = momentum * channel_var + ((nn_float)1.0 - momentum) * running_var;
+            matrix_assign(l->cache.batch_norm_conv.running_variance, 0, c, running_var);
+        }
+    }
+    
+    // normalization and scaling
+    for (int n=0; n<input->n_filters; n++) {
+        for (int c=0; c<input->n_channels; c++) {
+            nn_float mean, var;
+            if (training) {
+                mean = matrix_get(l->cache.batch_norm_conv.mean, 0, c);
+                var = matrix_get(l->cache.batch_norm_conv.variance, 0, c);
+            }
+            else {
+                mean = matrix_get(l->cache.batch_norm_conv.running_mean, 0, c);
+                var = matrix_get(l->cache.batch_norm_conv.running_variance, 0, c);
+            }
+
+            nn_float gamma = matrix_get(l->cache.batch_norm_conv.gamma, 0, c);
+            nn_float beta = matrix_get(l->cache.batch_norm_conv.beta, 0, c);
+            nn_float inv_std;
+
+            #ifdef SINGLE_PRECISION
+            inv_std = (nn_float)1.0 / sqrtf(var + 1e-5);
+            #endif
+            #ifdef DOUBLE_PRECISION
+            inv_std = (nn_float)1.0 / sqrt(var + 1e-5);
+            #endif
+
+            nn_float* input_channel = input->filters[n]->channels[c]->entries;
+            nn_float* normalized_channel = input_normalized->filters[n]->channels[c]->entries;
+            nn_float* output_channel = output->filters[n]->channels[c]->entries;
+
+            for (int i=0; i<input->n_rows * input->n_cols; i++) {
+                nn_float x = input_channel[i];
+                nn_float x_normalized = (x - mean) * inv_std;
+                normalized_channel[i] = x_normalized;
+                output_channel[i] = gamma * x_normalized + beta;
+            }
         }
     }
 }
@@ -1446,6 +1655,26 @@ unsigned long layer_max_pool_get_sizeof_mem_allocated(Layer* l) {
     size += tensor4D_get_sizeof_mem_allocated(l->cache.max_pool.delta);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.max_pool.dCost_dA);
     size += tensor4D_uint16_get_sizeof_mem_allocated(l->cache.max_pool.argmax);
+
+    return size;
+}
+
+unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l) {
+    unsigned long size = 0;
+    size += sizeof(l);
+    size += sizeof(l->params);
+    size += sizeof(l->params.batch_norm_conv);
+    size += sizeof(l->cache.batch_norm_conv);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.batch_norm_conv.output);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.batch_norm_conv.x_normalized);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.mean);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.variance);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.running_mean);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.running_variance);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.gamma);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.beta);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.gamma_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.beta_grad);
 
     return size;
 }

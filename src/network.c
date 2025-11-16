@@ -845,6 +845,11 @@ void forward_prop(NeuralNet* net, bool training) {
         case MAX_POOL:
             layer_max_pool_fp(l, net->batch_size);
             break;
+
+        case BATCH_NORM_CONV2D:
+            // add nesterov optimizer logic !!
+            layer_batch_norm_conv2D_fp(l, net->batch_size, training);
+            break;
         }
     }
 }

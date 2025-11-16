@@ -5,6 +5,7 @@
 #include "conv2D.h"
 #include "flatten.h"
 #include "max_pool.h"
+#include "batch_norm.h"
 #include "activation.h"
 #include "optimizer.h"
 #include "cost.h"
@@ -21,6 +22,7 @@ typedef enum {
     CONV_2D,
     MAX_POOL,
     FLATTEN,
+    BATCH_NORM_CONV2D,
     UNDEFINED
 } LayerType;
 
@@ -29,6 +31,7 @@ typedef union {
     ConvParams conv;
     FlattenParams flat;
     MaxPoolParams max_pool;
+    BatchNormConvParams batch_norm_conv;
 } LayerParams;
 
 typedef union {
@@ -36,6 +39,7 @@ typedef union {
     ConvCache conv;
     FlattenCache flat;
     MaxPoolCache max_pool;
+    BatchNormConvCache batch_norm_conv;
 } LayerCache;
 
 struct Layer{
@@ -63,6 +67,7 @@ void layer_output_compile(Layer* l, Cost* cost, int batch_size);
 void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int batch_size);
 void layer_flatten_compile(Layer* l, int batch_size);
 void layer_max_pool_compile(Layer* l, int batch_size);
+void layer_batch_norm_conv2D_compile(Layer* l, int batch_size);
 
 void layer_input_fp(Layer* l, Batch* train_batch, int batch_size);
 void layer_conv2D_input_fp(Layer* l, Batch* train_batch, int batch_size);
@@ -71,6 +76,7 @@ void layer_output_fp(Layer* l, Batch* label_batch, int batch_size);
 void layer_conv2D_fp(Layer* l, int batch_size);
 void layer_flatten_fp(Layer* l, int batch_size);
 void layer_max_pool_fp(Layer* l, int batch_size);
+void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training);
 
 void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size);
 void layer_dense_bp(Layer* l, int batch_size);
@@ -89,3 +95,4 @@ unsigned long layer_dense_get_sizeof_mem_allocated(Layer* l);
 unsigned long layer_conv2D_get_sizeof_mem_allocated(Layer* l);
 unsigned long layer_flatten_get_sizeof_mem_allocated(Layer* l);
 unsigned long layer_max_pool_get_sizeof_mem_allocated(Layer* l);
+unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l);
