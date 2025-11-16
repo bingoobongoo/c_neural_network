@@ -14,10 +14,10 @@ typedef struct {
     Matrix* weight;
     Matrix* bias;
     Matrix* delta;
-    Matrix* weight_gradient;
-    Matrix* bias_gradient;
+    Matrix* weight_grad;
+    Matrix* bias_grad;
     
     // auxiliary gradients
-    Matrix* dCost_dA; 
-    Matrix* dActivation_dZ;
+    Matrix* dL_dA; 
+    Matrix* dA_dZ;
 } DenseCache;

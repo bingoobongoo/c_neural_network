@@ -1,10 +1,10 @@
 #include "network.h"
 
-NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, nn_float act_param, CostType cost_type, int batch_size) {
+NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, nn_float act_param, LossType loss_type, int batch_size) {
     NeuralNet* net = (NeuralNet*)malloc(sizeof(NeuralNet));
     net->n_layers = 0;
     net->activation = activation_new(act_type, act_param);
-    net->cost = cost_new(cost_type);
+    net->loss = loss_new(loss_type);
     net->optimizer = opt;
     net->batch_score = score_new(batch_size);
     net->train_batch = NULL;
@@ -24,7 +24,7 @@ void neural_net_free(NeuralNet* net) {
     
     free(net->layers);
     free(net->activation);
-    cost_free(net->cost);
+    loss_free(net->loss);
     net->optimizer->optimizer_free(net->optimizer);
     score_free(net->batch_score);
     batch_free(net->train_batch);
@@ -58,12 +58,12 @@ void neural_net_compile(NeuralNet* net) {
         case OUTPUT: 
             layer_output_compile(
                 l,
-                net->cost,
+                net->loss,
                 net->batch_size
             );
             break;
 
-        case CONV_2D: 
+        case CONV2D: 
             layer_conv2D_compile(
                 l,
                 net->activation->type,
@@ -114,7 +114,7 @@ void neural_net_compile(NeuralNet* net) {
                     matrix_zero(mom->bias_momentum[i]);  
                     break;                  
                 }
-                case CONV_2D: {
+                case CONV2D: {
                     mom->weight_momentum[i] = tensor4D_new(
                         l->params.conv.filter_size,
                         l->params.conv.filter_size,
@@ -182,7 +182,7 @@ void neural_net_compile(NeuralNet* net) {
                     matrix_zero(ada->intermediate_b[i]);
                     break;
                 }
-                case CONV_2D: {
+                case CONV2D: {
                     ada->weight_s[i] = tensor4D_new(
                         l->params.conv.filter_size,
                         l->params.conv.filter_size,
@@ -309,7 +309,7 @@ void neural_net_compile(NeuralNet* net) {
                     matrix_zero(adam->intermediate_b[i]);
                     break;
                 }
-                case CONV_2D: {
+                case CONV2D: {
                     adam->weight_m[i] = tensor4D_new(
                         l->params.conv.filter_size, 
                         l->params.conv.filter_size,
@@ -432,7 +432,7 @@ void neural_net_info(NeuralNet* net) {
                 printf("------------------------------------------\n");
                 break;
             }
-            case CONV_2D_INPUT: {
+            case CONV2D_INPUT: {
                 l_name = "InputConv2D";
                 int out_chan = l->cache.conv.output->n_channels;
                 int out_rows = l->cache.conv.output->n_rows;
@@ -459,13 +459,13 @@ void neural_net_info(NeuralNet* net) {
                 printf("------------------------------------------\n");
                 break;
             }
-            case CONV_2D: {
+            case CONV2D: {
                 l_name = "Conv2D";
                 int out_chan = l->cache.conv.output->n_channels;
                 int out_rows = l->cache.conv.output->n_rows;
                 int out_cols = l->cache.conv.output->n_cols;
                 int filter_size = l->params.conv.filter_size;
-                int filter_chan = l->cache.conv.filter->n_channels;
+                int filter_chan = l->cache.conv.weight->n_channels;
                 int n_filters = l->params.conv.n_filters;
                 params = n_filters * (pow(filter_size, 2) * filter_chan + 1);
                 trainable_params += params;
@@ -499,7 +499,7 @@ void neural_net_info(NeuralNet* net) {
         printf("Non-trainable params: %lld\n", non_trainable_params);
         printf("Activation function: %s\n", net->activation->name);
         printf("Output activation: %s\n", net->layers[net->n_layers-1]->activation->name);
-        printf("Cost function: %s\n", net->cost->name);
+        printf("Loss function: %s\n", net->loss->name);
         printf("Layer memory allocated: %lld B\n", total_layer_mem_allocated);
         printf("------------------------------------\n");
         net->optimizer->optimizer_print_info(net->optimizer);
@@ -576,7 +576,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             batchify_matrix_into(y_train_split, start_idx, net->label_batch);
             forward_prop(net, true);
             avg_loss[i] = get_avg_batch_loss(
-                net->cost, 
+                net->loss, 
                 net->layers[net->n_layers-1]->cache.dense.output, 
                 net->label_batch->data.matrix
             );
@@ -779,7 +779,7 @@ void forward_prop(NeuralNet* net, bool training) {
             );
             break;
         
-        case CONV_2D_INPUT:
+        case CONV2D_INPUT:
             layer_conv2D_input_fp(
                 l,
                 input,
@@ -821,13 +821,13 @@ void forward_prop(NeuralNet* net, bool training) {
             layer_output_fp(l, net->label_batch, net->batch_size);
             break;
 
-        case CONV_2D:
+        case CONV2D:
             if (net->optimizer->type == NESTEROV && training) {
                 MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
                 tensor4D_add_into(
-                    l->cache.conv.filter,
+                    l->cache.conv.weight,
                     mom->weight_momentum[i],
-                    l->cache.conv.filter
+                    l->cache.conv.weight
                 );
                 matrix_add_into(
                     l->cache.conv.bias,
@@ -863,7 +863,7 @@ void back_prop(NeuralNet* net) {
         case OUTPUT: 
             layer_output_bp(
                 l,
-                net->cost,
+                net->loss,
                 net->label_batch,
                 net->batch_size
             );
@@ -873,7 +873,7 @@ void back_prop(NeuralNet* net) {
             layer_dense_bp(l, net->batch_size);
             break;
 
-        case CONV_2D:
+        case CONV2D:
             layer_conv2D_bp(l, net->batch_size);
             break;
 
@@ -886,7 +886,7 @@ void back_prop(NeuralNet* net) {
             break;
 
         case INPUT:
-        case CONV_2D_INPUT: {
+        case CONV2D_INPUT: {
             update_weights(net);
             break;
         }
@@ -908,7 +908,7 @@ void update_weights(NeuralNet* net) {
                 layer_dense_update_weights(l, net->optimizer);
                 break;
             }
-            case CONV_2D: {
+            case CONV2D: {
                 layer_conv2D_update_weights(l, net->optimizer);
                 break;                        
             }
@@ -933,13 +933,11 @@ void add_input_layer(int n_units, NeuralNet* net) {
 }
 
 void add_conv_input_layer(int n_rows, int n_cols, int n_channels, NeuralNet* net) {
-    Layer* input_l = layer_new(CONV_2D_INPUT, net);
+    Layer* input_l = layer_new(CONV2D_INPUT, net);
     input_l->params.conv.n_filters = net->batch_size;
     input_l->params.conv.filter_size = -1;
     input_l->params.conv.stride = -1;
     input_l->params.conv.n_units = n_rows * n_cols * n_channels;
-    input_l->params.conv.output_height = n_rows;
-    input_l->params.conv.output_width = n_cols;
 
     net->train_batch = batch_tensor_new(
         net->batch_size,
@@ -979,14 +977,12 @@ void add_dense_layer(int n_units, NeuralNet* net) {
 }
 
 void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net) {
-    Layer* conv_l = layer_new(CONV_2D, net);
+    Layer* conv_l = layer_new(CONV2D, net);
     conv_l->params.conv.n_filters = n_filters;
     conv_l->params.conv.filter_size = filter_size;
     conv_l->params.conv.stride = stride;
     conv_l->params.conv.n_units = -1;
     conv_l->params.conv.n_filter_channels = -1;
-    conv_l->params.conv.output_height = -1;
-    conv_l->params.conv.output_width = -1;
     net->layers[net->n_layers] = conv_l;
     conv_l->layer_idx = net->n_layers;
     net->n_layers++;
@@ -1004,8 +1000,6 @@ void add_max_pool_layer(int filter_size, int stride, NeuralNet* net) {
     max_pool_l->params.max_pool.filter_size = filter_size;
     max_pool_l->params.max_pool.stride = stride;
     max_pool_l->params.max_pool.n_units = -1;
-    max_pool_l->params.max_pool.output_width = -1;
-    max_pool_l->params.max_pool.output_height = -1;
     net->layers[net->n_layers] = max_pool_l;
     max_pool_l->layer_idx = net->n_layers;
     net->n_layers++;
@@ -1025,9 +1019,9 @@ void debug_layers_info(NeuralNet* net) {
         {
         case DENSE: {
             l_name = "Dense";
-            min_grad = matrix_min(l->cache.dense.weight_gradient);
-            max_grad = matrix_max(l->cache.dense.weight_gradient);
-            mean_grad = matrix_average(l->cache.dense.weight_gradient);
+            min_grad = matrix_min(l->cache.dense.weight_grad);
+            max_grad = matrix_max(l->cache.dense.weight_grad);
+            mean_grad = matrix_average(l->cache.dense.weight_grad);
             min_weight = matrix_min(l->cache.dense.weight);
             max_weight = matrix_max(l->cache.dense.weight);
             mean_weight = matrix_average(l->cache.dense.weight);
@@ -1040,9 +1034,9 @@ void debug_layers_info(NeuralNet* net) {
         }
         case OUTPUT: {
             l_name = "Output";
-            min_grad = matrix_min(l->cache.dense.weight_gradient);
-            max_grad = matrix_max(l->cache.dense.weight_gradient);
-            mean_grad = matrix_average(l->cache.dense.weight_gradient);
+            min_grad = matrix_min(l->cache.dense.weight_grad);
+            max_grad = matrix_max(l->cache.dense.weight_grad);
+            mean_grad = matrix_average(l->cache.dense.weight_grad);
             min_weight = matrix_min(l->cache.dense.weight);
             max_weight = matrix_max(l->cache.dense.weight);
             mean_weight = matrix_average(l->cache.dense.weight);
@@ -1053,14 +1047,14 @@ void debug_layers_info(NeuralNet* net) {
             printf("--------------------------------------------------------------------------------------------------------------------\n");
             break;            
         }
-        case CONV_2D: {
+        case CONV2D: {
             l_name = "Conv2D";
-            min_grad = tensor4D_min(l->cache.conv.filter_gradient);
-            max_grad = tensor4D_max(l->cache.conv.filter_gradient);
-            mean_grad = tensor4D_average(l->cache.conv.filter_gradient);
-            min_weight = tensor4D_min(l->cache.conv.filter);
-            max_weight = tensor4D_max(l->cache.conv.filter);
-            mean_weight = tensor4D_average(l->cache.conv.filter);
+            min_grad = tensor4D_min(l->cache.conv.weight_grad);
+            max_grad = tensor4D_max(l->cache.conv.weight_grad);
+            mean_grad = tensor4D_average(l->cache.conv.weight_grad);
+            min_weight = tensor4D_min(l->cache.conv.weight);
+            max_weight = tensor4D_max(l->cache.conv.weight);
+            mean_weight = tensor4D_average(l->cache.conv.weight);
             min_act = tensor4D_min(l->cache.conv.output);
             max_act = tensor4D_max(l->cache.conv.output);
             mean_act = tensor4D_average(l->cache.conv.output);

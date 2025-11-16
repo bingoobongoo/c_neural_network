@@ -15,12 +15,12 @@ void layer_free(Layer* l) {
     switch (l->l_type)
     {
     case INPUT:
-    case CONV_2D_INPUT:
+    case CONV2D_INPUT:
         free(l);
         return;
         break;
     
-    case CONV_2D:
+    case CONV2D:
         if (l->cache.conv.output != NULL) {
             tensor4D_free(l->cache.conv.output);
             l->cache.conv.output = NULL;
@@ -29,13 +29,13 @@ void layer_free(Layer* l) {
             tensor4D_free(l->cache.conv.z);
             l->cache.conv.z = NULL;
         }
-        if (l->cache.conv.filter != NULL) {
-            tensor4D_free(l->cache.conv.filter);
-            l->cache.conv.filter = NULL;
+        if (l->cache.conv.weight != NULL) {
+            tensor4D_free(l->cache.conv.weight);
+            l->cache.conv.weight = NULL;
         }
-        if (l->cache.conv.filter_flip != NULL) {
-            tensor4D_free(l->cache.conv.filter_flip);
-            l->cache.conv.filter_flip = NULL;
+        if (l->cache.conv.weight_flip != NULL) {
+            tensor4D_free(l->cache.conv.weight_flip);
+            l->cache.conv.weight_flip = NULL;
         }
         if (l->cache.conv.bias != NULL) {
             matrix_free(l->cache.conv.bias);
@@ -45,21 +45,21 @@ void layer_free(Layer* l) {
             tensor4D_free(l->cache.conv.delta);
             l->cache.conv.delta = NULL;
         }
-        if (l->cache.conv.filter_gradient != NULL) {
-            tensor4D_free(l->cache.conv.filter_gradient);
-            l->cache.conv.filter_gradient = NULL;
+        if (l->cache.conv.weight_grad != NULL) {
+            tensor4D_free(l->cache.conv.weight_grad);
+            l->cache.conv.weight_grad = NULL;
         }
-        if (l->cache.conv.bias_gradient != NULL) {
-            matrix_free(l->cache.conv.bias_gradient);
-            l->cache.conv.bias_gradient = NULL;
+        if (l->cache.conv.bias_grad != NULL) {
+            matrix_free(l->cache.conv.bias_grad);
+            l->cache.conv.bias_grad = NULL;
         }
-        if (l->cache.conv.dCost_dA != NULL) {
-            tensor4D_free(l->cache.conv.dCost_dA);
-            l->cache.conv.dCost_dA = NULL;
+        if (l->cache.conv.dL_dA != NULL) {
+            tensor4D_free(l->cache.conv.dL_dA);
+            l->cache.conv.dL_dA = NULL;
         }
-        if (l->cache.conv.dActivation_dZ != NULL) {
-            tensor4D_free(l->cache.conv.dActivation_dZ);
-            l->cache.conv.dActivation_dZ = NULL;
+        if (l->cache.conv.dA_dZ != NULL) {
+            tensor4D_free(l->cache.conv.dA_dZ);
+            l->cache.conv.dA_dZ = NULL;
         }
         if (l->cache.conv.padding != NULL) {
             tensor4D_free(l->cache.conv.padding);
@@ -77,21 +77,21 @@ void layer_free(Layer* l) {
             tensor3D_free(l->cache.conv.fp_im2col_output);
             l->cache.conv.fp_im2col_output = NULL;
         }
-        if (l->cache.conv.dCost_dW_im2col_input != NULL) {
-            tensor3D_free(l->cache.conv.dCost_dW_im2col_input);
-            l->cache.conv.dCost_dW_im2col_input = NULL;
+        if (l->cache.conv.dL_dW_im2col_input != NULL) {
+            tensor3D_free(l->cache.conv.dL_dW_im2col_input);
+            l->cache.conv.dL_dW_im2col_input = NULL;
         }
-        if (l->cache.conv.dCost_dW_im2col_kernel != NULL) {
-            tensor3D_free(l->cache.conv.dCost_dW_im2col_kernel);
-            l->cache.conv.dCost_dW_im2col_kernel = NULL;
+        if (l->cache.conv.dL_dW_im2col_kernel != NULL) {
+            tensor3D_free(l->cache.conv.dL_dW_im2col_kernel);
+            l->cache.conv.dL_dW_im2col_kernel = NULL;
         }
-        if (l->cache.conv.dCost_dW_im2col_output != NULL) {
-            tensor3D_free(l->cache.conv.dCost_dW_im2col_output);
-            l->cache.conv.dCost_dW_im2col_output = NULL;
+        if (l->cache.conv.dL_dW_im2col_output != NULL) {
+            tensor3D_free(l->cache.conv.dL_dW_im2col_output);
+            l->cache.conv.dL_dW_im2col_output = NULL;
         }
-        if (l->cache.conv.dCost_dW_im2col_output_sum != NULL) {
-            matrix_free(l->cache.conv.dCost_dW_im2col_output_sum);
-            l->cache.conv.dCost_dW_im2col_output_sum = NULL;
+        if (l->cache.conv.dL_dW_im2col_output_sum != NULL) {
+            matrix_free(l->cache.conv.dL_dW_im2col_output_sum);
+            l->cache.conv.dL_dW_im2col_output_sum = NULL;
         }
         if (l->cache.conv.delta_im2col_input != NULL) {
             tensor3D_free(l->cache.conv.delta_im2col_input);
@@ -129,21 +129,21 @@ void layer_free(Layer* l) {
             matrix_free(l->cache.dense.delta);
             l->cache.dense.delta = NULL;
         }
-        if (l->cache.dense.weight_gradient != NULL) {
-            matrix_free(l->cache.dense.weight_gradient);
-            l->cache.dense.weight_gradient = NULL;
+        if (l->cache.dense.weight_grad != NULL) {
+            matrix_free(l->cache.dense.weight_grad);
+            l->cache.dense.weight_grad = NULL;
         }
-        if (l->cache.dense.bias_gradient != NULL) {
-            matrix_free(l->cache.dense.bias_gradient);
-            l->cache.dense.bias_gradient = NULL;
+        if (l->cache.dense.bias_grad != NULL) {
+            matrix_free(l->cache.dense.bias_grad);
+            l->cache.dense.bias_grad = NULL;
         }
-        if (l->cache.dense.dCost_dA != NULL) {
-            matrix_free(l->cache.dense.dCost_dA);
-            l->cache.dense.dCost_dA = NULL;
+        if (l->cache.dense.dL_dA != NULL) {
+            matrix_free(l->cache.dense.dL_dA);
+            l->cache.dense.dL_dA = NULL;
         }
-        if (l->cache.dense.dActivation_dZ != NULL) {
-            matrix_free(l->cache.dense.dActivation_dZ);
-            l->cache.dense.dActivation_dZ = NULL;
+        if (l->cache.dense.dA_dZ != NULL) {
+            matrix_free(l->cache.dense.dA_dZ);
+            l->cache.dense.dA_dZ = NULL;
         }
         break;
 
@@ -152,9 +152,9 @@ void layer_free(Layer* l) {
             matrix_free(l->cache.flat.output);
             l->cache.flat.output = NULL;
         }
-        if (l->cache.flat.dCost_dA_matrix != NULL) {
-            matrix_free(l->cache.flat.dCost_dA_matrix);
-            l->cache.flat.dCost_dA_matrix = NULL;
+        if (l->cache.flat.delta != NULL) {
+            matrix_free(l->cache.flat.delta);
+            l->cache.flat.delta = NULL;
         }
         break;
 
@@ -174,45 +174,45 @@ void layer_free(Layer* l) {
         break;
 
     case BATCH_NORM_CONV2D:
-        if (l->cache.batch_norm_conv.output != NULL) {
-            tensor4D_free(l->cache.batch_norm_conv.output);
-            l->cache.batch_norm_conv.output = NULL;
+        if (l->cache.bn_conv.output != NULL) {
+            tensor4D_free(l->cache.bn_conv.output);
+            l->cache.bn_conv.output = NULL;
         }
-        if (l->cache.batch_norm_conv.x_normalized != NULL) {
-            tensor4D_free(l->cache.batch_norm_conv.x_normalized);
-            l->cache.batch_norm_conv.x_normalized = NULL;
+        if (l->cache.bn_conv.x_normalized != NULL) {
+            tensor4D_free(l->cache.bn_conv.x_normalized);
+            l->cache.bn_conv.x_normalized = NULL;
         }
-        if (l->cache.batch_norm_conv.mean != NULL) {
-            matrix_free(l->cache.batch_norm_conv.mean);
-            l->cache.batch_norm_conv.mean = NULL;
+        if (l->cache.bn_conv.mean != NULL) {
+            matrix_free(l->cache.bn_conv.mean);
+            l->cache.bn_conv.mean = NULL;
         }
-        if (l->cache.batch_norm_conv.variance != NULL) {
-            matrix_free(l->cache.batch_norm_conv.variance);
-            l->cache.batch_norm_conv.variance = NULL;
+        if (l->cache.bn_conv.variance != NULL) {
+            matrix_free(l->cache.bn_conv.variance);
+            l->cache.bn_conv.variance = NULL;
         }
-        if (l->cache.batch_norm_conv.running_mean != NULL) {
-            matrix_free(l->cache.batch_norm_conv.running_mean);
-            l->cache.batch_norm_conv.running_mean = NULL;
+        if (l->cache.bn_conv.running_mean != NULL) {
+            matrix_free(l->cache.bn_conv.running_mean);
+            l->cache.bn_conv.running_mean = NULL;
         }
-        if (l->cache.batch_norm_conv.running_variance != NULL) {
-            matrix_free(l->cache.batch_norm_conv.running_variance);
-            l->cache.batch_norm_conv.running_variance = NULL;
+        if (l->cache.bn_conv.running_variance != NULL) {
+            matrix_free(l->cache.bn_conv.running_variance);
+            l->cache.bn_conv.running_variance = NULL;
         }
-        if (l->cache.batch_norm_conv.gamma != NULL) {
-            matrix_free(l->cache.batch_norm_conv.gamma);
-            l->cache.batch_norm_conv.gamma = NULL;
+        if (l->cache.bn_conv.gamma != NULL) {
+            matrix_free(l->cache.bn_conv.gamma);
+            l->cache.bn_conv.gamma = NULL;
         }
-        if (l->cache.batch_norm_conv.beta != NULL) {
-            matrix_free(l->cache.batch_norm_conv.beta);
-            l->cache.batch_norm_conv.beta = NULL;
+        if (l->cache.bn_conv.beta != NULL) {
+            matrix_free(l->cache.bn_conv.beta);
+            l->cache.bn_conv.beta = NULL;
         }
-        if (l->cache.batch_norm_conv.gamma_grad != NULL) {
-            matrix_free(l->cache.batch_norm_conv.gamma_grad);
-            l->cache.batch_norm_conv.gamma_grad = NULL;
+        if (l->cache.bn_conv.gamma_grad != NULL) {
+            matrix_free(l->cache.bn_conv.gamma_grad);
+            l->cache.bn_conv.gamma_grad = NULL;
         }
-        if (l->cache.batch_norm_conv.beta_grad != NULL) {
-            matrix_free(l->cache.batch_norm_conv.beta_grad);
-            l->cache.batch_norm_conv.beta_grad = NULL;
+        if (l->cache.bn_conv.beta_grad != NULL) {
+            matrix_free(l->cache.bn_conv.beta_grad);
+            l->cache.bn_conv.beta_grad = NULL;
         }
         break;
     }
@@ -234,8 +234,8 @@ int layer_get_n_units(Layer* l) {
         return l->params.dense.n_units;
         break;
     
-    case CONV_2D_INPUT:
-    case CONV_2D:
+    case CONV2D_INPUT:
+    case CONV2D:
         return l->params.conv.n_units;
         break;
 
@@ -248,7 +248,7 @@ int layer_get_n_units(Layer* l) {
         break;
 
     case BATCH_NORM_CONV2D:
-        return l->params.batch_norm_conv.n_units;
+        return l->params.bn_conv.n_units;
         break;
     }
 
@@ -277,8 +277,8 @@ Matrix* layer_get_output_matrix(Layer* l) {
 Tensor4D* layer_get_output_tensor4D(Layer* l) {
     switch (l->l_type)
     {
-    case CONV_2D_INPUT:
-    case CONV_2D:
+    case CONV2D_INPUT:
+    case CONV2D:
         return l->cache.conv.output;
         break;
 
@@ -287,7 +287,7 @@ Tensor4D* layer_get_output_tensor4D(Layer* l) {
         break;
     
     case BATCH_NORM_CONV2D:
-        return l->cache.batch_norm_conv.output;
+        return l->cache.bn_conv.output;
         break;
     
     default:
@@ -305,7 +305,7 @@ Matrix* layer_get_delta_matrix(Layer* l) {
         break;
     
     case FLATTEN:
-        return l->cache.flat.dCost_dA_matrix;
+        return l->cache.flat.delta;
         break;
     
     default:
@@ -316,7 +316,7 @@ Matrix* layer_get_delta_matrix(Layer* l) {
 Tensor4D* layer_get_delta_tensor4D(Layer* l) {
     switch (l->l_type)
     {
-    case CONV_2D:
+    case CONV2D:
         return l->cache.conv.delta;
         break;
 
@@ -342,7 +342,7 @@ unsigned int layer_get_sizeof_mem_allocated(Layer* l) {
             size = layer_dense_get_sizeof_mem_allocated(l);
             break;
         
-        case CONV_2D:
+        case CONV2D:
             size = layer_conv2D_get_sizeof_mem_allocated(l);
             break;
         
@@ -387,19 +387,19 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
         batch_size,
         layer_get_n_units(l)
     );
-    l->cache.dense.weight_gradient = matrix_new(
+    l->cache.dense.weight_grad = matrix_new(
         layer_get_n_units(l->prev_layer),
         layer_get_n_units(l)
     );
-    l->cache.dense.bias_gradient = matrix_new(
+    l->cache.dense.bias_grad = matrix_new(
         1,
         layer_get_n_units(l)
     );
-    l->cache.dense.dCost_dA = matrix_new(
+    l->cache.dense.dL_dA = matrix_new(
         batch_size,
         layer_get_n_units(l)
     );
-    l->cache.dense.dActivation_dZ = matrix_new(
+    l->cache.dense.dA_dZ = matrix_new(
         batch_size,
         layer_get_n_units(l)
     );
@@ -459,7 +459,7 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
     }
 }
 
-void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
+void layer_output_compile(Layer* l, Loss* loss, int batch_size) {
     if (layer_get_n_units(l) == 1)
         l->activation = activation_new(SIGMOID, (nn_float)0.0);
     if (layer_get_n_units(l) > 1)
@@ -469,7 +469,7 @@ void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
         layer_get_n_units(l)
     );
 
-    cost->loss_m = matrix_new(batch_size, layer_get_n_units(l));
+    loss->loss_m = matrix_new(batch_size, layer_get_n_units(l));
 
     l->cache.dense.weight = matrix_new(
         layer_get_n_units(l->prev_layer),
@@ -491,19 +491,19 @@ void layer_output_compile(Layer* l, Cost* cost, int batch_size) {
         batch_size,
         layer_get_n_units(l)
     );
-    l->cache.dense.weight_gradient = matrix_new(
+    l->cache.dense.weight_grad = matrix_new(
         layer_get_n_units(l->prev_layer),
         layer_get_n_units(l)
     );
-    l->cache.dense.bias_gradient = matrix_new(
+    l->cache.dense.bias_grad = matrix_new(
         1,
         layer_get_n_units(l)
     );
-    l->cache.dense.dCost_dA = matrix_new(
+    l->cache.dense.dL_dA = matrix_new(
         batch_size,
         layer_get_n_units(l)
     );
-    l->cache.dense.dActivation_dZ = matrix_new(
+    l->cache.dense.dA_dZ = matrix_new(
         batch_size,
         layer_get_n_units(l)
     );
@@ -551,20 +551,18 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     int output_width = floor((input_width - filter_width) / stride) + 1;
 
     l->params.conv.n_filter_channels = input_channels;
-    l->params.conv.output_height = output_height;
-    l->params.conv.output_width = output_width;
 
     l->activation = activation_new(
         act_type,
         act_param
     );
-    l->cache.conv.filter = tensor4D_new(
+    l->cache.conv.weight = tensor4D_new(
         l->params.conv.filter_size,
         l->params.conv.filter_size,
         l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
-    l->cache.conv.filter_flip = tensor4D_new(
+    l->cache.conv.weight_flip = tensor4D_new(
     l->params.conv.filter_size,
     l->params.conv.filter_size,
     l->params.conv.n_filter_channels,
@@ -592,23 +590,23 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         l->params.conv.n_filters,
         batch_size
     );
-    l->cache.conv.filter_gradient = tensor4D_new(
+    l->cache.conv.weight_grad = tensor4D_new(
         l->params.conv.filter_size,
         l->params.conv.filter_size,
         l->params.conv.n_filter_channels,
         l->params.conv.n_filters
     );
-    l->cache.conv.bias_gradient = matrix_new(
+    l->cache.conv.bias_grad = matrix_new(
         1,
         l->params.conv.n_filters
     );
-    l->cache.conv.dCost_dA = tensor4D_new(
+    l->cache.conv.dL_dA = tensor4D_new(
         output_height,
         output_width,
         l->params.conv.n_filters,
         batch_size
     );
-    l->cache.conv.dActivation_dZ = tensor4D_new(
+    l->cache.conv.dA_dZ = tensor4D_new(
         output_height,
         output_width,
         l->params.conv.n_filters,
@@ -639,22 +637,22 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         output_height * output_width,
         batch_size
     );
-    l->cache.conv.dCost_dW_im2col_input = tensor3D_new(
+    l->cache.conv.dL_dW_im2col_input = tensor3D_new(
         output_height * output_width,
         filter_height * filter_width * l->params.conv.n_filter_channels,
         batch_size
     );
-    l->cache.conv.dCost_dW_im2col_kernel = tensor3D_new(
+    l->cache.conv.dL_dW_im2col_kernel = tensor3D_new(
         output_height * output_width,
         l->params.conv.n_filters,
         batch_size
     );
-    l->cache.conv.dCost_dW_im2col_output = tensor3D_new(
+    l->cache.conv.dL_dW_im2col_output = tensor3D_new(
         l->params.conv.n_filters,
         filter_height * filter_width * l->params.conv.n_filter_channels,
         batch_size
     );
-    l->cache.conv.dCost_dW_im2col_output_sum = matrix_new(
+    l->cache.conv.dL_dW_im2col_output_sum = matrix_new(
         l->params.conv.n_filters,
         filter_height * filter_width * l->params.conv.n_filter_channels
     );
@@ -686,7 +684,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         #ifdef SINGLE_PRECISION
 
         tensor4D_fill_normal_distribution(
-            l->cache.conv.filter,
+            l->cache.conv.weight,
             (nn_float)0.0,
             sqrtf((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
         );
@@ -695,7 +693,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         #ifdef DOUBLE_PRECISION
 
         tensor4D_fill_normal_distribution(
-            l->cache.conv.filter,
+            l->cache.conv.weight,
             (nn_float)0.0,
             sqrt((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
         );
@@ -709,7 +707,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         #ifdef SINGLE_PRECISION
 
         tensor4D_fill_normal_distribution(
-            l->cache.conv.filter,
+            l->cache.conv.weight,
             (nn_float)0.0,
             sqrtf((nn_float)2.0/layer_get_n_units(l->prev_layer))
         );
@@ -718,7 +716,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         #ifdef DOUBLE_PRECISION
 
         tensor4D_fill_normal_distribution(
-            l->cache.conv.filter,
+            l->cache.conv.weight,
             (nn_float)0.0,
             sqrt((nn_float)2.0/layer_get_n_units(l->prev_layer))
         );
@@ -734,7 +732,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     
     #ifdef IM2COL_CONV
     kernel_into_im2col_fwise(
-        l->cache.conv.filter,
+        l->cache.conv.weight,
         false,
         l->cache.conv.fp_im2col_kernel
     );
@@ -742,15 +740,15 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
 }
 
 void layer_flatten_compile(Layer* l, int batch_size) {
-    int prev_chan = layer_get_output_tensor4D(l->prev_layer)->n_channels;
-    int prev_rows = layer_get_output_tensor4D(l->prev_layer)->n_rows;
-    int prev_cols = layer_get_output_tensor4D(l->prev_layer)->n_cols;
-    l->params.flat.n_units = prev_chan * prev_rows * prev_cols;
+    int input_channels = layer_get_output_tensor4D(l->prev_layer)->n_channels;
+    int input_height = layer_get_output_tensor4D(l->prev_layer)->n_rows;
+    int input_width = layer_get_output_tensor4D(l->prev_layer)->n_cols;
+    l->params.flat.n_units = input_channels * input_height * input_width;
     l->cache.flat.output = matrix_new(
         batch_size,
         layer_get_n_units(l)
     );
-    l->cache.flat.dCost_dA_matrix = matrix_new(
+    l->cache.flat.delta = matrix_new(
         batch_size,
         layer_get_n_units(l)
     );
@@ -765,9 +763,6 @@ void layer_max_pool_compile(Layer* l, int batch_size) {
     int stride = l->params.max_pool.stride;
     int output_height = floor((input_height - filter_height) / stride) + 1;
     int output_width = floor((input_width - filter_width) / stride) + 1;
-
-    l->params.max_pool.output_height = output_height;
-    l->params.max_pool.output_width = output_width;
 
     l->cache.max_pool.output = tensor4D_new(
         output_height,
@@ -788,8 +783,6 @@ void layer_max_pool_compile(Layer* l, int batch_size) {
         batch_size
     );
 
-    l->cache.max_pool.dCost_dA = l->cache.max_pool.delta;
-
     l->params.max_pool.n_units = 
         l->cache.max_pool.output->n_rows *
         l->cache.max_pool.output->n_cols *
@@ -805,59 +798,59 @@ void layer_batch_norm_conv2D_compile(Layer* l, int batch_size) {
     int output_channels = input_channels;
     int output_filters = batch_size;
 
-    l->params.batch_norm_conv.output_height = output_height;
-    l->params.batch_norm_conv.output_width = output_width;
-    l->params.batch_norm_conv.output_channels = output_channels;
-    l->params.batch_norm_conv.output_filters = output_filters;
-    l->params.batch_norm_conv.n_units = output_height * output_width * output_channels;
+    l->params.bn_conv.output_height = output_height;
+    l->params.bn_conv.output_width = output_width;
+    l->params.bn_conv.output_channels = output_channels;
+    l->params.bn_conv.output_filters = output_filters;
+    l->params.bn_conv.n_units = output_height * output_width * output_channels;
 
-    l->cache.batch_norm_conv.output = tensor4D_new(
+    l->cache.bn_conv.output = tensor4D_new(
         output_height,
         output_width,
         output_channels,
         output_filters
     );
-    l->cache.batch_norm_conv.delta = tensor4D_new(
+    l->cache.bn_conv.delta = tensor4D_new(
         output_height,
         output_width,
         output_channels,
         output_filters
     );
-    l->cache.batch_norm_conv.x_normalized = tensor4D_new(
+    l->cache.bn_conv.x_normalized = tensor4D_new(
         input_height,
         input_width,
         input_channels,
         batch_size
     );
-    l->cache.batch_norm_conv.mean = matrix_new(
+    l->cache.bn_conv.mean = matrix_new(
         1,
         input_channels
     );
-    l->cache.batch_norm_conv.variance = matrix_new(
+    l->cache.bn_conv.variance = matrix_new(
         1,
         input_channels
     );
-    l->cache.batch_norm_conv.running_mean = matrix_new(
+    l->cache.bn_conv.running_mean = matrix_new(
         1,
         input_channels
     );
-    l->cache.batch_norm_conv.running_variance = matrix_new(
+    l->cache.bn_conv.running_variance = matrix_new(
         1,
         input_channels
     );
-    l->cache.batch_norm_conv.gamma = matrix_new(
+    l->cache.bn_conv.gamma = matrix_new(
         1,
         input_channels
     );
-    l->cache.batch_norm_conv.beta = matrix_new(
+    l->cache.bn_conv.beta = matrix_new(
         1,
         input_channels
     );
-    l->cache.batch_norm_conv.gamma_grad = matrix_new(
+    l->cache.bn_conv.gamma_grad = matrix_new(
         1,
         input_channels
     );
-    l->cache.batch_norm_conv.beta_grad = matrix_new(
+    l->cache.bn_conv.beta_grad = matrix_new(
         1,
         input_channels
     );
@@ -899,7 +892,7 @@ void layer_output_fp(Layer* l, Batch* label_batch, int batch_size) {
 
 void layer_conv2D_fp(Layer* l, int batch_size) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
-    Tensor4D* filter = l->cache.conv.filter;
+    Tensor4D* weight = l->cache.conv.weight;
     Tensor4D* z = l->cache.conv.z;
     Matrix* bias = l->cache.conv.bias;
     Tensor4D* output = l->cache.conv.output;
@@ -917,7 +910,7 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
         input_into_im2col_fwise(
             input,
             n,
-            filter,
+            weight,
             l->params.conv.stride,
             0,
             im2col_input
@@ -930,12 +923,12 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
             true
         );
 
-        for (int i=0; i<filter->n_filters; i++) {
+        for (int i=0; i<weight->n_filters; i++) {
             nn_float* src = im2col_output->entries + i*out_size;
             nn_float* dst = z->filters[n]->channels[i]->entries;
             memcpy(dst, src, out_size*sizeof(nn_float));
         }
-        for (int i=0; i<filter->n_filters; i++) {
+        for (int i=0; i<weight->n_filters; i++) {
             matrix_add_scalar_inplace(
                 matrix_get(bias, 0, i),
                 z->filters[n]->channels[i]
@@ -952,11 +945,11 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
 
     #pragma omp parallel for collapse(2) schedule(static)
     for (int n=0; n<batch_size; n++) {
-        for (int i=0; i<filter->n_filters; i++) {
+        for (int i=0; i<weight->n_filters; i++) {
             matrix_zero(z->filters[n]->channels[i]);
             tensor3D_acc_correlate_into(
                 input->filters[n],
-                filter->filters[i],
+                weight->filters[i],
                 z->filters[n]->channels[i],
                 l->params.conv.stride,
                 VALID
@@ -1011,9 +1004,9 @@ void layer_max_pool_fp(Layer* l, int batch_size) {
 
 void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
-    Tensor4D* input_normalized = l->cache.batch_norm_conv.x_normalized;
-    Tensor4D* output = l->cache.batch_norm_conv.output;
-    nn_float momentum = l->params.batch_norm_conv.momentum;
+    Tensor4D* input_normalized = l->cache.bn_conv.x_normalized;
+    Tensor4D* output = l->cache.bn_conv.output;
+    nn_float momentum = l->params.bn_conv.momentum;
 
     if (training) {
         // per-channel mean calculations
@@ -1025,17 +1018,17 @@ void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
             }
 
             nn_float mean = sum / (input->n_filters * input->n_rows * input->n_cols);
-            matrix_assign(l->cache.batch_norm_conv.mean, 0, c, mean);
+            matrix_assign(l->cache.bn_conv.mean, 0, c, mean);
 
             // running mean calculations
-            nn_float running_mean = matrix_get(l->cache.batch_norm_conv.running_mean, 0, c);
+            nn_float running_mean = matrix_get(l->cache.bn_conv.running_mean, 0, c);
             running_mean = momentum * mean + ((nn_float)1.0 - momentum) * running_mean;
-            matrix_assign(l->cache.batch_norm_conv.running_mean, 0, c, running_mean);
+            matrix_assign(l->cache.bn_conv.running_mean, 0, c, running_mean);
         }
 
         // per-channel variance calculations
         for (int c=0; c<input->n_channels; c++) {
-            nn_float mean = matrix_get(l->cache.batch_norm_conv.mean, 0, c);
+            nn_float mean = matrix_get(l->cache.bn_conv.mean, 0, c);
             nn_float sum = (nn_float)0.0;
 
             for (int n=0; n<input->n_filters; n++) {
@@ -1048,12 +1041,12 @@ void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
             }
 
             nn_float channel_var = sum / (input->n_filters * input->n_rows * input->n_cols);
-            matrix_assign(l->cache.batch_norm_conv.variance, 0, c, channel_var);
+            matrix_assign(l->cache.bn_conv.variance, 0, c, channel_var);
 
             // running variance calculations
-            nn_float running_var = matrix_get(l->cache.batch_norm_conv.running_variance, 0, c);
+            nn_float running_var = matrix_get(l->cache.bn_conv.running_variance, 0, c);
             running_var = momentum * channel_var + ((nn_float)1.0 - momentum) * running_var;
-            matrix_assign(l->cache.batch_norm_conv.running_variance, 0, c, running_var);
+            matrix_assign(l->cache.bn_conv.running_variance, 0, c, running_var);
         }
     }
     
@@ -1062,16 +1055,16 @@ void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
         for (int c=0; c<input->n_channels; c++) {
             nn_float mean, var;
             if (training) {
-                mean = matrix_get(l->cache.batch_norm_conv.mean, 0, c);
-                var = matrix_get(l->cache.batch_norm_conv.variance, 0, c);
+                mean = matrix_get(l->cache.bn_conv.mean, 0, c);
+                var = matrix_get(l->cache.bn_conv.variance, 0, c);
             }
             else {
-                mean = matrix_get(l->cache.batch_norm_conv.running_mean, 0, c);
-                var = matrix_get(l->cache.batch_norm_conv.running_variance, 0, c);
+                mean = matrix_get(l->cache.bn_conv.running_mean, 0, c);
+                var = matrix_get(l->cache.bn_conv.running_variance, 0, c);
             }
 
-            nn_float gamma = matrix_get(l->cache.batch_norm_conv.gamma, 0, c);
-            nn_float beta = matrix_get(l->cache.batch_norm_conv.beta, 0, c);
+            nn_float gamma = matrix_get(l->cache.bn_conv.gamma, 0, c);
+            nn_float beta = matrix_get(l->cache.bn_conv.beta, 0, c);
             nn_float inv_std;
 
             #ifdef SINGLE_PRECISION
@@ -1095,110 +1088,109 @@ void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
     }
 }
 
-void layer_output_bp(Layer* l, Cost* cost, Batch* label_batch, int batch_size) {
-    // activation gradient (dCost_dZ) calculations:
-    apply_cost_dA_into(
-        cost, 
+void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch, int batch_size) {
+    // dL_dZ calculation
+    apply_loss_dA_into(
+        loss, 
         l->cache.dense.output, 
         label_batch->data.matrix, 
-        l->cache.dense.dCost_dA
+        l->cache.dense.dL_dA
     );
 
-    // delta gradient (dCost_dZ) calculations:
+    // dL_dZ calculation
     apply_activation_dZ_into(
         l->activation, 
         l->cache.dense.z, 
-        l->cache.dense.dActivation_dZ
+        l->cache.dense.dA_dZ
     );
     matrix_multiply_into(
-        l->cache.dense.dCost_dA, 
-        l->cache.dense.dActivation_dZ, 
+        l->cache.dense.dL_dA, 
+        l->cache.dense.dA_dZ, 
         l->cache.dense.delta
     );
 
-    // weight gradient (dCost_dW) calculations:
+    // dL_dW calculation
     matrix_dot_into(
         layer_get_output_matrix(l->prev_layer), 
         l->cache.dense.delta, 
-        l->cache.dense.weight_gradient,
+        l->cache.dense.weight_grad,
         true,
         false
     );
 
-    // bias gradient (dCost_dB) calculations:
+    // dL_dB calculation
     matrix_sum_axis_into(
         l->cache.dense.delta, 
         1, 
-        l->cache.dense.bias_gradient
+        l->cache.dense.bias_grad
     );
 }
 
 void layer_dense_bp(Layer* l, int batch_size) {
-    // activation gradient (dCost_dA) calculations:
+    // dL_dA calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.dense.dCost_dA, batch_size);
+        bp_delta_from_dense(l->next_layer, l->cache.dense.dL_dA, batch_size);
     }
 
-    // delta gradient (dCost_dZ) calculations:
+    // dL_dZ calculation
     apply_activation_dZ_into(
         l->activation, 
         l->cache.dense.z, 
-        l->cache.dense.dActivation_dZ
+        l->cache.dense.dA_dZ
     );
     matrix_multiply_into(
-        l->cache.dense.dCost_dA, 
-        l->cache.dense.dActivation_dZ, 
+        l->cache.dense.dL_dA, 
+        l->cache.dense.dA_dZ, 
         l->cache.dense.delta
     );
 
-    // weight gradient (dCost_dW) calculations:
+    // dL_dW calculation
     matrix_dot_into(
         layer_get_output_matrix(l->prev_layer), 
         l->cache.dense.delta, 
-        l->cache.dense.weight_gradient,
+        l->cache.dense.weight_grad,
         true,
         false
     );
 
-    // bias gradient (dCost_dB) calculations:
+    // dL_dB calculation
     matrix_sum_axis_into(
         l->cache.dense.delta, 
         1, 
-        l->cache.dense.bias_gradient
+        l->cache.dense.bias_grad
     );
 }
 
 void layer_conv2D_bp(Layer* l, int batch_size) {
-    Tensor4D* filter = l->cache.conv.filter;
-    Tensor4D* filter_grad = l->cache.conv.filter_gradient;
-    Matrix* bias_grad = l->cache.conv.bias_gradient;
+    Tensor4D* weight = l->cache.conv.weight;
+    Tensor4D* weight_grad = l->cache.conv.weight_grad;
+    Matrix* bias_grad = l->cache.conv.bias_grad;
     Tensor4D* z = l->cache.conv.z;
-    Tensor4D* dA_dZ = l->cache.conv.dActivation_dZ;
-    Tensor4D* dCost_dA = l->cache.conv.dCost_dA;
+    Tensor4D* dA_dZ = l->cache.conv.dA_dZ;
+    Tensor4D* dL_dA = l->cache.conv.dL_dA;
     Tensor4D* delta = l->cache.conv.delta;
 
-    // activation gradient (dCost_dA) calculation
+    // dL_dA calculation
     if (l->next_layer->l_type == FLATTEN) {
-        bp_delta_from_flatten(l->next_layer, dCost_dA, batch_size);
+        bp_delta_from_flatten(l->next_layer, dL_dA, batch_size);
     }
     else if (l->next_layer->l_type == MAX_POOL) {
-        bp_delta_from_max_pool(l->next_layer, dCost_dA, batch_size);
+        bp_delta_from_max_pool(l->next_layer, dL_dA, batch_size);
     }
-    else if (l->next_layer->l_type == CONV_2D) {
-        bp_delta_from_conv2D(l->next_layer, dCost_dA, batch_size);
+    else if (l->next_layer->l_type == CONV2D) {
+        bp_delta_from_conv2D(l->next_layer, dL_dA, batch_size);
     }
 
-    // delta gradient (dCost_dZ) calculation
-
+    // dL_dZ calculation
     for (int n=0; n<batch_size; n++) {
-        for (int c=0; c<l->cache.conv.dCost_dA->n_channels; c++) {
+        for (int c=0; c<l->cache.conv.dL_dA->n_channels; c++) {
             apply_activation_dZ_into(
                 l->activation,
                 z->filters[n]->channels[c],
                 dA_dZ->filters[n]->channels[c]
             );
             matrix_multiply_into(
-                dCost_dA->filters[n]->channels[c],
+                dL_dA->filters[n]->channels[c],
                 dA_dZ->filters[n]->channels[c],
                 delta->filters[n]->channels[c]
             );
@@ -1206,25 +1198,25 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
     }
 
 
-    // filter gradient (dCost_dW) calculation
+    // dL_dW calculation
     {
         Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
         
         #ifdef IM2COL_CONV
 
-        Matrix* output_sum_mat = l->cache.conv.dCost_dW_im2col_output_sum;
+        Matrix* output_sum_mat = l->cache.conv.dL_dW_im2col_output_sum;
         matrix_zero(output_sum_mat);
 
         #pragma omp parallel for schedule(static)
         for (int n=0; n<batch_size; n++) {
-            Matrix* input_mat = l->cache.conv.dCost_dW_im2col_input->channels[n];
-            Matrix* kernel_mat = l->cache.conv.dCost_dW_im2col_kernel->channels[n];
-            Matrix* output_mat = l->cache.conv.dCost_dW_im2col_output->channels[n];
+            Matrix* input_mat = l->cache.conv.dL_dW_im2col_input->channels[n];
+            Matrix* kernel_mat = l->cache.conv.dL_dW_im2col_kernel->channels[n];
+            Matrix* output_mat = l->cache.conv.dL_dW_im2col_output->channels[n];
 
             input_into_im2col_fwise(
                 input,
                 n,
-                filter,
+                weight,
                 l->params.conv.stride,
                 0,
                 input_mat
@@ -1244,31 +1236,31 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
         }
 
         tensor3D_sum_element_wise_into(
-            l->cache.conv.dCost_dW_im2col_output,
+            l->cache.conv.dL_dW_im2col_output,
             output_sum_mat
         );
         
-        int k = filter->n_rows * filter->n_cols * filter->n_channels;
-        for (int f=0; f<filter->n_filters; f++) {
+        int k = weight->n_rows * weight->n_cols * weight->n_channels;
+        for (int f=0; f<weight->n_filters; f++) {
             nn_float* row = output_sum_mat->entries + f * k;
-            for (int c=0; c<filter->n_channels; c++) {
-                nn_float* src = row + c * filter->n_rows * filter->n_cols;
-                nn_float* dst = filter_grad->filters[f]->channels[c]->entries;
-                memcpy(dst, src, filter->n_rows * filter->n_cols * sizeof(nn_float));
+            for (int c=0; c<weight->n_channels; c++) {
+                nn_float* src = row + c * weight->n_rows * weight->n_cols;
+                nn_float* dst = weight_grad->filters[f]->channels[c]->entries;
+                memcpy(dst, src, weight->n_rows * weight->n_cols * sizeof(nn_float));
             }
         }
 
         #else
 
         #pragma omp parallel for collapse(2) schedule(static)
-        for (int i=0; i<filter->n_filters; i++) {
-            for (int j=0; j<filter->n_channels; j++) {
-                matrix_zero(filter_grad->filters[i]->channels[j]);
+        for (int i=0; i<weight->n_filters; i++) {
+            for (int j=0; j<weight->n_channels; j++) {
+                matrix_zero(weight_grad->filters[i]->channels[j]);
                 for (int n=0; n<batch_size; n++) {
                     matrix_acc_correlate_into(
                         input->filters[n]->channels[j],
                         delta->filters[n]->channels[i],
-                        filter_grad->filters[i]->channels[j],
+                        weight_grad->filters[i]->channels[j],
                         l->params.conv.stride,
                         VALID
                     );
@@ -1279,8 +1271,8 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
         #endif
     }
 
-    // bias gradient (dCost_dB) calculation
-    for (int i=0; i<filter->n_filters; i++) {
+    // dL_dB calculation
+    for (int i=0; i<weight->n_filters; i++) {
         nn_float sum = (nn_float)0.0;
         for (int n=0; n<batch_size; n++) {
             sum += matrix_sum(delta->filters[n]->channels[i]);
@@ -1290,19 +1282,19 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
 }
 
 void layer_max_pool_bp(Layer* l, int batch_size) {
-    // dCost_dZ calculation
+    // dL_dZ calculation
     if (l->next_layer->l_type == FLATTEN) {
         bp_delta_from_flatten(l->next_layer, l->cache.max_pool.delta, batch_size);     
     }
-    else if (l->next_layer->l_type == CONV_2D) {
+    else if (l->next_layer->l_type == CONV2D) {
         bp_delta_from_conv2D(l->next_layer, l->cache.max_pool.delta, batch_size);
     }
 }
 
 void layer_flatten_bp(Layer* l, int batch_size) {
-    // dCost_dA calculation
+    // dL_dZ calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.flat.dCost_dA_matrix, batch_size);
+        bp_delta_from_dense(l->next_layer, l->cache.flat.delta, batch_size);
     }
 }
 
@@ -1317,10 +1309,10 @@ void bp_delta_from_dense(Layer* from, Matrix* to, int batch_size) {
 }
 
 void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
-    Tensor4D* dCost_dA = to;
+    Tensor4D* dL_dA = to;
     Tensor4D* delta_next = from->cache.conv.delta;
-    Tensor4D* filter_next = from->cache.conv.filter;
-    Tensor4D* filter_flip_next = from->cache.conv.filter_flip;
+    Tensor4D* filter_next = from->cache.conv.weight;
+    Tensor4D* filter_flip_next = from->cache.conv.weight_flip;
     Tensor4D* padding_next = from->cache.conv.padding;
 
     #ifdef IM2COL_CONV
@@ -1350,10 +1342,10 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
         );
 
         Matrix* output_im2col_mat = from->cache.conv.delta_im2col_output->channels[n];
-        for (int c=0; c<dCost_dA->n_channels; c++) {
-            nn_float* src = output_im2col_mat->entries + c * dCost_dA->n_rows * dCost_dA->n_cols;
-            nn_float* dst = dCost_dA->filters[n]->channels[c]->entries;
-            memcpy(dst, src, dCost_dA->n_rows * dCost_dA->n_cols * sizeof(nn_float));
+        for (int c=0; c<dL_dA->n_channels; c++) {
+            nn_float* src = output_im2col_mat->entries + c * dL_dA->n_rows * dL_dA->n_cols;
+            nn_float* dst = dL_dA->filters[n]->channels[c]->entries;
+            memcpy(dst, src, dL_dA->n_rows * dL_dA->n_cols * sizeof(nn_float));
         }
     }
 
@@ -1361,13 +1353,13 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
 
     #pragma omp parallel for collapse(2) schedule(static)
     for (int n=0; n<batch_size; n++) {
-        for (int i=0; i<dCost_dA->n_channels; i++) {
-            matrix_zero(dCost_dA->filters[n]->channels[i]);
+        for (int i=0; i<dL_dA->n_channels; i++) {
+            matrix_zero(dL_dA->filters[n]->channels[i]);
             for (int f=0; f<filter_next->n_filters; f++) {
                 matrix_acc_convolve_full_into(
                     delta_next->filters[n]->channels[f],
                     filter_flip_next->filters[f]->channels[i],
-                    dCost_dA->filters[n]->channels[i],
+                    dL_dA->filters[n]->channels[i],
                     padding_next->filters[n]->channels[f]
                 );
             }
@@ -1378,7 +1370,7 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
 }
 
 void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size) {
-    Tensor4D* dCost_dA = to;
+    Tensor4D* dL_dA = to;
     Tensor4D* delta_next = layer_get_delta_tensor4D(from);
     Tensor4D* output_next = layer_get_output_tensor4D(from);
     Tensor4D_uint16* argmax = from->cache.max_pool.argmax;
@@ -1388,8 +1380,8 @@ void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size) {
     #pragma omp parallel for collapse(2) schedule(static)
     for (int n=0; n<batch_size; n++) {
         for (int c=0; c<output_next->n_channels; c++) {
-            Matrix* dCost_dA_mat = dCost_dA->filters[n]->channels[c];
-            matrix_zero(dCost_dA_mat);
+            Matrix* dL_dA_mat = dL_dA->filters[n]->channels[c];
+            matrix_zero(dL_dA_mat);
             Matrix* delta_next_mat = delta_next->filters[n]->channels[c];
             Matrix_uint16* argmax_mat = argmax->filters[n]->channels[c];
             int out_h = to->n_rows;
@@ -1403,7 +1395,7 @@ void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size) {
                     int ker_w_offset = grad_idx % filter_size;
                     int in_row = i*stride + ker_h_offset;
                     int in_col = j*stride + ker_w_offset;
-                    dCost_dA_mat->entries[in_row*out_w + in_col] +=
+                    dL_dA_mat->entries[in_row*out_w + in_col] +=
                         delta_next_mat->entries[i*out_w_next + j];
                 }
             }
@@ -1414,7 +1406,7 @@ void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size) {
 
 void bp_delta_from_flatten(Layer* from, Tensor4D* to, int batch_size) {
     matrix_into_tensor4D(
-        from->cache.flat.dCost_dA_matrix,
+        from->cache.flat.delta,
         to
     );
 }
@@ -1422,27 +1414,27 @@ void bp_delta_from_flatten(Layer* from, Tensor4D* to, int batch_size) {
 void layer_dense_update_weights(Layer* l, Optimizer* opt) {
     opt->update_dense_weights(
         l->cache.dense.weight, 
-        l->cache.dense.weight_gradient, 
+        l->cache.dense.weight_grad, 
         opt,
         l->layer_idx
     );
     opt->update_dense_bias(
         l->cache.dense.bias, 
-        l->cache.dense.bias_gradient, 
+        l->cache.dense.bias_grad, 
         opt,
         l->layer_idx
     );
 }
 
 void layer_conv2D_update_weights(Layer* l, Optimizer* opt) {
-    Tensor4D* filter = l->cache.conv.filter;
-    Tensor4D* filter_flip = l->cache.conv.filter_flip;
+    Tensor4D* weight = l->cache.conv.weight;
+    Tensor4D* weight_flip = l->cache.conv.weight_flip;
     Matrix* bias = l->cache.conv.bias;
-    Tensor4D* filter_grad = l->cache.conv.filter_gradient;
-    Matrix* bias_grad = l->cache.conv.bias_gradient;
+    Tensor4D* weight_grad = l->cache.conv.weight_grad;
+    Matrix* bias_grad = l->cache.conv.bias_grad;
     opt->update_conv_weights(
-        filter,
-        filter_grad,
+        weight,
+        weight_grad,
         opt,
         l->layer_idx
     );
@@ -1454,12 +1446,12 @@ void layer_conv2D_update_weights(Layer* l, Optimizer* opt) {
     );
 
     tensor4D_flip_into(
-        filter,
-        filter_flip
+        weight,
+        weight_flip
     );
 
     #ifdef IM2COL_CONV
-    kernel_into_im2col_fwise(filter, false, l->cache.conv.fp_im2col_kernel);
+    kernel_into_im2col_fwise(weight, false, l->cache.conv.fp_im2col_kernel);
     #endif
 }
 
@@ -1474,10 +1466,10 @@ unsigned long layer_output_get_sizeof_mem_allocated(Layer* l) {
     size += matrix_get_sizeof_mem_allocated(l->cache.dense.weight);
     size += matrix_get_sizeof_mem_allocated(l->cache.dense.bias);
     size += matrix_get_sizeof_mem_allocated(l->cache.dense.delta);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.weight_gradient);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.bias_gradient);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dCost_dA);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dActivation_dZ);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.weight_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.bias_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dL_dA);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dA_dZ);
 
     return size;
 }
@@ -1493,10 +1485,10 @@ unsigned long layer_dense_get_sizeof_mem_allocated(Layer* l) {
     size += matrix_get_sizeof_mem_allocated(l->cache.dense.weight);
     size += matrix_get_sizeof_mem_allocated(l->cache.dense.bias);
     size += matrix_get_sizeof_mem_allocated(l->cache.dense.delta);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.weight_gradient);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.bias_gradient);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dCost_dA);
-    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dActivation_dZ);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.weight_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.bias_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dL_dA);
+    size += matrix_get_sizeof_mem_allocated(l->cache.dense.dA_dZ);
 
     return size;
 }
@@ -1509,21 +1501,21 @@ unsigned long layer_conv2D_get_sizeof_mem_allocated(Layer* l) {
     size += sizeof(l->cache.conv);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.output);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.z);
-    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.filter);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.weight);
     size += matrix_get_sizeof_mem_allocated(l->cache.conv.bias);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.delta);
-    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.filter_gradient);
-    size += matrix_get_sizeof_mem_allocated(l->cache.conv.bias_gradient);
-    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.dCost_dA);
-    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.dActivation_dZ);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.weight_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.conv.bias_grad);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.dL_dA);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.dA_dZ);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.conv.padding);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.fp_im2col_input);
     size += matrix_get_sizeof_mem_allocated(l->cache.conv.fp_im2col_kernel);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.fp_im2col_output);
-    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dCost_dW_im2col_input);
-    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dCost_dW_im2col_kernel);
-    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dCost_dW_im2col_output);
-    size += matrix_get_sizeof_mem_allocated(l->cache.conv.dCost_dW_im2col_output_sum);
+    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_input);
+    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_kernel);
+    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_output);
+    size += matrix_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_output_sum);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.delta_im2col_input);
     size += matrix_get_sizeof_mem_allocated(l->cache.conv.delta_im2col_kernel);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.delta_im2col_output);
@@ -1538,7 +1530,7 @@ unsigned long layer_flatten_get_sizeof_mem_allocated(Layer* l) {
     size += sizeof(l->params.flat);
     size += sizeof(l->cache.flat);
     size += matrix_get_sizeof_mem_allocated(l->cache.flat.output);
-    size += matrix_get_sizeof_mem_allocated(l->cache.flat.dCost_dA_matrix);
+    size += matrix_get_sizeof_mem_allocated(l->cache.flat.delta);
 
     return size;
 }
@@ -1551,7 +1543,6 @@ unsigned long layer_max_pool_get_sizeof_mem_allocated(Layer* l) {
     size += sizeof(l->cache.max_pool);  
     size += tensor4D_get_sizeof_mem_allocated(l->cache.max_pool.output);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.max_pool.delta);
-    size += tensor4D_get_sizeof_mem_allocated(l->cache.max_pool.dCost_dA);
     size += tensor4D_uint16_get_sizeof_mem_allocated(l->cache.max_pool.argmax);
 
     return size;
@@ -1561,18 +1552,18 @@ unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l) {
     unsigned long size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
-    size += sizeof(l->params.batch_norm_conv);
-    size += sizeof(l->cache.batch_norm_conv);
-    size += tensor4D_get_sizeof_mem_allocated(l->cache.batch_norm_conv.output);
-    size += tensor4D_get_sizeof_mem_allocated(l->cache.batch_norm_conv.x_normalized);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.mean);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.variance);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.running_mean);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.running_variance);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.gamma);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.beta);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.gamma_grad);
-    size += matrix_get_sizeof_mem_allocated(l->cache.batch_norm_conv.beta_grad);
+    size += sizeof(l->params.bn_conv);
+    size += sizeof(l->cache.bn_conv);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.output);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.x_normalized);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.mean);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.variance);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.running_mean);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.running_variance);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.gamma);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.beta);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.gamma_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.beta_grad);
 
     return size;
 }

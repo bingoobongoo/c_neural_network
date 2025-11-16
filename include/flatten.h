@@ -9,5 +9,5 @@ typedef struct {
 
 typedef struct {
     Matrix* output;
-    Matrix* dCost_dA_matrix;
+    Matrix* delta;
 } FlattenCache;
