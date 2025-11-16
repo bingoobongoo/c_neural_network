@@ -857,15 +857,15 @@ void layer_batch_norm_conv2D_compile(Layer* l, int batch_size) {
 
 }
 
-void layer_input_fp(Layer* l, Batch* train_batch, int batch_size) {
+void layer_input_fp(Layer* l, Batch* train_batch) {
     l->cache.dense.output = train_batch->data.matrix;
 }
 
-void layer_conv2D_input_fp(Layer* l, Batch* train_batch, int batch_size) {
+void layer_conv2D_input_fp(Layer* l, Batch* train_batch) {
     l->cache.conv.output = train_batch->data.tensor;
 }
 
-void layer_dense_fp(Layer* l, int batch_size) {
+void layer_dense_fp(Layer* l) {
     matrix_dot_into(layer_get_output_matrix(
         l->prev_layer), 
         l->cache.dense.weight, 
@@ -877,7 +877,7 @@ void layer_dense_fp(Layer* l, int batch_size) {
     apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
 }
 
-void layer_output_fp(Layer* l, Batch* label_batch, int batch_size) {
+void layer_output_fp(Layer* l, Batch* label_batch) {
     matrix_dot_into(layer_get_output_matrix(
         l->prev_layer), 
         l->cache.dense.weight, 
@@ -890,7 +890,7 @@ void layer_output_fp(Layer* l, Batch* label_batch, int batch_size) {
     apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
 }
 
-void layer_conv2D_fp(Layer* l, int batch_size) {
+void layer_conv2D_fp(Layer* l) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
     Tensor4D* weight = l->cache.conv.weight;
     Tensor4D* z = l->cache.conv.z;
@@ -900,7 +900,7 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
     #ifdef IM2COL_CONV
     
     #pragma omp parallel for schedule(static)
-    for (int n=0; n<batch_size; n++) {
+    for (int n=0; n<input->n_filters; n++) {
         Matrix* im2col_input = l->cache.conv.fp_im2col_input->channels[n];
         Matrix* im2col_output = l->cache.conv.fp_im2col_output->channels[n];
         int out_h = z->filters[n]->n_rows;
@@ -944,7 +944,7 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
     #else
 
     #pragma omp parallel for collapse(2) schedule(static)
-    for (int n=0; n<batch_size; n++) {
+    for (int n=0; n<input->n_filters; n++) {
         for (int i=0; i<weight->n_filters; i++) {
             matrix_zero(z->filters[n]->channels[i]);
             tensor3D_acc_correlate_into(
@@ -969,7 +969,7 @@ void layer_conv2D_fp(Layer* l, int batch_size) {
     #endif
 }
 
-void layer_flatten_fp(Layer* l, int batch_size) {
+void layer_flatten_fp(Layer* l) {
     Tensor4D* t = layer_get_output_tensor4D(l->prev_layer);
     Matrix* m = l->cache.flat.output;
     tensor4D_into_matrix_fwise(
@@ -980,7 +980,7 @@ void layer_flatten_fp(Layer* l, int batch_size) {
     );
 }
 
-void layer_max_pool_fp(Layer* l, int batch_size) {
+void layer_max_pool_fp(Layer* l) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
     Tensor4D* output = layer_get_output_tensor4D(l);
     Tensor4D_uint16* argmax = l->cache.max_pool.argmax;
@@ -989,7 +989,7 @@ void layer_max_pool_fp(Layer* l, int batch_size) {
     const int stride = l->params.max_pool.stride;
 
     #pragma omp parallel for collapse(2) schedule(static)
-    for (int n=0; n<batch_size; n++) {
+    for (int n=0; n<input->n_filters; n++) {
         for (int c=0; c<input->n_channels; c++) {
             matrix_max_pool_into(
                 input->filters[n]->channels[c],
@@ -1002,7 +1002,7 @@ void layer_max_pool_fp(Layer* l, int batch_size) {
     }
 }
 
-void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
+void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
     Tensor4D* input_normalized = l->cache.bn_conv.x_normalized;
     Tensor4D* output = l->cache.bn_conv.output;
@@ -1088,7 +1088,7 @@ void layer_batch_norm_conv2D_fp(Layer* l, int batch_size, bool training) {
     }
 }
 
-void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch, int batch_size) {
+void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch) {
     // dL_dZ calculation
     apply_loss_dA_into(
         loss, 
@@ -1126,10 +1126,10 @@ void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch, int batch_size) {
     );
 }
 
-void layer_dense_bp(Layer* l, int batch_size) {
+void layer_dense_bp(Layer* l) {
     // dL_dA calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.dense.dL_dA, batch_size);
+        bp_delta_from_dense(l->next_layer, l->cache.dense.dL_dA);
     }
 
     // dL_dZ calculation
@@ -1161,7 +1161,7 @@ void layer_dense_bp(Layer* l, int batch_size) {
     );
 }
 
-void layer_conv2D_bp(Layer* l, int batch_size) {
+void layer_conv2D_bp(Layer* l) {
     Tensor4D* weight = l->cache.conv.weight;
     Tensor4D* weight_grad = l->cache.conv.weight_grad;
     Matrix* bias_grad = l->cache.conv.bias_grad;
@@ -1172,18 +1172,18 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
 
     // dL_dA calculation
     if (l->next_layer->l_type == FLATTEN) {
-        bp_delta_from_flatten(l->next_layer, dL_dA, batch_size);
+        bp_delta_from_flatten(l->next_layer, dL_dA);
     }
     else if (l->next_layer->l_type == MAX_POOL) {
-        bp_delta_from_max_pool(l->next_layer, dL_dA, batch_size);
+        bp_delta_from_max_pool(l->next_layer, dL_dA);
     }
     else if (l->next_layer->l_type == CONV2D) {
-        bp_delta_from_conv2D(l->next_layer, dL_dA, batch_size);
+        bp_delta_from_conv2D(l->next_layer, dL_dA);
     }
 
     // dL_dZ calculation
-    for (int n=0; n<batch_size; n++) {
-        for (int c=0; c<l->cache.conv.dL_dA->n_channels; c++) {
+    for (int n=0; n<delta->n_filters; n++) {
+        for (int c=0; c<delta->n_channels; c++) {
             apply_activation_dZ_into(
                 l->activation,
                 z->filters[n]->channels[c],
@@ -1208,7 +1208,7 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
         matrix_zero(output_sum_mat);
 
         #pragma omp parallel for schedule(static)
-        for (int n=0; n<batch_size; n++) {
+        for (int n=0; n<input->n_filters; n++) {
             Matrix* input_mat = l->cache.conv.dL_dW_im2col_input->channels[n];
             Matrix* kernel_mat = l->cache.conv.dL_dW_im2col_kernel->channels[n];
             Matrix* output_mat = l->cache.conv.dL_dW_im2col_output->channels[n];
@@ -1256,7 +1256,7 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
         for (int i=0; i<weight->n_filters; i++) {
             for (int j=0; j<weight->n_channels; j++) {
                 matrix_zero(weight_grad->filters[i]->channels[j]);
-                for (int n=0; n<batch_size; n++) {
+                for (int n=0; n<delta->n_filters; n++) {
                     matrix_acc_correlate_into(
                         input->filters[n]->channels[j],
                         delta->filters[n]->channels[i],
@@ -1274,31 +1274,31 @@ void layer_conv2D_bp(Layer* l, int batch_size) {
     // dL_dB calculation
     for (int i=0; i<weight->n_filters; i++) {
         nn_float sum = (nn_float)0.0;
-        for (int n=0; n<batch_size; n++) {
+        for (int n=0; n<delta->n_filters; n++) {
             sum += matrix_sum(delta->filters[n]->channels[i]);
         }
         matrix_assign(bias_grad, 0, i, sum);
     }
 }
 
-void layer_max_pool_bp(Layer* l, int batch_size) {
+void layer_max_pool_bp(Layer* l) {
     // dL_dZ calculation
     if (l->next_layer->l_type == FLATTEN) {
-        bp_delta_from_flatten(l->next_layer, l->cache.max_pool.delta, batch_size);     
+        bp_delta_from_flatten(l->next_layer, l->cache.max_pool.delta);     
     }
     else if (l->next_layer->l_type == CONV2D) {
-        bp_delta_from_conv2D(l->next_layer, l->cache.max_pool.delta, batch_size);
+        bp_delta_from_conv2D(l->next_layer, l->cache.max_pool.delta);
     }
 }
 
-void layer_flatten_bp(Layer* l, int batch_size) {
+void layer_flatten_bp(Layer* l) {
     // dL_dZ calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.flat.delta, batch_size);
+        bp_delta_from_dense(l->next_layer, l->cache.flat.delta);
     }
 }
 
-void bp_delta_from_dense(Layer* from, Matrix* to, int batch_size) {
+void bp_delta_from_dense(Layer* from, Matrix* to) {
     matrix_dot_into(
         from->cache.dense.delta,
         from->cache.dense.weight,
@@ -1308,7 +1308,7 @@ void bp_delta_from_dense(Layer* from, Matrix* to, int batch_size) {
     );
 }
 
-void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
+void bp_delta_from_conv2D(Layer* from, Tensor4D* to) {
     Tensor4D* dL_dA = to;
     Tensor4D* delta_next = from->cache.conv.delta;
     Tensor4D* filter_next = from->cache.conv.weight;
@@ -1324,7 +1324,7 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
     );
 
     #pragma omp parallel for schedule(static)
-    for (int n=0; n<batch_size; n++) {
+    for (int n=0; n<dL_dA->n_filters; n++) {
         input_into_im2col_fwise(
             delta_next,
             n,
@@ -1352,7 +1352,7 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
     #else
 
     #pragma omp parallel for collapse(2) schedule(static)
-    for (int n=0; n<batch_size; n++) {
+    for (int n=0; n<dL_dA->n_filters; n++) {
         for (int i=0; i<dL_dA->n_channels; i++) {
             matrix_zero(dL_dA->filters[n]->channels[i]);
             for (int f=0; f<filter_next->n_filters; f++) {
@@ -1369,7 +1369,7 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to, int batch_size) {
     #endif
 }
 
-void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size) {
+void bp_delta_from_max_pool(Layer* from, Tensor4D* to) {
     Tensor4D* dL_dA = to;
     Tensor4D* delta_next = layer_get_delta_tensor4D(from);
     Tensor4D* output_next = layer_get_output_tensor4D(from);
@@ -1378,7 +1378,7 @@ void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size) {
     int stride = from->params.max_pool.stride;
 
     #pragma omp parallel for collapse(2) schedule(static)
-    for (int n=0; n<batch_size; n++) {
+    for (int n=0; n<output_next->n_filters; n++) {
         for (int c=0; c<output_next->n_channels; c++) {
             Matrix* dL_dA_mat = dL_dA->filters[n]->channels[c];
             matrix_zero(dL_dA_mat);
@@ -1404,7 +1404,7 @@ void bp_delta_from_max_pool(Layer* from, Tensor4D* to, int batch_size) {
     }
 }
 
-void bp_delta_from_flatten(Layer* from, Tensor4D* to, int batch_size) {
+void bp_delta_from_flatten(Layer* from, Tensor4D* to) {
     matrix_into_tensor4D(
         from->cache.flat.delta,
         to

@@ -774,16 +774,14 @@ void forward_prop(NeuralNet* net, bool training) {
         case INPUT:
             layer_input_fp(
                 l,
-                input,
-                net->batch_size
+                input
             );
             break;
         
         case CONV2D_INPUT:
             layer_conv2D_input_fp(
                 l,
-                input,
-                net->batch_size
+                input
             );
             break;
 
@@ -801,7 +799,7 @@ void forward_prop(NeuralNet* net, bool training) {
                     l->cache.dense.bias
                 );
             }
-            layer_dense_fp(l, net->batch_size);
+            layer_dense_fp(l);
             break;
 
         case OUTPUT:
@@ -818,7 +816,7 @@ void forward_prop(NeuralNet* net, bool training) {
                     l->cache.dense.bias
                 );
             }
-            layer_output_fp(l, net->label_batch, net->batch_size);
+            layer_output_fp(l, net->label_batch);
             break;
 
         case CONV2D:
@@ -835,20 +833,20 @@ void forward_prop(NeuralNet* net, bool training) {
                     l->cache.conv.bias
                 );
             }
-            layer_conv2D_fp(l, net->batch_size);
+            layer_conv2D_fp(l);
             break;
             
         case FLATTEN:
-            layer_flatten_fp(l, net->batch_size);
+            layer_flatten_fp(l);
             break;
         
         case MAX_POOL:
-            layer_max_pool_fp(l, net->batch_size);
+            layer_max_pool_fp(l);
             break;
 
         case BATCH_NORM_CONV2D:
             // add nesterov optimizer logic !!
-            layer_batch_norm_conv2D_fp(l, net->batch_size, training);
+            layer_batch_norm_conv2D_fp(l, training);
             break;
         }
     }
@@ -864,25 +862,24 @@ void back_prop(NeuralNet* net) {
             layer_output_bp(
                 l,
                 net->loss,
-                net->label_batch,
-                net->batch_size
+                net->label_batch
             );
             break;
         
         case DENSE:
-            layer_dense_bp(l, net->batch_size);
+            layer_dense_bp(l);
             break;
 
         case CONV2D:
-            layer_conv2D_bp(l, net->batch_size);
+            layer_conv2D_bp(l);
             break;
 
         case FLATTEN:
-            layer_flatten_bp(l, net->batch_size);
+            layer_flatten_bp(l);
             break;
 
         case MAX_POOL: 
-            layer_max_pool_bp(l, net->batch_size);
+            layer_max_pool_bp(l);
             break;
 
         case INPUT:
