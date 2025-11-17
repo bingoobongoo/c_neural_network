@@ -80,6 +80,15 @@ void neural_net_compile(NeuralNet* net) {
                 net->batch_size
             );
             break;
+        
+        case BATCH_NORM_DENSE:
+            layer_batch_norm_dense_compile(
+                l,
+                net->activation->type,
+                net->activation->activation_param,
+                net->batch_size
+            );
+            break;
 
         case FLATTEN: 
             layer_flatten_compile(l, net->batch_size);
@@ -622,6 +631,14 @@ void neural_net_info(NeuralNet* net) {
                 printf("------------------------------------------\n");
                 break;
             }
+            case BATCH_NORM_DENSE: {
+                l_name = "BatchNormDense";
+                params = 2 * n_units;
+                trainable_params += params;
+                printf("%d  %s  %d  (%d x %d)  %lld\n", i, l_name, n_units, batch_size, n_units, params);
+                printf("------------------------------------------\n");
+                break;
+            }
             default:
                 l_name = "Undefined";
                 break;
@@ -630,11 +647,31 @@ void neural_net_info(NeuralNet* net) {
         printf("Trainable params: %lld\n", trainable_params);
         printf("Non-trainable params: %lld\n", non_trainable_params);
         printf("Activation function: %s\n", net->activation->name);
+        #ifdef SINGLE_PRECISION
+        printf("Numeric precision: float32\n");
+        #endif
+        #ifdef DOUBLE_PRECISION
+        printf("Numeric precision: float64\n");
+        #endif
         printf("Output activation: %s\n", net->layers[net->n_layers-1]->activation->name);
         printf("Loss function: %s\n", net->loss->name);
         printf("Layer memory allocated: %lld B\n", total_layer_mem_allocated);
         printf("------------------------------------\n");
         net->optimizer->optimizer_print_info(net->optimizer);
+        printf("Optimizations:\n");
+        #ifdef BLAS
+        printf("BLAS\n");
+        #endif
+        #ifdef IM2COL_CONV
+        printf("IM2COL\n");
+        #endif
+        #ifdef INLINE
+        printf("INLINING\n");
+        #endif
+        #ifdef MULTI_THREADING
+        printf("MULTI-THREADING\n");
+        #endif
+        printf("------------------------------------\n");
     }
     else {
         printf("Model has not been compiled. Please compile before running \"neural_net_info\".");
@@ -1004,6 +1041,23 @@ void forward_prop(NeuralNet* net, bool training) {
             }
             layer_batch_norm_conv2D_fp(l, training);
             break;
+
+        case BATCH_NORM_DENSE:
+            if (net->optimizer->type == NESTEROV && training) {
+                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
+                matrix_add_into(
+                    l->cache.bn_dense.gamma,
+                    mom->weight_momentum[i]->filters[0]->channels[0],
+                    l->cache.bn_dense.gamma
+                );
+                matrix_add_into(
+                    l->cache.bn_dense.beta, 
+                    mom->bias_momentum[i], 
+                    l->cache.bn_dense.beta
+                );
+            }
+            layer_batch_norm_dense_fp(l, training);
+            break;
         }
     }
 }
@@ -1041,6 +1095,10 @@ void back_prop(NeuralNet* net) {
         case BATCH_NORM_CONV2D:
             layer_batch_norm_conv2D_bp(l);
             break;
+        
+        case BATCH_NORM_DENSE:
+            layer_batch_norm_dense_bp(l);
+            break;
 
         case INPUT:
         case CONV2D_INPUT: {
@@ -1071,6 +1129,10 @@ void update_weights(NeuralNet* net) {
             }
             case BATCH_NORM_CONV2D: {
                 layer_batch_norm_conv2D_update_weights(l, net->optimizer);
+                break;
+            }
+            case BATCH_NORM_DENSE: {
+                layer_batch_norm_dense_update_weights(l, net->optimizer);
                 break;
             }
         }
@@ -1170,12 +1232,17 @@ void add_batch_norm_conv2D_layer(nn_float momentum, NeuralNet* net) {
     Layer* bn_conv_l = layer_new(BATCH_NORM_CONV2D, net);
     bn_conv_l->params.bn_conv.momentum = momentum;
     bn_conv_l->params.bn_conv.n_units = -1;
-    bn_conv_l->params.bn_conv.output_filters = -1;
-    bn_conv_l->params.bn_conv.output_channels = -1;
-    bn_conv_l->params.bn_conv.output_height = -1;
-    bn_conv_l->params.bn_conv.output_width = -1;
     net->layers[net->n_layers] = bn_conv_l;
     bn_conv_l->layer_idx = net->n_layers;
+    net->n_layers++;
+}
+
+void add_batch_norm_dense_layer(nn_float momentum, NeuralNet* net) {
+    Layer* bn_dense_l = layer_new(BATCH_NORM_DENSE, net);
+    bn_dense_l->params.bn_dense.momentum = momentum;
+    bn_dense_l->params.bn_dense.n_units = -1;
+    net->layers[net->n_layers] = bn_dense_l;
+    bn_dense_l->layer_idx = net->n_layers;
     net->n_layers++;
 }
 
@@ -1250,6 +1317,21 @@ void debug_layers_info(NeuralNet* net) {
             printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
             printf("--------------------------------------------------------------------------------------------------------------------\n");
             break;  
+        }
+        case BATCH_NORM_DENSE: {
+            l_name = "Dense";
+            min_grad = matrix_min(l->cache.bn_dense.gamma_grad);
+            max_grad = matrix_max(l->cache.bn_dense.gamma_grad);
+            mean_grad = matrix_average(l->cache.bn_dense.gamma_grad);
+            min_weight = matrix_min(l->cache.bn_dense.gamma);
+            max_weight = matrix_max(l->cache.bn_dense.gamma);
+            mean_weight = matrix_average(l->cache.bn_dense.gamma);
+            min_act = matrix_min(l->cache.bn_dense.output);
+            max_act = matrix_max(l->cache.bn_dense.output);
+            mean_act = matrix_average(l->cache.bn_dense.output);
+            printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
+            printf("--------------------------------------------------------------------------------------------------------------------\n");
+            break;
         }
         }
     }

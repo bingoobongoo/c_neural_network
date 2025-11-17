@@ -50,5 +50,6 @@ void add_conv_layer(int n_filters, int filter_size, int stride, NeuralNet* net);
 void add_flatten_layer(NeuralNet* net);
 void add_max_pool_layer(int filter_size, int stride, NeuralNet* net);
 void add_batch_norm_conv2D_layer(nn_float momentum, NeuralNet* net);
+void add_batch_norm_dense_layer(nn_float momentum, NeuralNet* net);
 
 void debug_layers_info(NeuralNet* net);

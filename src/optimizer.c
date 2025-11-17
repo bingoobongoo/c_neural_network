@@ -59,7 +59,7 @@ void optimizer_sgd_print_info(Optimizer* optimizer) {
         "Optimizer memory allocated: %d B\n", 
         optimizer->optimizer_get_mem_allocated(optimizer)
     );
-    printf("------------------------------------\n\n");
+    printf("------------------------------------\n");
 }
 
 unsigned int optimizer_sgd_get_mem_allocated(Optimizer* optimizer) {
@@ -205,7 +205,7 @@ void optimizer_momentum_print_info(Optimizer* optimizer) {
         "Optimizer memory allocated: %d B\n",
         optimizer->optimizer_get_mem_allocated(optimizer)
     );
-    printf("------------------------------------\n\n");
+    printf("------------------------------------\n");
 }
 
 unsigned int optimizer_momentum_get_mem_allocated(Optimizer* optimizer) {
@@ -375,7 +375,7 @@ void optimizer_adagrad_print_info(Optimizer* optimizer) {
         "Optimizer memory allocated: %d B\n",
         optimizer->optimizer_get_mem_allocated(optimizer)
     );
-    printf("------------------------------------\n\n");
+    printf("------------------------------------\n");
 }
 
 unsigned int optimizer_adagrad_get_mem_allocated(Optimizer* optimizer) {
@@ -650,7 +650,7 @@ void optimizer_adam_print_info(Optimizer* optimizer) {
         "Optimizer memory allocated: %d B\n",
         optimizer->optimizer_get_mem_allocated(optimizer)
     );
-    printf("------------------------------------\n\n");
+    printf("------------------------------------\n");
 }
 
 unsigned int optimizer_adam_get_mem_allocated(Optimizer* optimizer) {

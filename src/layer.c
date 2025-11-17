@@ -231,6 +231,65 @@ void layer_free(Layer* l) {
             l->cache.bn_conv.beta_grad = NULL;
         }
         break;
+
+    case BATCH_NORM_DENSE:
+        if (l->cache.bn_dense.output != NULL) {
+            matrix_free(l->cache.bn_dense.output);
+            l->cache.bn_conv.output = NULL;
+        }
+        if (l->cache.bn_dense.z != NULL) {
+            matrix_free(l->cache.bn_dense.z);
+            l->cache.bn_conv.z = NULL;
+        }
+        if (l->cache.bn_dense.delta != NULL) {
+            matrix_free(l->cache.bn_dense.delta);
+            l->cache.bn_conv.delta = NULL;
+        }
+        if (l->cache.bn_dense.dL_dA != NULL) {
+            matrix_free(l->cache.bn_dense.dL_dA);
+            l->cache.bn_conv.dL_dA = NULL;
+        }
+        if (l->cache.bn_dense.dA_dZ != NULL) {
+            matrix_free(l->cache.bn_dense.dA_dZ);
+            l->cache.bn_conv.dA_dZ = NULL;
+        }
+        if (l->cache.bn_dense.x_normalized != NULL) {
+            matrix_free(l->cache.bn_dense.x_normalized);
+            l->cache.bn_conv.x_normalized = NULL;
+        }
+        if (l->cache.bn_dense.mean != NULL) {
+            matrix_free(l->cache.bn_dense.mean);
+            l->cache.bn_conv.mean = NULL;
+        }
+        if (l->cache.bn_dense.variance != NULL) {
+            matrix_free(l->cache.bn_dense.variance);
+            l->cache.bn_conv.variance = NULL;
+        }
+        if (l->cache.bn_dense.running_mean != NULL) {
+            matrix_free(l->cache.bn_dense.running_mean);
+            l->cache.bn_conv.running_mean = NULL;
+        }
+        if (l->cache.bn_dense.running_variance != NULL) {
+            matrix_free(l->cache.bn_dense.running_variance);
+            l->cache.bn_conv.running_variance = NULL;
+        }
+        if (l->cache.bn_dense.gamma != NULL) {
+            matrix_free(l->cache.bn_dense.gamma);
+            l->cache.bn_conv.gamma = NULL;
+        }
+        if (l->cache.bn_dense.beta != NULL) {
+            matrix_free(l->cache.bn_dense.beta);
+            l->cache.bn_conv.beta = NULL;
+        }
+        if (l->cache.bn_dense.gamma_grad != NULL) {
+            matrix_free(l->cache.bn_dense.gamma_grad);
+            l->cache.bn_conv.gamma_grad = NULL;
+        }
+        if (l->cache.bn_dense.beta_grad != NULL) {
+            matrix_free(l->cache.bn_dense.beta_grad);
+            l->cache.bn_conv.beta_grad = NULL;
+        }
+        break;
     }
     
     if (l->activation != NULL) {
@@ -266,7 +325,12 @@ int layer_get_n_units(Layer* l) {
     case BATCH_NORM_CONV2D:
         return l->params.bn_conv.n_units;
         break;
+
+    case BATCH_NORM_DENSE:
+        return l->params.bn_dense.n_units;
+        break;
     }
+
 
     exit(1);
 }
@@ -282,6 +346,10 @@ Matrix* layer_get_output_matrix(Layer* l) {
 
     case FLATTEN:
         return l->cache.flat.output;    
+        break;
+    
+    case BATCH_NORM_DENSE:
+        return l->cache.bn_dense.output;
         break;
 
     default:
@@ -322,6 +390,10 @@ Matrix* layer_get_delta_matrix(Layer* l) {
     
     case FLATTEN:
         return l->cache.flat.delta;
+        break;
+    
+    case BATCH_NORM_DENSE:
+        return l->cache.bn_dense.delta;
         break;
     
     default:
@@ -372,6 +444,10 @@ unsigned int layer_get_sizeof_mem_allocated(Layer* l) {
 
         case BATCH_NORM_CONV2D:
             size = layer_batch_norm_conv2D_get_sizeof_mem_allocated(l);
+            break;
+        
+        case BATCH_NORM_DENSE:
+            size = layer_batch_norm_dense_get_sizeof_mem_allocated(l);
             break;
     }
 
@@ -823,12 +899,7 @@ void layer_batch_norm_conv2D_compile(Layer* l, ActivationType act_type, int act_
     int output_channels = input_channels;
     int output_filters = batch_size;
 
-    l->params.bn_conv.output_height = output_height;
-    l->params.bn_conv.output_width = output_width;
-    l->params.bn_conv.output_channels = output_channels;
-    l->params.bn_conv.output_filters = output_filters;
     l->params.bn_conv.n_units = output_height * output_width * output_channels;
-
 
     if (l->prev_layer->l_type == CONV2D) {
         l->activation = activation_new(
@@ -916,6 +987,86 @@ void layer_batch_norm_conv2D_compile(Layer* l, ActivationType act_type, int act_
     matrix_fill(l->cache.bn_conv.gamma, 1.0f);
     matrix_zero(l->cache.bn_conv.beta);
     matrix_fill(l->cache.bn_conv.running_variance, 1.0f);
+    matrix_zero(l->cache.bn_conv.running_mean);
+}
+
+void layer_batch_norm_dense_compile(Layer* l, ActivationType act_type, int act_param, int batch_size) {
+    if (l->prev_layer->l_type == DENSE) {
+        l->activation = activation_new(
+            act_type,
+            act_param
+        );
+    }
+    else {
+        l->activation = activation_new(
+            IDENTITY,
+            0.0
+        );
+    }
+
+    l->params.bn_dense.n_units = layer_get_n_units(l->prev_layer);
+
+    l->cache.bn_dense.output = matrix_new(
+        batch_size,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.z = matrix_new(
+        batch_size,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.delta = matrix_new(
+        batch_size,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.dL_dA = matrix_new(
+        batch_size,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.dA_dZ = matrix_new(
+        batch_size,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.x_normalized = matrix_new(
+        batch_size,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.mean = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.variance = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.running_mean = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.running_variance = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.gamma = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.beta = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.gamma_grad = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+    l->cache.bn_dense.beta_grad = matrix_new(
+        1,
+        layer_get_n_units(l)
+    );
+
+    matrix_fill(l->cache.bn_dense.gamma, 1.0f);
+    matrix_zero(l->cache.bn_dense.beta);
+    matrix_fill(l->cache.bn_dense.running_variance, 1.0f);
+    matrix_zero(l->cache.bn_dense.running_mean);
 }
 
 void layer_input_fp(Layer* l, Batch* train_batch) {
@@ -927,8 +1078,8 @@ void layer_conv2D_input_fp(Layer* l, Batch* train_batch) {
 }
 
 void layer_dense_fp(Layer* l) {
-    matrix_dot_into(layer_get_output_matrix(
-        l->prev_layer), 
+    matrix_dot_into(
+        layer_get_output_matrix(l->prev_layer), 
         l->cache.dense.weight, 
         l->cache.dense.z,
         false,
@@ -1109,8 +1260,8 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
                 nn_float* channel = input->filters[n]->channels[c]->entries;
 
                 for (int i=0; i<input->n_rows * input->n_cols; i++) {
-                    nn_float var = channel[i] - mean;
-                    sum += var * var;
+                    nn_float diff = channel[i] - mean;
+                    sum += diff * diff;
                 }
             }
 
@@ -1124,7 +1275,7 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
         }
     }
     
-    // normalization and scaling
+    // normalization and scaling + activation
     #ifdef MULTI_THREADING
     #pragma omp parallel for collapse(2) schedule(static)
     #endif
@@ -1171,6 +1322,97 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
     }
 }
 
+void layer_batch_norm_dense_fp(Layer* l, bool training) {
+    Matrix* input = layer_get_output_matrix(l->prev_layer);
+    Matrix* input_normalized = l->cache.bn_dense.x_normalized;
+    Matrix* z = l->cache.bn_dense.z;
+    Matrix* output = l->cache.bn_dense.output;
+    nn_float momentum = l->params.bn_dense.momentum;
+
+    if (training) {
+        // per-feature (per-column) mean calculations
+        // #ifdef MULTI_THREADING
+        // #pragma omp parallel for schedule(static)
+        // #endif
+        for (int j=0; j<input->n_cols; j++) {
+            nn_float sum = (nn_float)0.0;
+
+            for (int i=0; i<input->n_rows; i++) {
+                sum += input->entries[i*input->n_cols + j];
+            }
+
+            nn_float mean = sum / input->n_rows;
+            matrix_assign(l->cache.bn_dense.mean, 0, j, mean);
+
+            // running mean calculations
+            nn_float running_mean = matrix_get(l->cache.bn_dense.running_mean, 0, j);
+            running_mean = momentum * mean + ((nn_float)1.0 - momentum) * running_mean;
+            matrix_assign(l->cache.bn_dense.running_mean, 0, j, running_mean);
+        }
+
+        // per-feature (per-column) variance calculations
+        // #ifdef MULTI_THREADING
+        // #pragma omp parallel for schedule(static)
+        // #endif
+        for (int j=0; j<input->n_cols; j++) {
+            nn_float mean = matrix_get(l->cache.bn_dense.mean, 0, j);
+            nn_float sum = (nn_float)0.0;
+
+            for (int i=0; i<input->n_rows; i++) {
+                nn_float diff = input->entries[i*input->n_cols + j] - mean;
+                sum += diff * diff;
+            }
+
+            nn_float var = sum / input->n_rows;
+            matrix_assign(l->cache.bn_dense.variance, 0, j, var);
+
+            // running variance calculations
+            nn_float running_variance = matrix_get(l->cache.bn_dense.running_variance, 0, j);
+            running_variance = momentum * var + ((nn_float)1.0 - momentum) * running_variance;
+            matrix_assign(l->cache.bn_dense.running_variance, 0, j, running_variance);
+        }
+    }
+
+    // normalization and scaling + activation
+    // #ifdef MULTI_THREADING
+    // #pragma omp parallel for collapse(2) schedule(static)
+    // #endif
+    for (int i=0; i<input->n_rows; i++) {
+        for (int j=0; j<input->n_cols; j++) {
+            nn_float mean, var;
+            if (training) {
+                mean = matrix_get(l->cache.bn_dense.mean, 0, j);
+                var = matrix_get(l->cache.bn_dense.variance, 0, j);
+            }
+            else {
+                mean = matrix_get(l->cache.bn_dense.running_mean, 0, j);
+                var = matrix_get(l->cache.bn_dense.running_variance, 0, j);
+            }
+
+            nn_float gamma = matrix_get(l->cache.bn_dense.gamma, 0, j);
+            nn_float beta = matrix_get(l->cache.bn_dense.beta, 0, j);
+            nn_float inv_std;
+            #ifdef SINGLE_PRECISION
+            inv_std = (nn_float)1.0 / sqrtf(var + 1e-5);
+            #endif
+            #ifdef DOUBLE_PRECISION
+            inv_std = (nn_float)1.0 / sqrt(var + 1e-5);
+            #endif
+
+            nn_float x = input->entries[i*input->n_cols + j];
+            nn_float x_normalized = (x - mean) * inv_std;
+            input_normalized->entries[i*input->n_cols + j] = x_normalized;
+            z->entries[i*input->n_cols + j] = gamma * x_normalized + beta;
+        }
+    }
+
+    apply_activation_func_into(
+        l->activation,
+        z,
+        output
+    );
+}
+
 void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch) {
     // dL_dZ calculation
     apply_loss_dA_into(
@@ -1213,6 +1455,9 @@ void layer_dense_bp(Layer* l) {
     // dL_dA calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
         bp_delta_from_dense(l->next_layer, l->cache.dense.dL_dA);
+    }
+    else if (l->next_layer->l_type == BATCH_NORM_DENSE) {
+        bp_delta_from_batch_norm_dense(l->next_layer, l->cache.dense.dL_dA);
     }
 
     // dL_dZ calculation
@@ -1388,6 +1633,9 @@ void layer_flatten_bp(Layer* l) {
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
         bp_delta_from_dense(l->next_layer, l->cache.flat.delta);
     }
+    else if (l->next_layer->l_type == BATCH_NORM_DENSE) {
+        bp_delta_from_batch_norm_dense(l->next_layer, l->cache.flat.delta);
+    }
 }
 
 void layer_batch_norm_conv2D_bp(Layer* l) {
@@ -1420,7 +1668,7 @@ void layer_batch_norm_conv2D_bp(Layer* l) {
         }
     }
 
-    // dL_dgamma and dL_dbeta
+    // dL_dgamma and dL_dbeta calculation
     Matrix* beta_grad = l->cache.bn_conv.beta_grad;
     Matrix* gamma_grad = l->cache.bn_conv.gamma_grad;
     Tensor4D* x_norm = l->cache.bn_conv.x_normalized;
@@ -1431,9 +1679,11 @@ void layer_batch_norm_conv2D_bp(Layer* l) {
     for (int c=0; c<delta->n_channels; c++) {
         nn_float b_sum = (nn_float)0.0;
         nn_float g_sum = (nn_float)0.0;
+
         for (int n=0; n<delta->n_filters; n++) {
             nn_float* delta_row = delta->filters[n]->channels[c]->entries;
             nn_float* x_norm_row = x_norm->filters[n]->channels[c]->entries;
+
             for (int i=0; i<delta->n_rows * delta->n_cols; i++) {
                 b_sum += delta_row[i];
                 g_sum += delta_row[i] * x_norm_row[i];
@@ -1442,6 +1692,56 @@ void layer_batch_norm_conv2D_bp(Layer* l) {
 
         matrix_assign(beta_grad, 0, c, b_sum);
         matrix_assign(gamma_grad, 0, c, g_sum);
+    }
+}
+
+void layer_batch_norm_dense_bp(Layer* l) {
+    Matrix* delta = l->cache.bn_dense.delta;
+    Matrix* dL_dA = l->cache.bn_dense.dL_dA;
+    Matrix* dA_dZ = l->cache.bn_dense.dA_dZ;
+    Matrix* z = l->cache.bn_dense.z;
+
+    // dL/dA calculation
+    if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
+        bp_delta_from_dense(l->next_layer, l->cache.bn_dense.dA_dZ);
+    }
+
+    // dL/dZ calculation
+    apply_activation_dZ_into(
+        l->activation,
+        l->cache.bn_dense.z,
+        l->cache.bn_dense.dA_dZ
+    );
+    matrix_multiply_into(
+        l->cache.bn_dense.dL_dA,
+        l->cache.bn_dense.dA_dZ,
+        l->cache.bn_dense.delta
+    );
+
+    // dL/dgamma and dL/dbeta calculation
+    Matrix* beta_grad = l->cache.bn_dense.beta_grad;
+    Matrix* gamma_grad = l->cache.bn_dense.gamma_grad;
+    Matrix* x_norm = l->cache.bn_dense.x_normalized;
+
+    matrix_zero(beta_grad);
+    matrix_zero(gamma_grad);
+
+    // #ifdef MULTI_THREADING
+    // #pragma omp parallel for schedule(static)
+    // #endif
+    for (int j=0; j<delta->n_cols; j++) {
+        nn_float b_sum = (nn_float)0.0;
+        nn_float g_sum = (nn_float)0.0;
+
+        for (int i=0; i<delta->n_rows; i++) {
+            nn_float d = delta->entries[i*delta->n_cols + j];
+            nn_float x_n = x_norm->entries[i*delta->n_cols + j];
+            b_sum += d;
+            g_sum += d * x_n;
+        }
+
+        matrix_assign(beta_grad, 0, j, b_sum);
+        matrix_assign(gamma_grad, 0, j, g_sum);
     }
 }
 
@@ -1574,8 +1874,8 @@ void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to) {
         nn_float mean_c = matrix_get(from->cache.bn_conv.mean, 0, c);
         nn_float var_c = matrix_get(from->cache.bn_conv.variance, 0, c);
         nn_float gamma_c = matrix_get(from->cache.bn_conv.gamma, 0, c);
-        nn_float dvar_c = (nn_float)0.0;
         nn_float dmean_c = (nn_float)0.0;
+        nn_float dvar_c = (nn_float)0.0;
         int m = to->n_filters * to->n_rows * to->n_cols;
 
         #ifdef SINGLE_PRECISION
@@ -1610,7 +1910,7 @@ void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to) {
         }
 
         // dL_dmean (part 2/2)
-        dmean_c += dvar_c * sum / (nn_float)m *(nn_float)-2.0;
+        dmean_c += dvar_c * sum / (nn_float)m * (nn_float)-2.0;
 
         for (int n=0; n<to->n_filters; n++) {
             nn_float* delta = from->cache.bn_conv.delta->filters[n]->channels[c]->entries;
@@ -1624,6 +1924,62 @@ void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to) {
                 // dL_dX
                 dL_dX[i] = term1 + term2 + term3;
             }
+        }
+    }
+}
+
+void bp_delta_from_batch_norm_dense(Layer* from, Matrix* to) {
+    Matrix* bn_input = layer_get_output_matrix(from->prev_layer);
+
+    // #ifdef MULTI_THREADING
+    // #pragma omp parallel for schedule(static)
+    // #endif
+    for (int j=0; j<to->n_cols; j++) {
+        nn_float mean_j = matrix_get(from->cache.bn_dense.mean, 0, j);
+        nn_float var_j = matrix_get(from->cache.bn_dense.variance, 0, j);
+        nn_float gamma_j = matrix_get(from->cache.bn_dense.gamma, 0, j);
+        nn_float dmean_j = (nn_float)0.0;
+        nn_float dvar_j = (nn_float)0.0;
+        int m = to->n_rows;
+
+        #ifdef SINGLE_PRECISION
+        nn_float inv_std = (nn_float)1.0 / sqrtf(var_j + 1e-5);
+        nn_float inv_pow_3_2 = (nn_float)1.0 / (sqrtf(var_j + 1e-5) * (var_j + 1e-5));
+        #endif
+        #ifdef DOUBLE_PRECISION
+        nn_float inv_std = (nn_float)1.0 / sqrt(var_j + 1e-5);
+        nn_float inv_pow_3_2 = (nn_float)1.0 / (sqrt(var_j + 1e-5) * (var_j + 1e-5));        
+        #endif
+
+        for (int i=0; i<to->n_rows; i++) {
+            nn_float delta = from->cache.bn_dense.delta->entries[i*to->n_cols + j];
+            nn_float x = bn_input->entries[i*to->n_cols + j];
+            // dL/dvar
+            dvar_j += delta * gamma_j * (x-mean_j) * inv_pow_3_2 * (nn_float)-0.5;
+
+            //dL_dmean (part 1/2)
+            dmean_j += delta * gamma_j * (-inv_std);
+        }
+
+        nn_float sum = (nn_float)0.0;
+        for (int i=0; i<to->n_rows; i++) {
+            nn_float x = bn_input->entries[i*to->n_cols + j];
+            sum += x - mean_j;
+        }
+
+        // dL_dmean (part 2/2)
+        dmean_j += dvar_j * sum / m * (nn_float)-2.0;
+
+        for (int i=0; i<to->n_rows; i++) {
+            nn_float delta = from->cache.bn_dense.delta->entries[i*to->n_cols + j];
+            nn_float x = bn_input->entries[i*to->n_cols + j];
+
+            nn_float term1 = delta * gamma_j * inv_std;
+            nn_float term2 = dvar_j * (x - mean_j) / m * (nn_float)2.0;
+            nn_float term3 = dmean_j / m;
+
+            // dL/dX
+            to->entries[i*to->n_cols + j] = term1 + term2 + term3;
         }
     }
 }
@@ -1685,6 +2041,21 @@ void layer_batch_norm_conv2D_update_weights(Layer* l, Optimizer* opt) {
         opt,
         l->layer_idx
     );   
+}
+
+void layer_batch_norm_dense_update_weights(Layer* l, Optimizer* opt) {
+    opt->update_batch_norm_gamma(
+        l->cache.bn_dense.gamma, 
+        l->cache.bn_dense.gamma_grad, 
+        opt,
+        l->layer_idx
+    );
+    opt->update_batch_norm_beta(
+        l->cache.bn_dense.beta, 
+        l->cache.bn_dense.beta_grad, 
+        opt,
+        l->layer_idx
+    );       
 }
 
 unsigned long layer_output_get_sizeof_mem_allocated(Layer* l) {
@@ -1800,6 +2171,30 @@ unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l) {
     size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.beta);
     size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.gamma_grad);
     size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.beta_grad);
+
+    return size;
+}
+
+unsigned long layer_batch_norm_dense_get_sizeof_mem_allocated(Layer* l) {
+    unsigned long size = 0;
+    size += sizeof(l);
+    size += sizeof(l->params);
+    size += sizeof(l->params.bn_dense);
+    size += sizeof(l->cache.bn_dense);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.output);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.z);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.delta);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.dL_dA);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.dA_dZ);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.x_normalized);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.mean);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.variance);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.running_mean);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.running_variance);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.gamma);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.beta);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.gamma_grad);
+    size += matrix_get_sizeof_mem_allocated(l->cache.bn_dense.beta_grad);
 
     return size;
 }
