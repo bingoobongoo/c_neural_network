@@ -426,7 +426,9 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
     matrix_zero(into);
 
     if (!m1_trans && !m2_trans) {
+        #ifdef MULTI_THREADING
         #pragma omp parallel for
+        #endif
         for (int i=0; i<m1->n_rows; i++) {
             for (int k=0; k<m1->n_cols; k++) {
                 nn_float aik = matrix_get(m1, i, k);
@@ -442,7 +444,9 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
         }      
     }
     else if (m1_trans && !m2_trans) {
+        #ifdef MULTI_THREADING
         #pragma omp parallel for
+        #endif
         for (int i=0; i<m1->n_cols; i++) {
             for (int k=0; k<m1->n_rows; k++) {
                 nn_float aik = matrix_get(m1, k, i);
@@ -458,7 +462,9 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
         }        
     }
     else if (!m1_trans && m2_trans) {
+        #ifdef MULTI_THREADING
         #pragma omp parallel for
+        #endif
         for (int i=0; i<m1->n_rows; i++) {
             for (int k=0; k<m1->n_cols; k++) {
                 nn_float aik = matrix_get(m1, i, k);
@@ -474,7 +480,9 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
         } 
     }
     else {
+        #ifdef MULTI_THREADING
         #pragma omp parallel for
+        #endif
         for (int i=0; i<m1->n_cols; i++) {
             for (int k=0; k<m1->n_rows; k++) {
                 nn_float aik = matrix_get(m1, k, i);

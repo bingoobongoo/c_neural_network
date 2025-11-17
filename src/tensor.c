@@ -41,7 +41,9 @@ void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into) {
 }
 
 void tensor3D_acc_correlate_into(Tensor3D* input, Tensor3D* kernel, Matrix* into, int stride, CorrelationType type) {
+    #ifdef MULTI_THREADING
     #pragma omp parallel for schedule(static)
+    #endif
     for (int c=0; c<input->n_channels; c++) {
         matrix_acc_correlate_into(
             input->channels[c],

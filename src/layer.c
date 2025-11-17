@@ -960,7 +960,9 @@ void layer_conv2D_fp(Layer* l) {
 
     #ifdef IM2COL_CONV
     
+    #ifdef MULTI_THREADING
     #pragma omp parallel for schedule(static)
+    #endif
     for (int n=0; n<input->n_filters; n++) {
         Matrix* im2col_input = l->cache.conv.fp_im2col_input->channels[n];
         Matrix* im2col_output = l->cache.conv.fp_im2col_output->channels[n];
@@ -1004,7 +1006,9 @@ void layer_conv2D_fp(Layer* l) {
 
     #else
 
+    #ifdef MULTI_THREADING
     #pragma omp parallel for collapse(2) schedule(static)
+    #endif
     for (int n=0; n<input->n_filters; n++) {
         for (int i=0; i<weight->n_filters; i++) {
             matrix_zero(z->filters[n]->channels[i]);
@@ -1049,7 +1053,9 @@ void layer_max_pool_fp(Layer* l) {
     const int filter_size = l->params.max_pool.filter_size;
     const int stride = l->params.max_pool.stride;
 
+    #ifdef MULTI_THREADING
     #pragma omp parallel for collapse(2) schedule(static)
+    #endif
     for (int n=0; n<input->n_filters; n++) {
         for (int c=0; c<input->n_channels; c++) {
             matrix_max_pool_into(
@@ -1072,7 +1078,9 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
 
     if (training) {
         // per-channel mean calculations
+        #ifdef MULTI_THREADING
         #pragma omp parallel for schedule(static)
+        #endif
         for (int c=0; c<input->n_channels; c++) {
             nn_float sum = (nn_float)0.0;
 
@@ -1090,7 +1098,9 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
         }
 
         // per-channel variance calculations
+        #ifdef MULTI_THREADING
         #pragma omp parallel for schedule(static)
+        #endif
         for (int c=0; c<input->n_channels; c++) {
             nn_float mean = matrix_get(l->cache.bn_conv.mean, 0, c);
             nn_float sum = (nn_float)0.0;
@@ -1115,7 +1125,9 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
     }
     
     // normalization and scaling
+    #ifdef MULTI_THREADING
     #pragma omp parallel for collapse(2) schedule(static)
+    #endif
     for (int n=0; n<input->n_filters; n++) {
         for (int c=0; c<input->n_channels; c++) {
             nn_float mean, var;
@@ -1280,7 +1292,9 @@ void layer_conv2D_bp(Layer* l) {
         Matrix* output_sum_mat = l->cache.conv.dL_dW_im2col_output_sum;
         matrix_zero(output_sum_mat);
 
+        #ifdef MULTI_THREADING
         #pragma omp parallel for schedule(static)
+        #endif
         for (int n=0; n<input->n_filters; n++) {
             Matrix* input_mat = l->cache.conv.dL_dW_im2col_input->channels[n];
             Matrix* kernel_mat = l->cache.conv.dL_dW_im2col_kernel->channels[n];
@@ -1325,7 +1339,9 @@ void layer_conv2D_bp(Layer* l) {
 
         #else
 
+        #ifdef MULTI_THREADING
         #pragma omp parallel for collapse(2) schedule(static)
+        #endif
         for (int i=0; i<weight->n_filters; i++) {
             for (int j=0; j<weight->n_channels; j++) {
                 matrix_zero(weight_grad->filters[i]->channels[j]);
@@ -1454,7 +1470,9 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to) {
         from->cache.conv.delta_im2col_kernel
     );
 
+    #ifdef MULTI_THREADING
     #pragma omp parallel for schedule(static)
+    #endif
     for (int n=0; n<dL_dA->n_filters; n++) {
         input_into_im2col_fwise(
             delta_next,
@@ -1482,7 +1500,9 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to) {
 
     #else
 
+    #ifdef MULTI_THREADING
     #pragma omp parallel for collapse(2) schedule(static)
+    #endif
     for (int n=0; n<dL_dA->n_filters; n++) {
         for (int i=0; i<dL_dA->n_channels; i++) {
             matrix_zero(dL_dA->filters[n]->channels[i]);
@@ -1508,7 +1528,9 @@ void bp_delta_from_max_pool(Layer* from, Tensor4D* to) {
     int filter_size = from->params.max_pool.filter_size;
     int stride = from->params.max_pool.stride;
 
+    #ifdef MULTI_THREADING
     #pragma omp parallel for collapse(2) schedule(static)
+    #endif
     for (int n=0; n<output_next->n_filters; n++) {
         for (int c=0; c<output_next->n_channels; c++) {
             Matrix* dL_dA_mat = dL_dA->filters[n]->channels[c];
@@ -1545,7 +1567,9 @@ void bp_delta_from_flatten(Layer* from, Tensor4D* to) {
 void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to) {
     Tensor4D* bn_input = layer_get_output_tensor4D(from->prev_layer);
 
+    #ifdef MULTI_THREADING
     #pragma omp parallel for schedule(static)
+    #endif
     for (int c=0; c<to->n_channels; c++) {
         nn_float mean_c = matrix_get(from->cache.bn_conv.mean, 0, c);
         nn_float var_c = matrix_get(from->cache.bn_conv.variance, 0, c);
