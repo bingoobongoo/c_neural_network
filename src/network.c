@@ -695,7 +695,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
     nn_float avg_epoch_train_acc;
     nn_float avg_epoch_val_acc;
 
-    for (int epoch=0; epoch<n_epochs; epoch++) {
+    for (int epoch=1; epoch<=n_epochs; epoch++) {
         struct timeval start, end;
         gettimeofday(&start, NULL);
         for (start_idx=0, i=0; start_idx<training_size - net->batch_size; start_idx+=net->batch_size, i++) {
@@ -768,7 +768,19 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             shuffle_matrix_inplace(x_train_split_mat, y_train_split);
         }
 
-        printf("Epoch: %d/%d   loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", epoch+1, n_epochs, avg_epoch_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time);
+        printf(
+            "Epoch: %d/%d   loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", 
+            epoch, n_epochs, avg_epoch_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time
+        );
+
+        save_epoch_to_csv(
+            epoch,
+            avg_epoch_loss,
+            avg_epoch_train_acc,
+            avg_epoch_val_acc,
+            epoch_time,
+            "training_stats.csv"
+        );
 
         #ifdef DEBUG
         debug_layers_info(net);

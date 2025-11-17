@@ -55,3 +55,4 @@ dkms.conf
 *.mat
 neuralnet
 todo.txt
+training_stats.csv
