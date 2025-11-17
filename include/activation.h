@@ -10,6 +10,7 @@ typedef enum {
     LRELU,
     ELU,
     SOFTMAX,
+    IDENTITY
 } ActivationType;
 
 typedef struct {
@@ -39,3 +40,6 @@ nn_float leaky_relu_dZ(nn_float z, nn_float param);
 
 nn_float elu(nn_float z, nn_float param);
 nn_float elu_dZ(nn_float z, nn_float param);
+
+nn_float identity(nn_float z, nn_float param);
+nn_float identity_dZ(nn_float z, nn_float param);

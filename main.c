@@ -29,19 +29,19 @@ int main() {
         32
     );
 
-    // add_input_layer(x_train->n_cols, net);
-    // add_dense_layer(300, net);
-    // add_dense_layer(100, net);
-    // add_output_layer(y_train->n_cols, net);
-
-    add_conv_input_layer(28, 28, 1, net);
-    add_conv_layer(8, 8, 1, net);
-    add_conv_layer(8, 8, 1, net);
-    add_max_pool_layer(2, 2, net);
-    add_conv_layer(16, 4, 1, net);
-    add_conv_layer(16, 4, 1, net);
-    add_flatten_layer(net);
+    add_input_layer(x_train->n_cols, net);
+    add_dense_layer(300, net);
+    add_dense_layer(100, net);
     add_output_layer(y_train->n_cols, net);
+
+    // add_conv_input_layer(28, 28, 1, net);
+    // add_conv_layer(16, 8, 1, net);
+    // add_batch_norm_conv2D_layer(0.1, net);
+    // add_max_pool_layer(2, 2, net);
+    // add_conv_layer(4, 4, 1, net);
+    // add_batch_norm_conv2D_layer(0.1, net);
+    // add_flatten_layer(net);
+    // add_output_layer(y_train->n_cols, net);
 
     neural_net_compile(net);
     neural_net_info(net);

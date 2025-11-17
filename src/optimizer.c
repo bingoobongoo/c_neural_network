@@ -6,6 +6,8 @@ Optimizer* optimizer_sgd_new(nn_float learning_rate) {
     opt->update_dense_bias = update_dense_bias_sgd;
     opt->update_conv_weights = update_conv_weights_sgd;
     opt->update_conv_bias = update_conv_bias_sgd;
+    opt->update_batch_norm_gamma = update_dense_weights_sgd;
+    opt->update_batch_norm_beta = update_dense_bias_sgd;
     opt->optimizer_free = optimizer_sgd_free;
     opt->optimizer_print_info = optimizer_sgd_print_info;
     opt->optimizer_get_mem_allocated = optimizer_sgd_get_mem_allocated;
@@ -76,6 +78,8 @@ Optimizer* optimizer_momentum_new(nn_float learning_rate, nn_float beta, bool ne
     opt->update_dense_bias = update_dense_bias_momentum;
     opt->update_conv_weights = update_conv_weights_momentum;
     opt->update_conv_bias = update_conv_bias_momentum;
+    opt->update_batch_norm_gamma = update_dense_weights_momentum;
+    opt->update_batch_norm_beta = update_dense_bias_momentum;
     opt->optimizer_free = optimizer_momentum_free;
     opt->optimizer_print_info = optimizer_momentum_print_info;
     opt->optimizer_get_mem_allocated = optimizer_momentum_get_mem_allocated;
@@ -231,6 +235,8 @@ Optimizer* optimizer_adagrad_new(nn_float learning_rate) {
     opt->update_dense_bias = update_dense_bias_adagrad;
     opt->update_conv_weights = update_conv_weights_adagrad;
     opt->update_conv_bias = update_conv_bias_adagrad;
+    opt->update_batch_norm_gamma = update_dense_weights_adagrad;
+    opt->update_batch_norm_beta = update_dense_bias_adagrad;
     opt->optimizer_free = optimizer_adagrad_free;
     opt->optimizer_print_info = optimizer_adagrad_print_info;
     opt->optimizer_get_mem_allocated = optimizer_adagrad_get_mem_allocated;
@@ -407,6 +413,8 @@ Optimizer* optimizer_adam_new(nn_float learning_rate, nn_float beta_m, nn_float 
     opt->update_dense_bias = update_dense_bias_adam;
     opt->update_conv_weights = update_conv_weights_adam;
     opt->update_conv_bias = update_conv_bias_adam;
+    opt->update_batch_norm_gamma = update_dense_weights_adam;
+    opt->update_batch_norm_beta = update_dense_bias_adam;
     opt->optimizer_free = optimizer_adam_free;
     opt->optimizer_print_info = optimizer_adam_print_info;
     opt->optimizer_get_mem_allocated = optimizer_adam_get_mem_allocated;

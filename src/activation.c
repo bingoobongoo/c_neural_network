@@ -41,6 +41,13 @@ Activation* activation_new(ActivationType type, nn_float param) {
         act->name = "Softmax";
         return act;
         break;
+
+    case IDENTITY:
+        act->activation_func = identity;
+        act->dZ = identity_dZ;
+        act->name = "Identity";
+        return act;
+        break;
     
     default:
         printf("Unknown activation type.");
@@ -230,5 +237,13 @@ nn_float elu_dZ(nn_float z, nn_float param) {
         return elu(z, param) + param;
     }
 
+    return (nn_float)1.0;
+}
+
+nn_float identity(nn_float z, nn_float param) {
+    return z;
+}
+
+nn_float identity_dZ(nn_float z, nn_float param) {
     return (nn_float)1.0;
 }

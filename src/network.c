@@ -71,6 +71,15 @@ void neural_net_compile(NeuralNet* net) {
                 net->batch_size
             );
             break;
+        
+        case BATCH_NORM_CONV2D:
+            layer_batch_norm_conv2D_compile(
+                l,
+                net->activation->type,
+                net->activation->activation_param, 
+                net->batch_size
+            );
+            break;
 
         case FLATTEN: 
             layer_flatten_compile(l, net->batch_size);
@@ -126,6 +135,22 @@ void neural_net_compile(NeuralNet* net) {
                     mom->bias_momentum[i] = matrix_new(
                         1,
                         l->params.conv.n_filters
+                    );
+                    matrix_zero(mom->bias_momentum[i]);
+                    break;
+                }
+                case BATCH_NORM_CONV2D: {
+                    mom->weight_momentum[i] = tensor4D_new(
+                        1,
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    tensor4D_zero(mom->weight_momentum[i]);
+
+                    mom->bias_momentum[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
                     );
                     matrix_zero(mom->bias_momentum[i]);
                     break;
@@ -211,6 +236,36 @@ void neural_net_compile(NeuralNet* net) {
                     );
                     matrix_zero(ada->intermediate_b[i]);
                     break;
+                }
+                case BATCH_NORM_CONV2D: {
+                    ada->weight_s[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    tensor4D_zero(ada->weight_s[i]);
+
+                    ada->bias_s[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
+                    );
+                    matrix_zero(ada->bias_s[i]);
+
+                    ada->intermediate_w[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    tensor4D_zero(ada->intermediate_w[i]);
+
+                    ada->intermediate_b[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
+                    );
+                    matrix_zero(ada->intermediate_b[i]);
+                    break;  
                 }
                 default: {
                     ada->weight_s[i] = NULL;
@@ -375,6 +430,72 @@ void neural_net_compile(NeuralNet* net) {
                     matrix_zero(adam->intermediate_b[i]);
                     break;
                 }
+                case BATCH_NORM_CONV2D: {
+                    adam->weight_m[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->weight_m_corr[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->weight_s[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->weight_s_corr[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->intermediate_w[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_conv.gamma->n_cols,
+                        1,
+                        1
+                    );
+
+                    tensor4D_zero(adam->weight_m[i]);
+                    tensor4D_zero(adam->weight_m_corr[i]);
+                    tensor4D_zero(adam->weight_s[i]);
+                    tensor4D_zero(adam->weight_s_corr[i]);
+                    tensor4D_zero(adam->intermediate_w[i]);
+                    
+                    adam->bias_m[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
+                    );
+                    adam->bias_m_corr[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
+                    );
+                    adam->bias_s[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
+                    );
+                    adam->bias_s_corr[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
+                    );
+                    adam->intermediate_b[i] = matrix_new(
+                        1,
+                        l->cache.bn_conv.beta->n_cols
+                    );
+
+                    matrix_zero(adam->bias_m[i]);
+                    matrix_zero(adam->bias_m_corr[i]);
+                    matrix_zero(adam->bias_s[i]);
+                    matrix_zero(adam->bias_s_corr[i]);
+                    matrix_zero(adam->intermediate_b[i]);
+                    break;
+                }
                 default: {
                     adam->weight_m[i] = NULL;
                     adam->weight_m_corr[i] = NULL;
@@ -486,6 +607,17 @@ void neural_net_info(NeuralNet* net) {
                 int out_cols = l->cache.conv.output->n_cols;
                 l_name = "MaxPool";
                 params = 0;
+                printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
+                printf("------------------------------------------\n");
+                break;
+            }
+            case BATCH_NORM_CONV2D: {
+                int out_chan = l->cache.bn_conv.output->n_channels;
+                int out_rows = l->cache.bn_conv.output->n_rows;
+                int out_cols = l->cache.bn_conv.output->n_cols;
+                l_name = "BatchNormConv2D";
+                params = 2 * out_chan;
+                trainable_params += params;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
                 printf("------------------------------------------\n");
                 break;
@@ -845,7 +977,19 @@ void forward_prop(NeuralNet* net, bool training) {
             break;
 
         case BATCH_NORM_CONV2D:
-            // add nesterov optimizer logic !!
+            if (net->optimizer->type == NESTEROV && training) {
+                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
+                matrix_add_into(
+                    l->cache.bn_conv.gamma,
+                    mom->weight_momentum[i]->filters[0]->channels[0],
+                    l->cache.bn_conv.gamma
+                );
+                matrix_add_into(
+                    l->cache.bn_conv.beta,
+                    mom->bias_momentum[i],
+                    l->cache.bn_conv.beta
+                );
+            }
             layer_batch_norm_conv2D_fp(l, training);
             break;
         }
@@ -881,6 +1025,10 @@ void back_prop(NeuralNet* net) {
         case MAX_POOL: 
             layer_max_pool_bp(l);
             break;
+        
+        case BATCH_NORM_CONV2D:
+            layer_batch_norm_conv2D_bp(l);
+            break;
 
         case INPUT:
         case CONV2D_INPUT: {
@@ -908,6 +1056,10 @@ void update_weights(NeuralNet* net) {
             case CONV2D: {
                 layer_conv2D_update_weights(l, net->optimizer);
                 break;                        
+            }
+            case BATCH_NORM_CONV2D: {
+                layer_batch_norm_conv2D_update_weights(l, net->optimizer);
+                break;
             }
         }
     }
@@ -1002,6 +1154,19 @@ void add_max_pool_layer(int filter_size, int stride, NeuralNet* net) {
     net->n_layers++;
 }
 
+void add_batch_norm_conv2D_layer(nn_float momentum, NeuralNet* net) {
+    Layer* bn_conv_l = layer_new(BATCH_NORM_CONV2D, net);
+    bn_conv_l->params.bn_conv.momentum = momentum;
+    bn_conv_l->params.bn_conv.n_units = -1;
+    bn_conv_l->params.bn_conv.output_filters = -1;
+    bn_conv_l->params.bn_conv.output_channels = -1;
+    bn_conv_l->params.bn_conv.output_height = -1;
+    bn_conv_l->params.bn_conv.output_width = -1;
+    net->layers[net->n_layers] = bn_conv_l;
+    bn_conv_l->layer_idx = net->n_layers;
+    net->n_layers++;
+}
+
 void debug_layers_info(NeuralNet* net) {
     printf("lp  layer   min_grad   max_grad   mean_grad   min_weight   max_weight   mean_weight");
     printf("   min_act   max_act   mean_act\n");
@@ -1055,6 +1220,21 @@ void debug_layers_info(NeuralNet* net) {
             min_act = tensor4D_min(l->cache.conv.output);
             max_act = tensor4D_max(l->cache.conv.output);
             mean_act = tensor4D_average(l->cache.conv.output);
+            printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
+            printf("--------------------------------------------------------------------------------------------------------------------\n");
+            break;  
+        }
+        case BATCH_NORM_CONV2D: {
+            l_name = "BatchNormConv2D";
+            min_grad = matrix_min(l->cache.bn_conv.gamma_grad);
+            max_grad = matrix_max(l->cache.bn_conv.gamma_grad);
+            mean_grad = matrix_average(l->cache.bn_conv.gamma_grad);
+            min_weight = matrix_min(l->cache.bn_conv.gamma);
+            max_weight = matrix_max(l->cache.bn_conv.gamma);
+            mean_weight = matrix_average(l->cache.bn_conv.gamma);
+            min_act = tensor4D_min(l->cache.bn_conv.output);
+            max_act = tensor4D_max(l->cache.bn_conv.output);
+            mean_act = tensor4D_average(l->cache.bn_conv.output);
             printf("%d   %s   %f   %f   %f   %f   %f   %f   %f   %f   %f\n", i, l_name, min_grad, max_grad, mean_grad, min_weight, max_weight, mean_weight, min_act, max_act, mean_act);
             printf("--------------------------------------------------------------------------------------------------------------------\n");
             break;  

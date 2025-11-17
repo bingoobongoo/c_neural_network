@@ -10,12 +10,15 @@ typedef struct {
     int output_height;
     int output_channels;
     int output_filters;
-    int momentum;
+    nn_float momentum; // how much new batch stats affect mean and variance (higher = more, def=0.1)
 } BatchNormConvParams;
 
 typedef struct {
     Tensor4D* output;
+    Tensor4D* z;
     Tensor4D* delta;
+    Tensor4D* dL_dA;
+    Tensor4D* dA_dZ;
     Tensor4D* x_normalized;
     Matrix* mean;
     Matrix* variance;

@@ -19,6 +19,18 @@ struct Optimizer {
     void (*update_conv_bias)(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int layer_idx);
     void (*update_dense_weights)(Matrix* weights, Matrix* gradient, Optimizer* optimizer, int layer_idx);
     void (*update_dense_bias)(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int layer_idx);
+    void (*update_batch_norm_gamma)(
+        Matrix* gamma, 
+        Matrix* gamma_gradient, 
+        Optimizer* optimizer, 
+        int layer_idx
+    );
+    void (*update_batch_norm_beta)(
+        Matrix* beta,
+        Matrix* beta_grad,
+        Optimizer* optimizer,
+        int layer_idx
+    );
     void (*optimizer_free)(Optimizer* optimizer);
     void (*optimizer_print_info)(Optimizer* optimizer);
     unsigned int (*optimizer_get_mem_allocated)(Optimizer* optimizer);

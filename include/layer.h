@@ -67,7 +67,7 @@ void layer_output_compile(Layer* l, Loss* loss, int batch_size);
 void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int batch_size);
 void layer_flatten_compile(Layer* l, int batch_size);
 void layer_max_pool_compile(Layer* l, int batch_size);
-void layer_batch_norm_conv2D_compile(Layer* l, int batch_size);
+void layer_batch_norm_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int batch_size);
 
 void layer_input_fp(Layer* l, Batch* train_batch);
 void layer_conv2D_input_fp(Layer* l, Batch* train_batch);
@@ -83,14 +83,17 @@ void layer_dense_bp(Layer* l);
 void layer_conv2D_bp(Layer* l);
 void layer_max_pool_bp(Layer* l);
 void layer_flatten_bp(Layer* l);
+void layer_batch_norm_conv2D_bp(Layer* l);
 
 void bp_delta_from_dense(Layer* from, Matrix* to);
 void bp_delta_from_conv2D(Layer* from, Tensor4D* to);
 void bp_delta_from_max_pool(Layer* from, Tensor4D* to);
 void bp_delta_from_flatten(Layer* from, Tensor4D* to);
+void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to);
 
 void layer_dense_update_weights(Layer* l, Optimizer* opt);
 void layer_conv2D_update_weights(Layer* l, Optimizer* opt);
+void layer_batch_norm_conv2D_update_weights(Layer* l, Optimizer* opt);
 
 unsigned long layer_output_get_sizeof_mem_allocated(Layer* l);
 unsigned long layer_dense_get_sizeof_mem_allocated(Layer* l);

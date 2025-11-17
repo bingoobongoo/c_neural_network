@@ -160,12 +160,12 @@ void layer_free(Layer* l) {
 
     case MAX_POOL: 
         if (l->cache.max_pool.output != NULL) {
-            tensor4D_free(l->cache.conv.output);
-            l->cache.conv.output = NULL;
+            tensor4D_free(l->cache.max_pool.output);
+            l->cache.max_pool.output = NULL;
         }
         if (l->cache.max_pool.delta != NULL) {
-            tensor4D_free(l->cache.conv.delta);
-            l->cache.conv.delta = NULL;
+            tensor4D_free(l->cache.max_pool.delta);
+            l->cache.max_pool.delta = NULL;
         }
         if (l->cache.max_pool.argmax != NULL) {
             tensor4D_uint16_free(l->cache.max_pool.argmax);
@@ -177,6 +177,22 @@ void layer_free(Layer* l) {
         if (l->cache.bn_conv.output != NULL) {
             tensor4D_free(l->cache.bn_conv.output);
             l->cache.bn_conv.output = NULL;
+        }
+        if (l->cache.bn_conv.z != NULL) {
+            tensor4D_free(l->cache.bn_conv.z);
+            l->cache.bn_conv.z = NULL;
+        }
+        if (l->cache.bn_conv.delta != NULL) {
+            tensor4D_free(l->cache.bn_conv.delta);
+            l->cache.bn_conv.delta = NULL;
+        }
+        if (l->cache.bn_conv.dL_dA != NULL) {
+            tensor4D_free(l->cache.bn_conv.dL_dA);
+            l->cache.bn_conv.dL_dA = NULL;
+        }
+        if (l->cache.bn_conv.dA_dZ != NULL) {
+            tensor4D_free(l->cache.bn_conv.dA_dZ);
+            l->cache.bn_conv.dA_dZ = NULL;
         }
         if (l->cache.bn_conv.x_normalized != NULL) {
             tensor4D_free(l->cache.bn_conv.x_normalized);
@@ -552,10 +568,18 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
 
     l->params.conv.n_filter_channels = input_channels;
 
-    l->activation = activation_new(
-        act_type,
-        act_param
-    );
+    if (l->next_layer->l_type == BATCH_NORM_CONV2D) {
+        l->activation = activation_new(
+            IDENTITY,
+            0.0
+        );
+    }
+    else {
+        l->activation = activation_new(
+            act_type,
+            act_param
+        );
+    }
     l->cache.conv.weight = tensor4D_new(
         l->params.conv.filter_size,
         l->params.conv.filter_size,
@@ -704,6 +728,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     case RELU:
     case LRELU:
     case ELU:
+    case IDENTITY:
         #ifdef SINGLE_PRECISION
 
         tensor4D_fill_normal_distribution(
@@ -789,7 +814,7 @@ void layer_max_pool_compile(Layer* l, int batch_size) {
         l->cache.max_pool.output->n_channels;
 }
 
-void layer_batch_norm_conv2D_compile(Layer* l, int batch_size) {
+void layer_batch_norm_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int batch_size) {
     int input_height = layer_get_output_tensor4D(l->prev_layer)->n_rows;
     int input_width = layer_get_output_tensor4D(l->prev_layer)->n_cols;
     int input_channels = layer_get_output_tensor4D(l->prev_layer)->n_channels;
@@ -804,7 +829,27 @@ void layer_batch_norm_conv2D_compile(Layer* l, int batch_size) {
     l->params.bn_conv.output_filters = output_filters;
     l->params.bn_conv.n_units = output_height * output_width * output_channels;
 
+
+    if (l->prev_layer->l_type == CONV2D) {
+        l->activation = activation_new(
+            act_type,
+            act_param
+        );
+    }
+    else {
+        l->activation = activation_new(
+            IDENTITY,
+            0.0
+        );
+    }
+
     l->cache.bn_conv.output = tensor4D_new(
+        output_height,
+        output_width,
+        output_channels,
+        output_filters
+    );
+    l->cache.bn_conv.z = tensor4D_new(
         output_height,
         output_width,
         output_channels,
@@ -816,12 +861,25 @@ void layer_batch_norm_conv2D_compile(Layer* l, int batch_size) {
         output_channels,
         output_filters
     );
+    l->cache.bn_conv.dL_dA = tensor4D_new(
+        output_height,
+        output_width,
+        output_channels,
+        output_filters
+    );
+    l->cache.bn_conv.dA_dZ = tensor4D_new(
+        output_height,
+        output_width,
+        output_channels,
+        output_filters
+    );
     l->cache.bn_conv.x_normalized = tensor4D_new(
         input_height,
         input_width,
         input_channels,
         batch_size
     );
+    
     l->cache.bn_conv.mean = matrix_new(
         1,
         input_channels
@@ -855,6 +913,9 @@ void layer_batch_norm_conv2D_compile(Layer* l, int batch_size) {
         input_channels
     );
 
+    matrix_fill(l->cache.bn_conv.gamma, 1.0f);
+    matrix_zero(l->cache.bn_conv.beta);
+    matrix_fill(l->cache.bn_conv.running_variance, 1.0f);
 }
 
 void layer_input_fp(Layer* l, Batch* train_batch) {
@@ -1005,11 +1066,13 @@ void layer_max_pool_fp(Layer* l) {
 void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
     Tensor4D* input = layer_get_output_tensor4D(l->prev_layer);
     Tensor4D* input_normalized = l->cache.bn_conv.x_normalized;
+    Tensor4D* z = l->cache.bn_conv.z;
     Tensor4D* output = l->cache.bn_conv.output;
     nn_float momentum = l->params.bn_conv.momentum;
 
     if (training) {
         // per-channel mean calculations
+        #pragma omp parallel for schedule(static)
         for (int c=0; c<input->n_channels; c++) {
             nn_float sum = (nn_float)0.0;
 
@@ -1027,6 +1090,7 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
         }
 
         // per-channel variance calculations
+        #pragma omp parallel for schedule(static)
         for (int c=0; c<input->n_channels; c++) {
             nn_float mean = matrix_get(l->cache.bn_conv.mean, 0, c);
             nn_float sum = (nn_float)0.0;
@@ -1051,6 +1115,7 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
     }
     
     // normalization and scaling
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int n=0; n<input->n_filters; n++) {
         for (int c=0; c<input->n_channels; c++) {
             nn_float mean, var;
@@ -1076,14 +1141,20 @@ void layer_batch_norm_conv2D_fp(Layer* l, bool training) {
 
             nn_float* input_channel = input->filters[n]->channels[c]->entries;
             nn_float* normalized_channel = input_normalized->filters[n]->channels[c]->entries;
-            nn_float* output_channel = output->filters[n]->channels[c]->entries;
+            nn_float* z_channel = z->filters[n]->channels[c]->entries;
 
             for (int i=0; i<input->n_rows * input->n_cols; i++) {
                 nn_float x = input_channel[i];
                 nn_float x_normalized = (x - mean) * inv_std;
                 normalized_channel[i] = x_normalized;
-                output_channel[i] = gamma * x_normalized + beta;
+                z_channel[i] = gamma * x_normalized + beta;
             }
+
+            apply_activation_func_into(
+                l->activation,
+                z->filters[n]->channels[c],
+                output->filters[n]->channels[c]
+            );
         }
     }
 }
@@ -1180,6 +1251,9 @@ void layer_conv2D_bp(Layer* l) {
     else if (l->next_layer->l_type == CONV2D) {
         bp_delta_from_conv2D(l->next_layer, dL_dA);
     }
+    else if (l->next_layer->l_type == BATCH_NORM_CONV2D) {
+        bp_delta_from_batch_norm_conv2D(l->next_layer, dL_dA);
+    }
 
     // dL_dZ calculation
     for (int n=0; n<delta->n_filters; n++) {
@@ -1196,7 +1270,6 @@ void layer_conv2D_bp(Layer* l) {
             );
         }
     }
-
 
     // dL_dW calculation
     {
@@ -1283,11 +1356,14 @@ void layer_conv2D_bp(Layer* l) {
 
 void layer_max_pool_bp(Layer* l) {
     // dL_dZ calculation
-    if (l->next_layer->l_type == FLATTEN) {
+    if (l->next_layer->l_type == CONV2D) {
+        bp_delta_from_conv2D(l->next_layer, l->cache.max_pool.delta);
+    }
+    else if (l->next_layer->l_type == FLATTEN) {
         bp_delta_from_flatten(l->next_layer, l->cache.max_pool.delta);     
     }
-    else if (l->next_layer->l_type == CONV2D) {
-        bp_delta_from_conv2D(l->next_layer, l->cache.max_pool.delta);
+    else if (l->next_layer->l_type == BATCH_NORM_CONV2D) {
+        bp_delta_from_batch_norm_conv2D(l->next_layer, l->cache.max_pool.delta);
     }
 }
 
@@ -1295,6 +1371,61 @@ void layer_flatten_bp(Layer* l) {
     // dL_dZ calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
         bp_delta_from_dense(l->next_layer, l->cache.flat.delta);
+    }
+}
+
+void layer_batch_norm_conv2D_bp(Layer* l) {
+    Tensor4D* delta = l->cache.bn_conv.delta;
+    Tensor4D* dL_dA = l->cache.bn_conv.dL_dA;
+    Tensor4D* dA_dZ = l->cache.bn_conv.dA_dZ;
+    Tensor4D* z = l->cache.bn_conv.z;
+
+    // dL_dA calculation
+    if (l->next_layer->l_type == CONV2D) {
+        bp_delta_from_conv2D(l->next_layer, dL_dA);
+    }
+    else if (l->next_layer->l_type == FLATTEN) {
+        bp_delta_from_flatten(l->next_layer, dL_dA);
+    }
+
+    // dL_dZ calculation
+    for (int n=0; n<delta->n_filters; n++) {
+        for (int c=0; c<delta->n_channels; c++) {
+            apply_activation_dZ_into(
+                l->activation,
+                z->filters[n]->channels[c],
+                dA_dZ->filters[n]->channels[c]
+            );
+            matrix_multiply_into(
+                dL_dA->filters[n]->channels[c],
+                dA_dZ->filters[n]->channels[c],
+                delta->filters[n]->channels[c]
+            );
+        }
+    }
+
+    // dL_dgamma and dL_dbeta
+    Matrix* beta_grad = l->cache.bn_conv.beta_grad;
+    Matrix* gamma_grad = l->cache.bn_conv.gamma_grad;
+    Tensor4D* x_norm = l->cache.bn_conv.x_normalized;
+
+    matrix_zero(beta_grad);
+    matrix_zero(gamma_grad);
+
+    for (int c=0; c<delta->n_channels; c++) {
+        nn_float b_sum = (nn_float)0.0;
+        nn_float g_sum = (nn_float)0.0;
+        for (int n=0; n<delta->n_filters; n++) {
+            nn_float* delta_row = delta->filters[n]->channels[c]->entries;
+            nn_float* x_norm_row = x_norm->filters[n]->channels[c]->entries;
+            for (int i=0; i<delta->n_rows * delta->n_cols; i++) {
+                b_sum += delta_row[i];
+                g_sum += delta_row[i] * x_norm_row[i];
+            }
+        }
+
+        matrix_assign(beta_grad, 0, c, b_sum);
+        matrix_assign(gamma_grad, 0, c, g_sum);
     }
 }
 
@@ -1411,6 +1542,68 @@ void bp_delta_from_flatten(Layer* from, Tensor4D* to) {
     );
 }
 
+void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to) {
+    Tensor4D* bn_input = layer_get_output_tensor4D(from->prev_layer);
+
+    #pragma omp parallel for schedule(static)
+    for (int c=0; c<to->n_channels; c++) {
+        nn_float mean_c = matrix_get(from->cache.bn_conv.mean, 0, c);
+        nn_float var_c = matrix_get(from->cache.bn_conv.variance, 0, c);
+        nn_float gamma_c = matrix_get(from->cache.bn_conv.gamma, 0, c);
+        nn_float dvar_c = (nn_float)0.0;
+        nn_float dmean_c = (nn_float)0.0;
+        int m = to->n_filters * to->n_rows * to->n_cols;
+
+        #ifdef SINGLE_PRECISION
+        nn_float inv_std = (nn_float)1.0 / sqrtf(var_c + 1e-5);
+        nn_float inv_pow_3_2 = (nn_float)1.0 / (sqrtf(var_c + 1e-5) * (var_c + 1e-5));
+        #endif
+        #ifdef DOUBLE_PRECISION
+        nn_float inv_std = (nn_float)1.0 / sqrt(var_c + 1e-5);
+        nn_float inv_pow_3_2 = (nn_float)1.0 / (sqrt(var_c + 1e-5) * (var_c + 1e-5));        
+        #endif
+
+        for (int n=0; n<to->n_filters; n++) {
+            nn_float* delta = from->cache.bn_conv.delta->filters[n]->channels[c]->entries;
+            nn_float* x = bn_input->filters[n]->channels[c]->entries;
+
+            for (int i=0; i<to->n_rows * to->n_cols; i++) {
+                // dL_dvar
+                dvar_c += delta[i] * gamma_c * (x[i]-mean_c) * inv_pow_3_2 * (nn_float)-0.5;
+
+                // dL_dmean (part 1/2)
+                dmean_c += delta[i] * gamma_c * (-inv_std);
+            }
+        }
+
+        nn_float sum = (nn_float)0.0;
+        for (int n=0; n<to->n_filters; n++) {
+            nn_float* x = bn_input->filters[n]->channels[c]->entries;
+
+            for (int i=0; i<to->n_rows * to->n_cols; i++) {
+                sum += x[i] - mean_c;
+            }
+        }
+
+        // dL_dmean (part 2/2)
+        dmean_c += dvar_c * sum / (nn_float)m *(nn_float)-2.0;
+
+        for (int n=0; n<to->n_filters; n++) {
+            nn_float* delta = from->cache.bn_conv.delta->filters[n]->channels[c]->entries;
+            nn_float* x = bn_input->filters[n]->channels[c]->entries;
+            nn_float* dL_dX = to->filters[n]->channels[c]->entries;
+            for (int i=0; i<to->n_rows * to->n_cols; i++) {
+                nn_float term1 = delta[i] * gamma_c * inv_std;
+                nn_float term2 = dvar_c * (x[i] - mean_c) / (nn_float)m * (nn_float)2.0;
+                nn_float term3 = dmean_c / (nn_float)m;
+
+                // dL_dX
+                dL_dX[i] = term1 + term2 + term3;
+            }
+        }
+    }
+}
+
 void layer_dense_update_weights(Layer* l, Optimizer* opt) {
     opt->update_dense_weights(
         l->cache.dense.weight, 
@@ -1453,6 +1646,21 @@ void layer_conv2D_update_weights(Layer* l, Optimizer* opt) {
     #ifdef IM2COL_CONV
     kernel_into_im2col_fwise(weight, false, l->cache.conv.fp_im2col_kernel);
     #endif
+}
+
+void layer_batch_norm_conv2D_update_weights(Layer* l, Optimizer* opt) {
+    opt->update_batch_norm_gamma(
+        l->cache.bn_conv.gamma, 
+        l->cache.bn_conv.gamma_grad, 
+        opt,
+        l->layer_idx
+    );
+    opt->update_batch_norm_beta(
+        l->cache.bn_conv.beta, 
+        l->cache.bn_conv.beta_grad, 
+        opt,
+        l->layer_idx
+    );   
 }
 
 unsigned long layer_output_get_sizeof_mem_allocated(Layer* l) {
@@ -1555,6 +1763,10 @@ unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l) {
     size += sizeof(l->params.bn_conv);
     size += sizeof(l->cache.bn_conv);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.output);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.z);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.delta);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.dL_dA);
+    size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.dA_dZ);
     size += tensor4D_get_sizeof_mem_allocated(l->cache.bn_conv.x_normalized);
     size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.mean);
     size += matrix_get_sizeof_mem_allocated(l->cache.bn_conv.variance);
