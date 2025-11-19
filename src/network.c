@@ -195,8 +195,6 @@ void neural_net_compile(NeuralNet* net) {
         ada->n_layers = net->n_layers;
         ada->weight_s = (Tensor4D**)malloc(ada->n_layers * sizeof(Tensor4D*));
         ada->bias_s = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
-        ada->intermediate_w = (Tensor4D**)malloc(ada->n_layers * sizeof(Tensor4D*));
-        ada->intermediate_b = (Matrix**)malloc(ada->n_layers * sizeof(Matrix*));
 
         for (int i=0; i<ada->n_layers; i++) {
             Layer* l = net->layers[i];
@@ -217,20 +215,6 @@ void neural_net_compile(NeuralNet* net) {
                         layer_get_n_units(l)
                     );
                     matrix_zero(ada->bias_s[i]);
-
-                    ada->intermediate_w[i] = tensor4D_new(
-                        layer_get_n_units(l->prev_layer), 
-                        layer_get_n_units(l),
-                        1,
-                        1
-                    );
-                    tensor4D_zero(ada->intermediate_w[i]);
-
-                    ada->intermediate_b[i] = matrix_new(
-                        1,
-                        layer_get_n_units(l)
-                    );
-                    matrix_zero(ada->intermediate_b[i]);
                     break;
                 }
                 case CONV2D: {
@@ -247,20 +231,6 @@ void neural_net_compile(NeuralNet* net) {
                         l->params.conv.n_filters
                     );
                     matrix_zero(ada->bias_s[i]);
-
-                    ada->intermediate_w[i] = tensor4D_new(
-                        l->params.conv.filter_size,
-                        l->params.conv.filter_size,
-                        l->params.conv.n_filter_channels,
-                        l->params.conv.n_filters
-                    );
-                    tensor4D_zero(ada->intermediate_w[i]);
-
-                    ada->intermediate_b[i] = matrix_new(
-                        1,
-                        l->params.conv.n_filters
-                    );
-                    matrix_zero(ada->intermediate_b[i]);
                     break;
                 }
                 case BATCH_NORM_CONV2D: {
@@ -277,20 +247,6 @@ void neural_net_compile(NeuralNet* net) {
                         l->cache.bn_conv.beta->n_cols
                     );
                     matrix_zero(ada->bias_s[i]);
-
-                    ada->intermediate_w[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_conv.gamma->n_cols,
-                        1,
-                        1
-                    );
-                    tensor4D_zero(ada->intermediate_w[i]);
-
-                    ada->intermediate_b[i] = matrix_new(
-                        1,
-                        l->cache.bn_conv.beta->n_cols
-                    );
-                    matrix_zero(ada->intermediate_b[i]);
                     break;  
                 }
                 case BATCH_NORM_DENSE: {
@@ -307,27 +263,11 @@ void neural_net_compile(NeuralNet* net) {
                         l->cache.bn_dense.beta->n_cols
                     );
                     matrix_zero(ada->bias_s[i]);
-
-                    ada->intermediate_w[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_dense.gamma->n_cols,
-                        1,
-                        1
-                    );
-                    tensor4D_zero(ada->intermediate_w[i]);
-
-                    ada->intermediate_b[i] = matrix_new(
-                        1,
-                        l->cache.bn_dense.beta->n_cols
-                    );
-                    matrix_zero(ada->intermediate_b[i]);
                     break;  
                 }
                 default: {
                     ada->weight_s[i] = NULL;
                     ada->bias_s[i] = NULL;
-                    ada->intermediate_w[i] = NULL;
-                    ada->intermediate_b[i] = NULL;
                     break;
                 }
             }
@@ -339,15 +279,9 @@ void neural_net_compile(NeuralNet* net) {
         adam->n_layers = net->n_layers;
 
         adam->weight_m = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->weight_m_corr = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->weight_s = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->weight_s_corr = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
-        adam->intermediate_w = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));
+        adam->weight_s = (Tensor4D**)malloc(adam->n_layers * sizeof(Tensor4D*));;
         adam->bias_m = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
-        adam->bias_m_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
         adam->bias_s = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
-        adam->bias_s_corr = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
-        adam->intermediate_b = (Matrix**)malloc(adam->n_layers * sizeof(Matrix*));
 
         for (int i=0; i<adam->n_layers; i++) {
             Layer* l = net->layers[i];
@@ -361,25 +295,7 @@ void neural_net_compile(NeuralNet* net) {
                         1,
                         1
                     );
-                    adam->weight_m_corr[i] = tensor4D_new(
-                        layer_get_n_units(l->prev_layer), 
-                        layer_get_n_units(l),
-                        1,
-                        1
-                    );
                     adam->weight_s[i] = tensor4D_new(
-                        layer_get_n_units(l->prev_layer), 
-                        layer_get_n_units(l),
-                        1,
-                        1
-                    );
-                    adam->weight_s_corr[i] = tensor4D_new(
-                        layer_get_n_units(l->prev_layer), 
-                        layer_get_n_units(l),
-                        1,
-                        1
-                    );
-                    adam->intermediate_w[i] = tensor4D_new(
                         layer_get_n_units(l->prev_layer), 
                         layer_get_n_units(l),
                         1,
@@ -387,16 +303,9 @@ void neural_net_compile(NeuralNet* net) {
                     );
 
                     tensor4D_zero(adam->weight_m[i]);
-                    tensor4D_zero(adam->weight_m_corr[i]);
                     tensor4D_zero(adam->weight_s[i]);
-                    tensor4D_zero(adam->weight_s_corr[i]);
-                    tensor4D_zero(adam->intermediate_w[i]);
                     
                     adam->bias_m[i] = matrix_new(
-                        1,
-                        layer_get_n_units(l)
-                    );
-                    adam->bias_m_corr[i] = matrix_new(
                         1,
                         layer_get_n_units(l)
                     );
@@ -404,20 +313,9 @@ void neural_net_compile(NeuralNet* net) {
                         1,
                         layer_get_n_units(l)
                     );
-                    adam->bias_s_corr[i] = matrix_new(
-                        1,
-                        layer_get_n_units(l)
-                    );
-                    adam->intermediate_b[i] = matrix_new(
-                        1,
-                        layer_get_n_units(l)
-                    );
 
                     matrix_zero(adam->bias_m[i]);
-                    matrix_zero(adam->bias_m_corr[i]);
-                    matrix_zero(adam->bias_s[i]);
-                    matrix_zero(adam->bias_s_corr[i]);
-                    matrix_zero(adam->intermediate_b[i]);
+                    matrix_zero(adam->bias_s[i]);;
                     break;
                 }
                 case CONV2D: {
@@ -427,25 +325,7 @@ void neural_net_compile(NeuralNet* net) {
                         l->params.conv.n_filter_channels,
                         l->params.conv.n_filters
                     );
-                    adam->weight_m_corr[i] = tensor4D_new(
-                        l->params.conv.filter_size, 
-                        l->params.conv.filter_size,
-                        l->params.conv.n_filter_channels,
-                        l->params.conv.n_filters
-                    );
                     adam->weight_s[i] = tensor4D_new(
-                        l->params.conv.filter_size, 
-                        l->params.conv.filter_size,
-                        l->params.conv.n_filter_channels,
-                        l->params.conv.n_filters
-                    );
-                    adam->weight_s_corr[i] = tensor4D_new(
-                        l->params.conv.filter_size, 
-                        l->params.conv.filter_size,
-                        l->params.conv.n_filter_channels,
-                        l->params.conv.n_filters
-                    );
-                    adam->intermediate_w[i] = tensor4D_new(
                         l->params.conv.filter_size, 
                         l->params.conv.filter_size,
                         l->params.conv.n_filter_channels,
@@ -453,16 +333,9 @@ void neural_net_compile(NeuralNet* net) {
                     );
 
                     tensor4D_zero(adam->weight_m[i]);
-                    tensor4D_zero(adam->weight_m_corr[i]);
                     tensor4D_zero(adam->weight_s[i]);
-                    tensor4D_zero(adam->weight_s_corr[i]);
-                    tensor4D_zero(adam->intermediate_w[i]);
                     
                     adam->bias_m[i] = matrix_new(
-                        1,
-                        l->params.conv.n_filters
-                    );
-                    adam->bias_m_corr[i] = matrix_new(
                         1,
                         l->params.conv.n_filters
                     );
@@ -470,20 +343,9 @@ void neural_net_compile(NeuralNet* net) {
                         1,
                         l->params.conv.n_filters
                     );
-                    adam->bias_s_corr[i] = matrix_new(
-                        1,
-                        l->params.conv.n_filters
-                    );
-                    adam->intermediate_b[i] = matrix_new(
-                        1,
-                        l->params.conv.n_filters
-                    );
 
                     matrix_zero(adam->bias_m[i]);
-                    matrix_zero(adam->bias_m_corr[i]);
                     matrix_zero(adam->bias_s[i]);
-                    matrix_zero(adam->bias_s_corr[i]);
-                    matrix_zero(adam->intermediate_b[i]);
                     break;
                 }
                 case BATCH_NORM_CONV2D: {
@@ -493,25 +355,7 @@ void neural_net_compile(NeuralNet* net) {
                         1,
                         1
                     );
-                    adam->weight_m_corr[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_conv.gamma->n_cols,
-                        1,
-                        1
-                    );
                     adam->weight_s[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_conv.gamma->n_cols,
-                        1,
-                        1
-                    );
-                    adam->weight_s_corr[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_conv.gamma->n_cols,
-                        1,
-                        1
-                    );
-                    adam->intermediate_w[i] = tensor4D_new(
                         1, 
                         l->cache.bn_conv.gamma->n_cols,
                         1,
@@ -519,16 +363,9 @@ void neural_net_compile(NeuralNet* net) {
                     );
 
                     tensor4D_zero(adam->weight_m[i]);
-                    tensor4D_zero(adam->weight_m_corr[i]);
                     tensor4D_zero(adam->weight_s[i]);
-                    tensor4D_zero(adam->weight_s_corr[i]);
-                    tensor4D_zero(adam->intermediate_w[i]);
                     
                     adam->bias_m[i] = matrix_new(
-                        1,
-                        l->cache.bn_conv.beta->n_cols
-                    );
-                    adam->bias_m_corr[i] = matrix_new(
                         1,
                         l->cache.bn_conv.beta->n_cols
                     );
@@ -536,20 +373,9 @@ void neural_net_compile(NeuralNet* net) {
                         1,
                         l->cache.bn_conv.beta->n_cols
                     );
-                    adam->bias_s_corr[i] = matrix_new(
-                        1,
-                        l->cache.bn_conv.beta->n_cols
-                    );
-                    adam->intermediate_b[i] = matrix_new(
-                        1,
-                        l->cache.bn_conv.beta->n_cols
-                    );
 
                     matrix_zero(adam->bias_m[i]);
-                    matrix_zero(adam->bias_m_corr[i]);
                     matrix_zero(adam->bias_s[i]);
-                    matrix_zero(adam->bias_s_corr[i]);
-                    matrix_zero(adam->intermediate_b[i]);
                     break;
                 }
                 case BATCH_NORM_DENSE: {
@@ -559,25 +385,7 @@ void neural_net_compile(NeuralNet* net) {
                         1,
                         1
                     );
-                    adam->weight_m_corr[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_dense.gamma->n_cols,
-                        1,
-                        1
-                    );
                     adam->weight_s[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_dense.gamma->n_cols,
-                        1,
-                        1
-                    );
-                    adam->weight_s_corr[i] = tensor4D_new(
-                        1, 
-                        l->cache.bn_dense.gamma->n_cols,
-                        1,
-                        1
-                    );
-                    adam->intermediate_w[i] = tensor4D_new(
                         1, 
                         l->cache.bn_dense.gamma->n_cols,
                         1,
@@ -585,16 +393,9 @@ void neural_net_compile(NeuralNet* net) {
                     );
 
                     tensor4D_zero(adam->weight_m[i]);
-                    tensor4D_zero(adam->weight_m_corr[i]);
                     tensor4D_zero(adam->weight_s[i]);
-                    tensor4D_zero(adam->weight_s_corr[i]);
-                    tensor4D_zero(adam->intermediate_w[i]);
                     
                     adam->bias_m[i] = matrix_new(
-                        1,
-                        l->cache.bn_dense.beta->n_cols
-                    );
-                    adam->bias_m_corr[i] = matrix_new(
                         1,
                         l->cache.bn_dense.beta->n_cols
                     );
@@ -602,33 +403,16 @@ void neural_net_compile(NeuralNet* net) {
                         1,
                         l->cache.bn_dense.beta->n_cols
                     );
-                    adam->bias_s_corr[i] = matrix_new(
-                        1,
-                        l->cache.bn_dense.beta->n_cols
-                    );
-                    adam->intermediate_b[i] = matrix_new(
-                        1,
-                        l->cache.bn_dense.beta->n_cols
-                    );
 
                     matrix_zero(adam->bias_m[i]);
-                    matrix_zero(adam->bias_m_corr[i]);
                     matrix_zero(adam->bias_s[i]);
-                    matrix_zero(adam->bias_s_corr[i]);
-                    matrix_zero(adam->intermediate_b[i]);
                     break; 
                 }
                 default: {
                     adam->weight_m[i] = NULL;
-                    adam->weight_m_corr[i] = NULL;
                     adam->weight_s[i] = NULL;
-                    adam->weight_s_corr[i] = NULL;
-                    adam->intermediate_w[i] = NULL;
                     adam->bias_m[i] = NULL;
-                    adam->bias_m_corr[i] = NULL;
                     adam->bias_s[i] = NULL;
-                    adam->bias_s_corr[i] = NULL;
-                    adam->intermediate_b[i] = NULL;
                     break;
                 }
             } 
@@ -945,11 +729,6 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
     printf("Fit time taken: %.3f seconds\n", total_time);
     printf("Average fit time taken per epoch: %.3f seconds\n", total_time / n_epochs);
 
-    if (net->optimizer->type == ADAM) {
-        AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
-        adam->ctr = 0;
-    }
-
     if (net->is_cnn) {
         tensor4D_free(x_train_split_tensor);
         tensor4D_free(x_val_split_tensor);
@@ -1228,7 +1007,8 @@ void back_prop(NeuralNet* net) {
 void update_weights(NeuralNet* net) {
     if (net->optimizer->type == ADAM) {
         AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
-        adam->ctr++;
+        adam->beta_m_pow *= adam->beta_m;
+        adam->beta_s_pow *= adam->beta_s;
     }
 
     for (int j=1; j<net->n_layers; j++) {

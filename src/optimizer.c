@@ -119,18 +119,26 @@ void update_dense_weights_momentum(Matrix* weights, Matrix* gradient, Optimizer*
 
     Matrix* weight_momentum = mom->weight_momentum[layer_idx]->filters[0]->channels[0];
 
-    if (optimizer->type == NESTEROV) {
-        matrix_subtract_into(
-            weights, 
-            weight_momentum, 
-            weights
-        );
-    }
+    nn_float* w = weights->entries;
+    nn_float* g = gradient->entries;
+    nn_float* w_m = weight_momentum->entries;
+    nn_float lr = mom->learning_rate;
+    nn_float beta = mom->beta;
+    int n = weights->n_rows * weights->n_cols;
 
-    matrix_scale_inplace(mom->beta, weight_momentum);
-    matrix_scale_inplace(mom->learning_rate, gradient);
-    matrix_subtract_into(weight_momentum, gradient, weight_momentum);
-    matrix_add_into(weights, weight_momentum, weights);  
+    if (optimizer->type == NESTEROV) {
+        for (int i=0; i<n; i++) {
+            w[i] -= w_m[i];
+            w_m[i] = w_m[i] * beta - g[i] * lr;
+            w[i] += w_m[i];
+        }
+    }
+    else {
+        for (int i=0; i<n; i++) {
+            w_m[i] = w_m[i] * beta - g[i] * lr;
+            w[i] += w_m[i];
+        }
+    } 
 }
 
 void update_conv_weights_momentum(Tensor4D* weights, Tensor4D* gradient, Optimizer* optimizer, int layer_idx) {
@@ -138,18 +146,37 @@ void update_conv_weights_momentum(Tensor4D* weights, Tensor4D* gradient, Optimiz
 
     Tensor4D* weight_momentum = mom->weight_momentum[layer_idx];
 
-    if (optimizer->type == NESTEROV) {
-        tensor4D_subtract_into(
-            weights, 
-            weight_momentum, 
-            weights
-        );
-    }
+    nn_float lr = mom->learning_rate;
+    nn_float beta = mom->beta;
+    int n = weights->n_rows * weights->n_cols;
 
-    tensor4D_scale_inplace(mom->beta, weight_momentum);
-    tensor4D_scale_inplace(mom->learning_rate, gradient);
-    tensor4D_subtract_into(weight_momentum, gradient, weight_momentum);
-    tensor4D_add_into(weights, weight_momentum, weights);
+    if (optimizer->type == NESTEROV) {
+        for (int f=0; f<weights->n_filters; f++) {
+            for (int c=0; c<weights->n_channels; c++) {
+                nn_float* w = weights->filters[f]->channels[c]->entries;
+                nn_float* g = gradient->filters[f]->channels[c]->entries;
+                nn_float* w_m = weight_momentum->filters[f]->channels[c]->entries;
+                for (int i=0; i<n; i++) {
+                    w[i] -= w_m[i];
+                    w_m[i] = w_m[i] * beta - g[i] * lr;
+                    w[i] += w_m[i];
+                }
+            }
+        }
+    }
+    else {
+        for (int f=0; f<weights->n_filters; f++) {
+            for (int c=0; c<weights->n_channels; c++) {
+                nn_float* w = weights->filters[f]->channels[c]->entries;
+                nn_float* g = gradient->filters[f]->channels[c]->entries;
+                nn_float* w_m = weight_momentum->filters[f]->channels[c]->entries;
+                for (int i=0; i<n; i++) {
+                    w_m[i] = w_m[i] * beta - g[i] * lr;
+                    w[i] += w_m[i];
+                }
+            }
+        }
+    }
 }
 
 void update_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int layer_idx) {
@@ -157,18 +184,26 @@ void update_bias_momentum(Matrix* bias, Matrix* gradient, Optimizer* optimizer, 
 
     Matrix* bias_momentum = mom->bias_momentum[layer_idx];
 
-    if (optimizer->type == NESTEROV) {
-        matrix_subtract_into(
-            bias, 
-            bias_momentum, 
-            bias
-        );
-    }
+    nn_float* b = bias->entries;
+    nn_float* g = gradient->entries;
+    nn_float* b_m = bias_momentum->entries;
+    nn_float lr = mom->learning_rate;
+    nn_float beta = mom->beta;
+    int n = bias->n_rows * bias->n_cols;
 
-    matrix_scale_inplace(mom->beta, bias_momentum);
-    matrix_scale_inplace(mom->learning_rate, gradient);
-    matrix_subtract_into(bias_momentum, gradient, bias_momentum);
-    matrix_add_into(bias, bias_momentum, bias);
+    if (optimizer->type == NESTEROV) {
+        for (int i=0; i<n; i++) {
+            b[i] -= b_m[i];
+            b_m[i] = b_m[i] * beta - g[i] * lr;
+            b[i] += b_m[i];
+        }
+    }
+    else {
+        for (int i=0; i<n; i++) {
+            b_m[i] = b_m[i] * beta - g[i] * lr;
+            b[i] += b_m[i];
+        }
+    } 
 }
 
 void pre_update_dense_weights_nesterov(Matrix* weight, Optimizer* optimizer, int layer_idx) {
@@ -251,8 +286,6 @@ Optimizer* optimizer_adagrad_new(nn_float learning_rate) {
     ada->n_layers = -1;
     ada->weight_s = NULL;
     ada->bias_s = NULL;
-    ada->intermediate_w = NULL;
-    ada->intermediate_b = NULL;
 
     opt->settings = ada;
 
@@ -265,14 +298,10 @@ void optimizer_adagrad_free(Optimizer* optimizer) {
     for (int i=0; i<ada->n_layers; i++) {
         tensor4D_free(ada->weight_s[i]);
         matrix_free(ada->bias_s[i]);
-        tensor4D_free(ada->intermediate_w[i]);
-        matrix_free(ada->intermediate_b[i]);
     }
 
     free(ada->weight_s);
     free(ada->bias_s);
-    free(ada->intermediate_w);
-    free(ada->intermediate_b);
 
     free(optimizer->settings);
     free(optimizer);
@@ -282,69 +311,83 @@ void update_dense_weights_adagrad(Matrix* weights, Matrix* gradient, Optimizer* 
     AdaGradConfig* ada = (AdaGradConfig*)optimizer->settings;
 
     Matrix* weight_s = ada->weight_s[layer_idx]->filters[0]->channels[0];
-    Matrix* intermediate = ada->intermediate_w[layer_idx]->filters[0]->channels[0];
-
-    matrix_multiply_into(gradient, gradient, intermediate);
-    matrix_add_into(weight_s, intermediate, weight_s);
     
-    matrix_scale_inplace(ada->learning_rate, gradient);
-    matrix_add_scalar_into((nn_float)1e-9, weight_s, intermediate);
+    nn_float* w = weights->entries;
+    nn_float* g = gradient->entries;
+    nn_float* s = weight_s->entries;
 
-    #ifdef SINGLE_PRECISION
-    matrix_apply_inplace(sqrtf, intermediate);
-    #endif
-    #ifdef DOUBLE_PRECISION
-    matrix_apply_inplace(sqrt, intermediate);
-    #endif
+    int n = weights->n_rows * weights->n_cols;
+    nn_float lr = ada->learning_rate;
 
-    matrix_divide_into(gradient, intermediate, intermediate);
-    matrix_subtract_into(weights, intermediate, weights); 
+    for (int i=0; i<n; i++) {
+        s[i] += g[i] * g[i];
+
+        #ifdef SINGLE_PRECISION
+        nn_float denom = sqrtf(s[i] + 1e-5);
+        #elif defined(DOUBLE_PRECISION)
+        nn_float denom = sqrt(s[i] + 1e-5);
+        #endif
+
+        nn_float step = lr * g[i] / denom;
+        w[i] -= step;
+    }
 }
 
 void update_conv_weights_adagrad(Tensor4D* weights, Tensor4D* gradient, Optimizer* optimizer, int layer_idx) {
     AdaGradConfig* ada = (AdaGradConfig*)optimizer->settings;
 
     Tensor4D* weight_s = ada->weight_s[layer_idx];
-    Tensor4D* intermediate = ada->intermediate_w[layer_idx];
+    int n = weights->n_rows * weights->n_cols;
+    nn_float lr = ada->learning_rate;
 
-    tensor4D_multiply_into(gradient, gradient, intermediate);
-    tensor4D_add_into(weight_s, intermediate, weight_s);
+    for (int f=0; f<weights->n_filters; f++) {
+        for (int c=0; c<weights->n_channels; c++) {
+            nn_float* w = weights->filters[f]->channels[c]->entries;
+            nn_float* g = gradient->filters[f]->channels[c]->entries;
+            nn_float* s = weight_s->filters[f]->channels[c]->entries;
+
+            for (int i=0; i<n; i++) {
+                s[i] += g[i] * g[i];
+
+                #ifdef SINGLE_PRECISION
+                nn_float denom = sqrtf(s[i] + 1e-5);
+                #elif defined(DOUBLE_PRECISION)
+                nn_float denom = sqrt(s[i] + 1e-5);
+                #endif
+
+                nn_float step = lr * g[i] / denom;
+                w[i] -= step;
+            }
+        }
+    }
+
     
-    tensor4D_scale_inplace(ada->learning_rate, gradient);
-    tensor4D_add_scalar_into((nn_float)1e-9, weight_s, intermediate);
-
-    #ifdef SINGLE_PRECISION
-    tensor4D_apply_inplace(sqrtf, intermediate);
-    #endif
-    #ifdef DOUBLE_PRECISION
-    tensor4D_apply_inplace(sqrt, intermediate);
-    #endif
-
-    tensor4D_divide_into(gradient, intermediate, intermediate);
-    tensor4D_subtract_into(weights, intermediate, weights);
 }
 
 void update_bias_adagrad(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int layer_idx) {
     AdaGradConfig* ada = (AdaGradConfig*)optimizer->settings;
 
     Matrix* bias_s = ada->bias_s[layer_idx];
-    Matrix* intermediate = ada->intermediate_b[layer_idx];
+    nn_float* b = bias->entries;
+    nn_float* g = gradient->entries;
+    nn_float* s = bias_s->entries;
 
-    matrix_multiply_into(gradient, gradient, intermediate);
-    matrix_add_into(bias_s, intermediate, bias_s);
-    
-    matrix_scale_inplace(ada->learning_rate, gradient);
-    matrix_add_scalar_into((nn_float)1e-9, bias_s, intermediate);
+    int n = bias->n_rows * bias->n_cols;
+    nn_float lr = ada->learning_rate;
 
-    #ifdef SINGLE_PRECISION
-    matrix_apply_inplace(sqrtf, intermediate);
-    #endif
-    #ifdef DOUBLE_PRECISION
-    matrix_apply_inplace(sqrt, intermediate);
-    #endif
+    for (int i=0; i<n; i++) {
+        s[i] += g[i] * g[i];
 
-    matrix_divide_into(gradient, intermediate, intermediate);
-    matrix_subtract_into(bias, intermediate, bias);
+        #ifdef SINGLE_PRECISION
+        nn_float denom = sqrtf(s[i] + 1e-5);
+        #elif defined(DOUBLE_PRECISION)
+        nn_float denom = sqrt(s[i] + 1e-5);
+        #endif
+
+        nn_float step = lr * g[i] / denom;
+        b[i] -= step;
+    }
+
 }
 
 void optimizer_adagrad_print_info(Optimizer* optimizer) {
@@ -368,8 +411,6 @@ size_t optimizer_adagrad_get_mem_allocated(Optimizer* optimizer) {
     size += sizeof(*ada);
     size += ada->n_layers * sizeof(*(ada->weight_s));
     size += ada->n_layers * sizeof(*(ada->bias_s));
-    size += ada->n_layers * sizeof(*(ada->intermediate_w));
-    size += ada->n_layers * sizeof(*(ada->intermediate_b));
 
     for (int i=0; i<ada->n_layers; i++) {
         if (ada->weight_s[i] != NULL) {
@@ -377,12 +418,6 @@ size_t optimizer_adagrad_get_mem_allocated(Optimizer* optimizer) {
         }
         if (ada->bias_s[i] != NULL) {
             size += matrix_get_sizeof_mem_allocated(ada->bias_s[i]);
-        }
-        if (ada->intermediate_w[i] != NULL) {
-            size += tensor4D_get_sizeof_mem_allocated(ada->intermediate_w[i]);
-        }
-        if (ada->intermediate_b[i] != NULL) {
-            size += matrix_get_sizeof_mem_allocated(ada->intermediate_b[i]);
         }
     }
 
@@ -407,20 +442,14 @@ Optimizer* optimizer_adam_new(nn_float learning_rate, nn_float beta_m, nn_float 
     adam->beta_m = beta_m;
     adam->beta_s = beta_s;
     adam->n_layers = -1;
-    adam->ctr = 0;
+    adam->beta_m_pow = (nn_float)1.0;
+    adam->beta_s_pow = (nn_float)1.0;
 
     adam->weight_m = NULL;
     adam->bias_m = NULL;
-    adam->weight_m_corr = NULL;
-    adam->bias_m_corr = NULL;
 
     adam->weight_s = NULL;
     adam->bias_s = NULL;
-    adam->weight_s_corr = NULL;
-    adam->bias_m_corr = NULL;
-
-    adam->intermediate_w = NULL;
-    adam->intermediate_b = NULL;
 
     opt->settings = adam;
 
@@ -432,30 +461,17 @@ void optimizer_adam_free(Optimizer* optimizer) {
 
     for (int i=1; i<adam->n_layers; i++) {
         tensor4D_free(adam->weight_m[i]);
-        tensor4D_free(adam->weight_m_corr[i]);
         tensor4D_free(adam->weight_s[i]);
-        tensor4D_free(adam->weight_s_corr[i]);
-        tensor4D_free(adam->intermediate_w[i]);
         
         matrix_free(adam->bias_m[i]);
-        matrix_free(adam->bias_m_corr[i]);
         matrix_free(adam->bias_s[i]);
-        matrix_free(adam->bias_s_corr[i]);
-        matrix_free(adam->intermediate_b[i]);
-
     }
 
     free(adam->weight_m);
-    free(adam->weight_m_corr);
     free(adam->weight_s);
-    free(adam->weight_s_corr);
-    free(adam->intermediate_w);
     
     free(adam->bias_m);
-    free(adam->bias_m_corr);
     free(adam->bias_s);
-    free(adam->bias_s_corr);
-    free(adam->intermediate_b);
     
     free(optimizer->settings);
     free(optimizer);
@@ -465,120 +481,128 @@ void update_dense_weights_adam(Matrix* weights, Matrix* gradient, Optimizer* opt
     AdamConfig* adam = (AdamConfig*)optimizer->settings;
 
     Matrix* weight_m = adam->weight_m[layer_idx]->filters[0]->channels[0];
-    Matrix* weight_m_corr = adam->weight_m_corr[layer_idx]->filters[0]->channels[0];
     Matrix* weight_s = adam->weight_s[layer_idx]->filters[0]->channels[0];
-    Matrix* weight_s_corr = adam->weight_s_corr[layer_idx]->filters[0]->channels[0];
-    Matrix* intermediate_w = adam->intermediate_w[layer_idx]->filters[0]->channels[0];
 
-    matrix_scale_inplace(adam->beta_m, weight_m);
-    matrix_scale_into((nn_float)1.0 - adam->beta_m, gradient, intermediate_w);
-    matrix_subtract_into(weight_m, intermediate_w, weight_m);
+    nn_float* w = weights->entries;
+    nn_float* g = gradient->entries;
+    nn_float* m = weight_m->entries;
+    nn_float* s = weight_s->entries;
 
-    matrix_scale_inplace(adam->beta_s, weight_s);
-    matrix_multiply_into(gradient, gradient, intermediate_w);
-    matrix_scale_inplace((nn_float)1.0 - adam->beta_s, intermediate_w);
-    matrix_add_into(weight_s, intermediate_w, weight_s);
+    int n = weights->n_rows * weights->n_cols;
 
-    #ifdef SINGLE_PRECISION
+    nn_float beta_m = adam->beta_m;
+    nn_float beta_s = adam->beta_s;
+    nn_float lr = adam->learning_rate;
 
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_m, adam->ctr)), weight_m, weight_m_corr);
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
-    matrix_add_scalar_into((nn_float)1e-9, weight_s_corr, intermediate_w);
-    matrix_apply_inplace(sqrtf, intermediate_w);
+    nn_float beta_m_pow = adam->beta_m_pow;
+    nn_float beta_s_pow = adam->beta_s_pow;
+    nn_float inv_bias_m = (nn_float)1.0 / ((nn_float)1.0 - beta_m_pow);
+    nn_float inv_bias_s = (nn_float)1.0 / ((nn_float)1.0 - beta_s_pow);
 
-    #endif
-    #ifdef DOUBLE_PRECISION
+    for (int i=0; i<n; i++) {
+        m[i] = beta_m * m[i] + ((nn_float)1.0 - beta_m) * g[i];
+        s[i] = beta_s * s[i] + ((nn_float)1.0 - beta_s) * g[i] * g[i];
 
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_m, adam->ctr)), weight_m, weight_m_corr);
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
-    matrix_add_scalar_into((nn_float)1e-9, weight_s_corr, intermediate_w);
-    matrix_apply_inplace(sqrt, intermediate_w);
+        nn_float m_hat = m[i] * inv_bias_m;
+        nn_float s_hat = s[i] * inv_bias_s;
 
-    #endif
+        #ifdef SINGLE_PRECISION
+        nn_float denom = sqrtf(s_hat + 1e-5);
+        #elif defined(DOUBLE_PRECISION)
+        nn_float denom = sqrt(s_hat + 1e-5);
+        #endif
 
-    matrix_divide_into(weight_m_corr, intermediate_w, intermediate_w);
-    matrix_scale_inplace(adam->learning_rate, intermediate_w);
-    matrix_add_into(weights, intermediate_w, weights);
+        nn_float step = lr * (m_hat / denom);
+
+        w[i] -= step;
+    }
 }
 
 void update_conv_weights_adam(Tensor4D* weights, Tensor4D* gradient, Optimizer* optimizer, int layer_idx) {
     AdamConfig* adam = (AdamConfig*)optimizer->settings;
 
     Tensor4D* weight_m = adam->weight_m[layer_idx];
-    Tensor4D* weight_m_corr = adam->weight_m_corr[layer_idx];
     Tensor4D* weight_s = adam->weight_s[layer_idx];
-    Tensor4D* weight_s_corr = adam->weight_s_corr[layer_idx];
-    Tensor4D* intermediate_w = adam->intermediate_w[layer_idx];
 
-    tensor4D_scale_inplace(adam->beta_m, weight_m);
-    tensor4D_scale_into((nn_float)1.0 - adam->beta_m, gradient, intermediate_w);
-    tensor4D_subtract_into(weight_m, intermediate_w, weight_m);
+    nn_float beta_m = adam->beta_m;
+    nn_float beta_s = adam->beta_s;
+    nn_float lr = adam->learning_rate;
 
-    tensor4D_scale_inplace(adam->beta_s, weight_s);
-    tensor4D_multiply_into(gradient, gradient, intermediate_w);
-    tensor4D_scale_inplace((nn_float)1.0 - adam->beta_s, intermediate_w);
-    tensor4D_add_into(weight_s, intermediate_w, weight_s);
+    nn_float beta_m_pow = adam->beta_m_pow;
+    nn_float beta_s_pow = adam->beta_s_pow;
+    nn_float inv_bias_m = (nn_float)1.0 / ((nn_float)1.0 - beta_m_pow);
+    nn_float inv_bias_s = (nn_float)1.0 / ((nn_float)1.0 - beta_s_pow);
 
-    #ifdef SINGLE_PRECISION
+    for (int f=0; f<weights->n_filters; f++) {
+        for (int c=0; c<weights->n_channels; c++) {
+            nn_float* w = weights->filters[f]->channels[c]->entries;
+            nn_float* g = gradient->filters[f]->channels[c]->entries;
+            nn_float* m = weight_m->filters[f]->channels[c]->entries;
+            nn_float* s = weight_s->filters[f]->channels[c]->entries;
 
-    tensor4D_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_m, adam->ctr)), weight_m, weight_m_corr);
-    tensor4D_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
-    tensor4D_add_scalar_into((nn_float)1e-9, weight_s_corr, intermediate_w);
-    tensor4D_apply_inplace(sqrtf, intermediate_w);
+            int n = weights->n_rows * weights->n_cols;
 
-    #endif
-    #ifdef DOUBLE_PRECISION
+            for (int i=0; i<n; i++) {
+                m[i] = beta_m * m[i] + ((nn_float)1.0 - beta_m) * g[i];
+                s[i] = beta_s * s[i] + ((nn_float)1.0 - beta_s) * g[i] * g[i];
 
-    tensor4D_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_m, adam->ctr)), weight_m, weight_m_corr);
-    tensor4D_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_s, adam->ctr)), weight_s, weight_s_corr);
-    tensor4D_add_scalar_into((nn_float)1e-9, weight_s_corr, intermediate_w);
-    tensor4D_apply_inplace(sqrt, intermediate_w);
+                nn_float m_hat = m[i] * inv_bias_m;
+                nn_float s_hat = s[i] * inv_bias_s;
 
-    #endif
+                #ifdef SINGLE_PRECISION
+                nn_float denom = sqrtf(s_hat + 1e-5);
+                #elif defined(DOUBLE_PRECISION)
+                nn_float denom = sqrt(s_hat + 1e-5);
+                #endif
 
-    tensor4D_divide_into(weight_m_corr, intermediate_w, intermediate_w);
-    tensor4D_scale_inplace(adam->learning_rate, intermediate_w);
-    tensor4D_add_into(weights, intermediate_w, weights);
+                nn_float step = lr * (m_hat / denom);
+
+                w[i] -= step;
+            }
+        }
+    }
+
 }
 
 void update_bias_adam(Matrix* bias, Matrix* gradient, Optimizer* optimizer, int layer_idx) {
     AdamConfig* adam = (AdamConfig*)optimizer->settings;
 
     Matrix* bias_m = adam->bias_m[layer_idx];
-    Matrix* bias_m_corr = adam->bias_m_corr[layer_idx];
     Matrix* bias_s = adam->bias_s[layer_idx];
-    Matrix* bias_s_corr = adam->bias_s_corr[layer_idx];
-    Matrix* intermediate_b = adam->intermediate_b[layer_idx];
 
-    matrix_scale_inplace(adam->beta_m, bias_m);
-    matrix_scale_into((nn_float)1.0 - adam->beta_m, gradient, intermediate_b);
-    matrix_subtract_into(bias_m, intermediate_b, bias_m);
+    nn_float* b = bias->entries;
+    nn_float* g = gradient->entries;
+    nn_float* m = bias_m->entries;
+    nn_float* s = bias_s->entries;
 
-    matrix_scale_inplace(adam->beta_s, bias_s);
-    matrix_multiply_into(gradient, gradient, intermediate_b);
-    matrix_scale_inplace((nn_float)1.0 - adam->beta_s, intermediate_b);
-    matrix_add_into(bias_s, intermediate_b, bias_s);
+    int n = bias->n_rows * bias->n_cols;
 
-    #ifdef SINGLE_PRECISION
+    nn_float beta_m = adam->beta_m;
+    nn_float beta_s = adam->beta_s;
+    nn_float lr = adam->learning_rate;
 
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_m, adam->ctr)), bias_m, bias_m_corr);
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_s, adam->ctr)), bias_s, bias_s_corr);
-    matrix_add_scalar_into(1e-9, bias_s_corr, intermediate_b);
-    matrix_apply_inplace(sqrtf, intermediate_b);
+    nn_float beta_m_pow = adam->beta_m_pow;
+    nn_float beta_s_pow = adam->beta_s_pow;
+    nn_float inv_bias_m = (nn_float)1.0 / ((nn_float)1.0 - beta_m_pow);
+    nn_float inv_bias_s = (nn_float)1.0 / ((nn_float)1.0 - beta_s_pow);
 
-    #endif
-    #ifdef DOUBLE_PRECISION
+    for (int i=0; i<n; i++) {
+        m[i] = beta_m * m[i] + ((nn_float)1.0 - beta_m) * g[i];
+        s[i] = beta_s * s[i] + ((nn_float)1.0 - beta_s) * g[i] * g[i];
 
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_m, adam->ctr)), bias_m, bias_m_corr);
-    matrix_scale_into((nn_float)1.0 / ((nn_float)1.0 - powi(adam->beta_s, adam->ctr)), bias_s, bias_s_corr);
-    matrix_add_scalar_into(1e-9, bias_s_corr, intermediate_b);
-    matrix_apply_inplace(sqrt, intermediate_b);
+        nn_float m_hat = m[i] * inv_bias_m;
+        nn_float s_hat = s[i] * inv_bias_s;
 
-    #endif
-    
-    matrix_divide_into(bias_m_corr, intermediate_b, intermediate_b);
-    matrix_scale_inplace(adam->learning_rate, intermediate_b);
-    matrix_add_into(bias, intermediate_b, bias);
+        #ifdef SINGLE_PRECISION
+        nn_float denom = sqrtf(s_hat + 1e-5);
+        #elif defined(DOUBLE_PRECISION)
+        nn_float denom = sqrt(s_hat + 1e-5);
+        #endif
+
+        nn_float step = lr * (m_hat / denom);
+
+        b[i] -= step;
+    }
 }
 
 void optimizer_adam_print_info(Optimizer* optimizer) {
@@ -603,48 +627,23 @@ size_t optimizer_adam_get_mem_allocated(Optimizer* optimizer) {
     AdamConfig* adam = (AdamConfig*)optimizer->settings;
     size += sizeof(*adam);
     size += adam->n_layers * sizeof(*(adam->weight_m));
-    size += adam->n_layers * sizeof(*(adam->weight_m_corr));
     size += adam->n_layers * sizeof(*(adam->weight_s));
-    size += adam->n_layers * sizeof(*(adam->weight_s_corr));
-    size += adam->n_layers * sizeof(*(adam->intermediate_w));
 
     size += adam->n_layers * sizeof(*(adam->bias_m));
-    size += adam->n_layers * sizeof(*(adam->bias_m_corr));
     size += adam->n_layers * sizeof(*(adam->bias_s));
-    size += adam->n_layers * sizeof(*(adam->bias_s_corr));
-    size += adam->n_layers * sizeof(*(adam->intermediate_b));
 
     for (int i=0; i<adam->n_layers; i++) {
         if (adam->weight_m[i] != NULL) {
             size += tensor4D_get_sizeof_mem_allocated(adam->weight_m[i]);
         }
-        if (adam->weight_m_corr[i] != NULL) {
-            size += tensor4D_get_sizeof_mem_allocated(adam->weight_m_corr[i]);
-        }
         if (adam->weight_s[i] != NULL) {
             size += tensor4D_get_sizeof_mem_allocated(adam->weight_s[i]);
         }
-        if (adam->weight_s_corr[i] != NULL) {
-            size += tensor4D_get_sizeof_mem_allocated(adam->weight_s_corr[i]);
-        }
-        if (adam->intermediate_w[i] != NULL) {
-            size += tensor4D_get_sizeof_mem_allocated(adam->intermediate_w[i]);
-        }
-
         if (adam->bias_m[i] != NULL) {
             size += matrix_get_sizeof_mem_allocated(adam->bias_m[i]);
         }
-        if (adam->bias_m_corr[i] != NULL) {
-            size += matrix_get_sizeof_mem_allocated(adam->bias_m_corr[i]);
-        }
         if (adam->bias_s[i] != NULL) {
             size += matrix_get_sizeof_mem_allocated(adam->bias_s[i]);
-        }
-        if (adam->bias_s_corr[i] != NULL) {
-            size += matrix_get_sizeof_mem_allocated(adam->bias_s_corr[i]);
-        }
-        if (adam->intermediate_b[i] != NULL) {
-            size += matrix_get_sizeof_mem_allocated(adam->intermediate_b[i]);
         }
     }
 
