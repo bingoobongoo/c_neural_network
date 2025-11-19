@@ -10,31 +10,31 @@ typedef struct {
     int filter_size;
     int stride;
     int n_units;
-    int output_width;
-    int output_height;
 } ConvParams;
 
 typedef struct {
     Tensor4D* output;
     Tensor4D* z;
-    Tensor4D* filter;
-    Tensor4D* filter_flip;
+    Tensor4D* weight;
+    Tensor4D* weight_flip;
     Matrix* bias;
     Tensor4D* delta;
-    Tensor4D* filter_gradient;
-    Matrix* bias_gradient;
+    Tensor4D* weight_grad;
+    Matrix* bias_grad;
 
     // auxiliary
-    Tensor4D* dCost_dA;
-    Tensor4D* dActivation_dZ;
+    Tensor4D* dL_dA;
+    Tensor4D* dA_dZ;
     Tensor4D* padding;
+
+    // im2col auxiliary
     Tensor3D* fp_im2col_input;
     Matrix* fp_im2col_kernel;
     Tensor3D* fp_im2col_output;
-    Tensor3D* dCost_dW_im2col_input;
-    Tensor3D* dCost_dW_im2col_kernel;
-    Tensor3D* dCost_dW_im2col_output;
-    Matrix* dCost_dW_im2col_output_sum;
+    Tensor3D* dL_dW_im2col_input;
+    Tensor3D* dL_dW_im2col_kernel;
+    Tensor3D* dL_dW_im2col_output;
+    Matrix* dL_dW_im2col_output_sum;
     Tensor3D* delta_im2col_input;
     Matrix* delta_im2col_kernel;
     Tensor3D* delta_im2col_output;

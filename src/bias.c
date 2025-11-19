@@ -29,7 +29,7 @@ void bias_add_to_dense_z(Matrix* restrict bias, Matrix* restrict z) {
 void bias_add_to_conv_z(Matrix* restrict bias, Tensor4D* restrict z) {
     #ifdef DEBUG
 
-    // z->n_channels = filter->n_filters (filter is weights for cnn)
+    // z->n_channels = weight->n_filters (weight is weights for cnn)
     if (bias->n_cols != z->n_channels || bias->n_rows != 1) {
         printf("(bias_add_to_dense_z) Bias is of wrong shape:\n");
         printf("Bias dimension: "); matrix_print_dimensions(bias);

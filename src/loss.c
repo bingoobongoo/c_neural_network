@@ -1,94 +1,89 @@
-#include "cost.h"
+#include "loss.h"
 
-Cost* cost_new(CostType type) {
-    Cost* cost = (Cost*)malloc(sizeof(Cost));
-    cost->cost_type = type;
-    cost->loss_m = NULL;
+Loss* loss_new(LossType type) {
+    Loss* loss = (Loss*)malloc(sizeof(Loss));
+    loss->loss_type = type;
+    loss->loss_m = NULL;
     switch (type)
     {
     case MSE:
-        cost->cost_func = mse;
-        cost->dA = mse_dA;
-        cost->name = "Mean Squared Error (MSE)";
+        loss->loss_func = mse;
+        loss->dA = mse_dA;
+        loss->name = "Mean Squared Error (MSE)";
         break;
     
     case CAT_CROSS_ENTROPY:
-        cost->cost_func = cat_cross_entropy;
-        cost->dA = cat_cross_entropy_dA;
-        cost->name = "Categorical Cross-Entropy";
+        loss->loss_func = cat_cross_entropy;
+        loss->dA = cat_cross_entropy_dA;
+        loss->name = "Categorical Cross-Entropy";
         break;
     }
 
-    return cost;
+    return loss;
 }
 
-void cost_free(Cost* cost) {
-    matrix_free(cost->loss_m);
-    free(cost);
+void loss_free(Loss* loss) {
+    matrix_free(loss->loss_m);
+    free(loss);
 }
 
-Matrix* apply_cost_func(Cost* cost, Matrix* output_activation_m, Matrix* label_m) {
+Matrix* apply_loss_func(Loss* loss, Matrix* output_activation_m, Matrix* label_m) {
     Matrix* err_m = matrix_new(output_activation_m->n_rows, output_activation_m->n_cols);
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
             nn_float output_activation = matrix_get(output_activation_m, i, j);
             nn_float label = matrix_get(label_m, i, j);
-            matrix_assign(err_m, i, j, cost->cost_func(output_activation, label));
+            matrix_assign(err_m, i, j, loss->loss_func(output_activation, label));
         }
     }
 
     return err_m;
 }
 
-void apply_cost_func_into(Cost* cost, Matrix* output_activation_m, Matrix* label_m, Matrix* into) {
+void apply_loss_func_into(Loss* loss, Matrix* output_activation_m, Matrix* label_m, Matrix* into) {
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
             nn_float output_activation = matrix_get(output_activation_m, i, j);
             nn_float label = matrix_get(label_m, i, j);
-            matrix_assign(into, i, j, cost->cost_func(output_activation, label));
+            matrix_assign(into, i, j, loss->loss_func(output_activation, label));
         }
     }
 }
 
-Matrix* apply_cost_dA(Cost* cost, Matrix* output_activation_m, Matrix* label_m) {
+Matrix* apply_loss_dA(Loss* loss, Matrix* output_activation_m, Matrix* label_m) {
     Matrix* dA = matrix_new(output_activation_m->n_rows, output_activation_m->n_cols);
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
             nn_float output_activation = matrix_get(output_activation_m, i, j);
             nn_float label = matrix_get(label_m, i, j);
-            matrix_assign(dA, i, j, cost->dA(output_activation, label));
+            matrix_assign(dA, i, j, loss->dA(output_activation, label));
         }
     }
 
     return dA;
 }
 
-void apply_cost_dA_into(Cost* cost, Matrix* output_activation_m, Matrix* label_m, Matrix* into) {
+void apply_loss_dA_into(Loss* loss, Matrix* output_activation_m, Matrix* label_m, Matrix* into) {
     for (int i=0; i<output_activation_m->n_rows; i++) {
         for (int j=0; j<output_activation_m->n_cols; j++) {
             nn_float output_activation = matrix_get(output_activation_m, i, j);
             nn_float label = matrix_get(label_m, i, j);
-            matrix_assign(into, i, j, cost->dA(output_activation, label));
+            matrix_assign(into, i, j, loss->dA(output_activation, label));
         }
     }
 }
 
-nn_float get_avg_batch_loss(Cost* cost, Matrix* output_activation_m, Matrix* label_m) {
+nn_float get_avg_batch_loss(Loss* loss, Matrix* output_activation_m, Matrix* label_m) {
     nn_float avg_loss = (nn_float)0.0;
-    apply_cost_func_into(cost, output_activation_m, label_m, cost->loss_m);
-    avg_loss = matrix_sum(cost->loss_m) / (label_m->n_rows * label_m->n_cols);
+    apply_loss_func_into(loss, output_activation_m, label_m, loss->loss_m);
+    avg_loss = matrix_sum(loss->loss_m) / (label_m->n_rows * label_m->n_cols);
 
     return avg_loss;
 
 }
 
 nn_float mse(nn_float output_activation, nn_float label) {
-    #ifdef SINGLE_PRECISION
-    return powf(output_activation - label, (nn_float)2.0);
-    #endif
-    #ifdef DOUBLE_PRECISION
-    return pow(output_activation - label, (nn_float)2.0);
-    #endif
+    return powi(output_activation - label, 2);
 }
 
 nn_float mse_dA(nn_float output_activation, nn_float label) {

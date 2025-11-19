@@ -2,7 +2,7 @@ import time
 import tensorflow as tf
 import keras
 from keras import Sequential
-from keras.api.layers import Dense, Flatten, MaxPooling2D, Conv2D, Input
+from keras.api.layers import Dense, Flatten, MaxPooling2D, Conv2D, Input, BatchNormalization
 from keras.api.datasets import fashion_mnist
 from keras.api.utils import to_categorical
 
@@ -19,14 +19,16 @@ y_train = to_categorical(y_train, 10)
 y_test  = to_categorical(y_test, 10) 
 
 model = Sequential([
+    Dense(1000, activation="relu"),
+    Dense(500, activation="relu"),
     Dense(300, activation="relu"),
     Dense(100, activation="relu"),
     Dense(10, activation="softmax")
 ])
 
-opt = keras.optimizers.SGD(learning_rate=0.01)
+opt = keras.optimizers.Adam(0.001, 0.9, 0.999)
 
-model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 class TimerCallback(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):

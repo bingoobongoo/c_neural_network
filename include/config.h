@@ -59,5 +59,6 @@ performed. The default is 32-bit floating point (single precision).
 // OPTIMIZATIONS
 
 #define INLINE
+#define MULTI_THREADING
 
 // =============================================================================
