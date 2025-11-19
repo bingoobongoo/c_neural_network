@@ -40,6 +40,7 @@ void neural_net_compile(NeuralNet* net) {
     // 5. initialize static storage for auxiliary gradients
     // 6. initialize static storage for optimizer matrices
     // 7. initialize batches
+
     neural_net_link_layers(net);
 
     for (int i=1; i<net->n_layers; i++) {
@@ -164,6 +165,22 @@ void neural_net_compile(NeuralNet* net) {
                     matrix_zero(mom->bias_momentum[i]);
                     break;
                 }
+                case BATCH_NORM_DENSE: {
+                    mom->weight_momentum[i] = tensor4D_new(
+                        1,
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    tensor4D_zero(mom->weight_momentum[i]);
+
+                    mom->bias_momentum[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
+                    );
+                    matrix_zero(mom->bias_momentum[i]);
+                    break;  
+                }
                 default: {
                     mom->weight_momentum[i] = NULL;
                     mom->bias_momentum[i] = NULL;
@@ -272,6 +289,36 @@ void neural_net_compile(NeuralNet* net) {
                     ada->intermediate_b[i] = matrix_new(
                         1,
                         l->cache.bn_conv.beta->n_cols
+                    );
+                    matrix_zero(ada->intermediate_b[i]);
+                    break;  
+                }
+                case BATCH_NORM_DENSE: {
+                    ada->weight_s[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    tensor4D_zero(ada->weight_s[i]);
+
+                    ada->bias_s[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
+                    );
+                    matrix_zero(ada->bias_s[i]);
+
+                    ada->intermediate_w[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    tensor4D_zero(ada->intermediate_w[i]);
+
+                    ada->intermediate_b[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
                     );
                     matrix_zero(ada->intermediate_b[i]);
                     break;  
@@ -505,6 +552,72 @@ void neural_net_compile(NeuralNet* net) {
                     matrix_zero(adam->intermediate_b[i]);
                     break;
                 }
+                case BATCH_NORM_DENSE: {
+                    adam->weight_m[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->weight_m_corr[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->weight_s[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->weight_s_corr[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+                    adam->intermediate_w[i] = tensor4D_new(
+                        1, 
+                        l->cache.bn_dense.gamma->n_cols,
+                        1,
+                        1
+                    );
+
+                    tensor4D_zero(adam->weight_m[i]);
+                    tensor4D_zero(adam->weight_m_corr[i]);
+                    tensor4D_zero(adam->weight_s[i]);
+                    tensor4D_zero(adam->weight_s_corr[i]);
+                    tensor4D_zero(adam->intermediate_w[i]);
+                    
+                    adam->bias_m[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
+                    );
+                    adam->bias_m_corr[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
+                    );
+                    adam->bias_s[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
+                    );
+                    adam->bias_s_corr[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
+                    );
+                    adam->intermediate_b[i] = matrix_new(
+                        1,
+                        l->cache.bn_dense.beta->n_cols
+                    );
+
+                    matrix_zero(adam->bias_m[i]);
+                    matrix_zero(adam->bias_m_corr[i]);
+                    matrix_zero(adam->bias_s[i]);
+                    matrix_zero(adam->bias_s_corr[i]);
+                    matrix_zero(adam->intermediate_b[i]);
+                    break; 
+                }
                 default: {
                     adam->weight_m[i] = NULL;
                     adam->weight_m_corr[i] = NULL;
@@ -597,7 +710,7 @@ void neural_net_info(NeuralNet* net) {
                 int filter_size = l->params.conv.filter_size;
                 int filter_chan = l->cache.conv.weight->n_channels;
                 int n_filters = l->params.conv.n_filters;
-                params = n_filters * (pow(filter_size, 2) * filter_chan + 1);
+                params = n_filters * (powi(filter_size, 2) * filter_chan + 1);
                 trainable_params += params;
                 printf("%d  %s  %d  (%d x %d x %d x %d)  %lld\n", i, l_name, n_units, batch_size, out_chan, out_rows, out_cols, params);
                 printf("------------------------------------------\n");
@@ -727,6 +840,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
     int i = 0;
 
     nn_float epoch_time;
+    nn_float total_time = (nn_float)0.0;
     nn_float sum;
     nn_float avg_epoch_loss;
     nn_float avg_epoch_train_acc;
@@ -763,7 +877,8 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             #endif
         }
         gettimeofday(&end, NULL);
-        epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;;
+        epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+        total_time += epoch_time;
 
         sum = (nn_float)0.0;
         for (int j=0; j<i; j++) {
@@ -823,6 +938,9 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
         debug_layers_info(net);
         #endif
     }
+
+    printf("Fit time taken: %.3f seconds\n", total_time);
+    printf("Average fit time taken per epoch: %.3f seconds\n", total_time / n_epochs);
 
     if (net->optimizer->type == ADAM) {
         AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
@@ -968,16 +1086,15 @@ void forward_prop(NeuralNet* net, bool training) {
 
         case DENSE:
             if (net->optimizer->type == NESTEROV && training) {
-                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                matrix_add_into(
+                pre_update_dense_weights_nesterov(
                     l->cache.dense.weight,
-                    mom->weight_momentum[i]->filters[0]->channels[0],
-                    l->cache.dense.weight
+                    net->optimizer,
+                    i
                 );
-                matrix_add_into(
-                    l->cache.dense.bias, 
-                    mom->bias_momentum[i], 
-                    l->cache.dense.bias
+                pre_update_bias_nesterov(
+                    l->cache.dense.bias,
+                    net->optimizer,
+                    i
                 );
             }
             layer_dense_fp(l);
@@ -985,16 +1102,15 @@ void forward_prop(NeuralNet* net, bool training) {
 
         case OUTPUT:
             if (net->optimizer->type == NESTEROV && training) {
-                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                matrix_add_into(
+                pre_update_dense_weights_nesterov(
                     l->cache.dense.weight,
-                    mom->weight_momentum[i]->filters[0]->channels[0],
-                    l->cache.dense.weight
+                    net->optimizer,
+                    i
                 );
-                matrix_add_into(
-                    l->cache.dense.bias, 
-                    mom->bias_momentum[i], 
-                    l->cache.dense.bias
+                pre_update_bias_nesterov(
+                    l->cache.dense.bias,
+                    net->optimizer,
+                    i
                 );
             }
             layer_output_fp(l, net->label_batch);
@@ -1002,16 +1118,15 @@ void forward_prop(NeuralNet* net, bool training) {
 
         case CONV2D:
             if (net->optimizer->type == NESTEROV && training) {
-                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                tensor4D_add_into(
+                pre_update_conv_weights_nesterov(
                     l->cache.conv.weight,
-                    mom->weight_momentum[i],
-                    l->cache.conv.weight
+                    net->optimizer,
+                    i
                 );
-                matrix_add_into(
+                pre_update_bias_nesterov(
                     l->cache.conv.bias,
-                    mom->bias_momentum[i],
-                    l->cache.conv.bias
+                    net->optimizer,
+                    i
                 );
             }
             layer_conv2D_fp(l);
@@ -1027,16 +1142,15 @@ void forward_prop(NeuralNet* net, bool training) {
 
         case BATCH_NORM_CONV2D:
             if (net->optimizer->type == NESTEROV && training) {
-                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                matrix_add_into(
+                pre_update_dense_weights_nesterov(
                     l->cache.bn_conv.gamma,
-                    mom->weight_momentum[i]->filters[0]->channels[0],
-                    l->cache.bn_conv.gamma
+                    net->optimizer,
+                    i
                 );
-                matrix_add_into(
+                pre_update_bias_nesterov(
                     l->cache.bn_conv.beta,
-                    mom->bias_momentum[i],
-                    l->cache.bn_conv.beta
+                    net->optimizer,
+                    i
                 );
             }
             layer_batch_norm_conv2D_fp(l, training);
@@ -1044,16 +1158,15 @@ void forward_prop(NeuralNet* net, bool training) {
 
         case BATCH_NORM_DENSE:
             if (net->optimizer->type == NESTEROV && training) {
-                MomentumConfig* mom = (MomentumConfig*)net->optimizer->settings;
-                matrix_add_into(
+                pre_update_dense_weights_nesterov(
                     l->cache.bn_dense.gamma,
-                    mom->weight_momentum[i]->filters[0]->channels[0],
-                    l->cache.bn_dense.gamma
+                    net->optimizer,
+                    i
                 );
-                matrix_add_into(
-                    l->cache.bn_dense.beta, 
-                    mom->bias_momentum[i], 
-                    l->cache.bn_dense.beta
+                pre_update_bias_nesterov(
+                    l->cache.bn_dense.beta,
+                    net->optimizer,
+                    i
                 );
             }
             layer_batch_norm_dense_fp(l, training);
@@ -1114,6 +1227,7 @@ void update_weights(NeuralNet* net) {
         AdamConfig* adam = (AdamConfig*)net->optimizer->settings;
         adam->ctr++;
     }
+
     for (int j=1; j<net->n_layers; j++) {
         Layer* l = net->layers[j];
         switch(l->l_type)

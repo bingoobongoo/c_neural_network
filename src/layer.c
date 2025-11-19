@@ -418,8 +418,8 @@ Tensor4D* layer_get_delta_tensor4D(Layer* l) {
     }
 }
 
-unsigned int layer_get_sizeof_mem_allocated(Layer* l) {
-    unsigned int size = 0;
+size_t layer_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     switch(l->l_type)
     {
         case OUTPUT:
@@ -455,10 +455,19 @@ unsigned int layer_get_sizeof_mem_allocated(Layer* l) {
 }
 
 void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int batch_size) {
-    l->activation = activation_new(
-        act_type,
-        act_param
-    );
+    if (l->next_layer->l_type == BATCH_NORM_DENSE) {
+        l->activation = activation_new(
+            IDENTITY,
+            0.0
+        );
+    }
+    else {
+        l->activation = activation_new(
+            act_type,
+            act_param
+        );
+    }
+
     l->cache.dense.weight = matrix_new(
         layer_get_n_units(l->prev_layer),
         layer_get_n_units(l)
@@ -524,6 +533,7 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
     case RELU:
     case LRELU:
     case ELU:
+    case IDENTITY:
         #ifdef SINGLE_PRECISION
 
         matrix_fill_normal_distribution(
@@ -722,7 +732,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         batch_size
     );
 
-
+    #ifdef IM2COL_CONV
     l->cache.conv.fp_im2col_input = tensor3D_new(
         output_height * output_width,
         filter_height * filter_width * l->params.conv.n_filter_channels,
@@ -770,6 +780,19 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         input_height * input_width,
         batch_size
     );
+    #endif
+    #ifndef IM2COL_CONV
+    l->cache.conv.fp_im2col_input = NULL;
+    l->cache.conv.fp_im2col_kernel = NULL;
+    l->cache.conv.fp_im2col_output = NULL;
+    l->cache.conv.dL_dW_im2col_input = NULL;
+    l->cache.conv.dL_dW_im2col_kernel = NULL;
+    l->cache.conv.dL_dW_im2col_output = NULL;
+    l->cache.conv.dL_dW_im2col_output_sum = NULL;
+    l->cache.conv.delta_im2col_input = NULL;
+    l->cache.conv.delta_im2col_kernel = NULL;
+    l->cache.conv.delta_im2col_output = NULL;
+    #endif
 
     l->params.conv.n_units = 
         l->cache.conv.output->n_rows *
@@ -1991,7 +2014,7 @@ void layer_dense_update_weights(Layer* l, Optimizer* opt) {
         opt,
         l->layer_idx
     );
-    opt->update_dense_bias(
+    opt->update_bias(
         l->cache.dense.bias, 
         l->cache.dense.bias_grad, 
         opt,
@@ -2011,7 +2034,7 @@ void layer_conv2D_update_weights(Layer* l, Optimizer* opt) {
         opt,
         l->layer_idx
     );
-    opt->update_conv_bias(
+    opt->update_bias(
         bias,
         bias_grad,
         opt,
@@ -2058,8 +2081,8 @@ void layer_batch_norm_dense_update_weights(Layer* l, Optimizer* opt) {
     );       
 }
 
-unsigned long layer_output_get_sizeof_mem_allocated(Layer* l) {
-    unsigned long size = 0;
+size_t layer_output_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
     size += sizeof(l->params.dense);
@@ -2077,8 +2100,8 @@ unsigned long layer_output_get_sizeof_mem_allocated(Layer* l) {
     return size;
 }
 
-unsigned long layer_dense_get_sizeof_mem_allocated(Layer* l) {
-    unsigned long size = 0;
+size_t layer_dense_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
     size += sizeof(l->params.dense);
@@ -2096,8 +2119,8 @@ unsigned long layer_dense_get_sizeof_mem_allocated(Layer* l) {
     return size;
 }
 
-unsigned long layer_conv2D_get_sizeof_mem_allocated(Layer* l) {
-    unsigned long size = 0;
+size_t layer_conv2D_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
     size += sizeof(l->params.conv);
@@ -2126,8 +2149,8 @@ unsigned long layer_conv2D_get_sizeof_mem_allocated(Layer* l) {
     return size;
 }
 
-unsigned long layer_flatten_get_sizeof_mem_allocated(Layer* l) {
-    unsigned long size = 0;
+size_t layer_flatten_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
     size += sizeof(l->params.flat);
@@ -2138,8 +2161,8 @@ unsigned long layer_flatten_get_sizeof_mem_allocated(Layer* l) {
     return size;
 }
 
-unsigned long layer_max_pool_get_sizeof_mem_allocated(Layer* l) {
-    unsigned long size = 0;
+size_t layer_max_pool_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
     size += sizeof(l->params.max_pool);
@@ -2151,8 +2174,8 @@ unsigned long layer_max_pool_get_sizeof_mem_allocated(Layer* l) {
     return size;
 }
 
-unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l) {
-    unsigned long size = 0;
+size_t layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
     size += sizeof(l->params.bn_conv);
@@ -2175,8 +2198,8 @@ unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l) {
     return size;
 }
 
-unsigned long layer_batch_norm_dense_get_sizeof_mem_allocated(Layer* l) {
-    unsigned long size = 0;
+size_t layer_batch_norm_dense_get_sizeof_mem_allocated(Layer* l) {
+    size_t size = 0;
     size += sizeof(l);
     size += sizeof(l->params);
     size += sizeof(l->params.bn_dense);

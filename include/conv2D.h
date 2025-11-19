@@ -26,6 +26,8 @@ typedef struct {
     Tensor4D* dL_dA;
     Tensor4D* dA_dZ;
     Tensor4D* padding;
+
+    // im2col auxiliary
     Tensor3D* fp_im2col_input;
     Matrix* fp_im2col_kernel;
     Tensor3D* fp_im2col_output;

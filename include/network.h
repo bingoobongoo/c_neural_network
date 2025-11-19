@@ -5,6 +5,7 @@
 
 #include "config.h"
 #include "matrix.h"
+#include "scalar.h"
 #include "layer.h"
 #include "tensor.h"
 #include "activation.h"

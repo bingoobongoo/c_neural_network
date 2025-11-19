@@ -83,12 +83,7 @@ nn_float get_avg_batch_loss(Loss* loss, Matrix* output_activation_m, Matrix* lab
 }
 
 nn_float mse(nn_float output_activation, nn_float label) {
-    #ifdef SINGLE_PRECISION
-    return powf(output_activation - label, (nn_float)2.0);
-    #endif
-    #ifdef DOUBLE_PRECISION
-    return pow(output_activation - label, (nn_float)2.0);
-    #endif
+    return powi(output_activation - label, 2);
 }
 
 nn_float mse_dA(nn_float output_activation, nn_float label) {

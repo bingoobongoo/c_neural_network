@@ -63,7 +63,7 @@ Matrix* layer_get_output_matrix(Layer* l);
 Tensor4D* layer_get_output_tensor4D(Layer* l);
 Matrix* layer_get_delta_matrix(Layer* l);
 Tensor4D* layer_get_delta_tensor4D(Layer* l);
-unsigned int layer_get_sizeof_mem_allocated(Layer* l);
+size_t layer_get_sizeof_mem_allocated(Layer* l);
 
 void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int batch_size);
 void layer_output_compile(Layer* l, Loss* loss, int batch_size);
@@ -103,10 +103,10 @@ void layer_conv2D_update_weights(Layer* l, Optimizer* opt);
 void layer_batch_norm_conv2D_update_weights(Layer* l, Optimizer* opt);
 void layer_batch_norm_dense_update_weights(Layer* l, Optimizer* opt);
 
-unsigned long layer_output_get_sizeof_mem_allocated(Layer* l);
-unsigned long layer_dense_get_sizeof_mem_allocated(Layer* l);
-unsigned long layer_conv2D_get_sizeof_mem_allocated(Layer* l);
-unsigned long layer_flatten_get_sizeof_mem_allocated(Layer* l);
-unsigned long layer_max_pool_get_sizeof_mem_allocated(Layer* l);
-unsigned long layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l);
-unsigned long layer_batch_norm_dense_get_sizeof_mem_allocated(Layer* l);
+size_t layer_output_get_sizeof_mem_allocated(Layer* l);
+size_t layer_dense_get_sizeof_mem_allocated(Layer* l);
+size_t layer_conv2D_get_sizeof_mem_allocated(Layer* l);
+size_t layer_flatten_get_sizeof_mem_allocated(Layer* l);
+size_t layer_max_pool_get_sizeof_mem_allocated(Layer* l);
+size_t layer_batch_norm_conv2D_get_sizeof_mem_allocated(Layer* l);
+size_t layer_batch_norm_dense_get_sizeof_mem_allocated(Layer* l);

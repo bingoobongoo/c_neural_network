@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "matrix.h"
+#include "scalar.h"
 
 typedef enum {
     MSE,

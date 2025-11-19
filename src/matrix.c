@@ -1035,9 +1035,11 @@ void matrix_max_pool_into(Matrix* input, Matrix* into, Matrix_uint16* argmax, in
     }
 }
 
-unsigned long matrix_get_sizeof_mem_allocated(Matrix* m) {
-    unsigned long size = 0;
-    size += sizeof(m);
+size_t matrix_get_sizeof_mem_allocated(Matrix* m) {
+    size_t size = 0;
+    if (m == NULL) return size;
+
+    size += sizeof(*m);
     size += m->n_rows * m->n_cols * sizeof(nn_float);
 
     return size;

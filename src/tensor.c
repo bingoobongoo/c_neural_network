@@ -15,6 +15,8 @@ Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels) {
 }
 
 void tensor3D_free(Tensor3D* t) {
+    if (t == NULL) return;
+
     for (int i=0; i<t->n_channels; i++) {
         matrix_free(t->channels[i]);
     }
@@ -231,6 +233,8 @@ Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
 }
 
 void tensor4D_free(Tensor4D* t) {
+    if (t == NULL) return;
+    
     for (int i=0; i<t->n_filters; i++) {
         tensor3D_free(t->filters[i]);
     }
@@ -551,25 +555,35 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
     }
 }
 
-unsigned long tensor3D_get_sizeof_mem_allocated(Tensor3D* t) {
-    unsigned long size = 0;
-    size += sizeof(t);
-    size += t->n_channels * t->n_rows * t->n_cols * sizeof(nn_float);
+size_t tensor3D_get_sizeof_mem_allocated(Tensor3D* t) {
+    size_t size = 0;
+    if (t == NULL) return size;
+
+    size += sizeof(*t);
+    for (int i=0; i<t->n_channels; i++) {
+        size += matrix_get_sizeof_mem_allocated(t->channels[i]);
+    }
 
     return size;
 }
 
-unsigned long tensor4D_get_sizeof_mem_allocated(Tensor4D* t) {
-    unsigned long size = 0;
-    size += sizeof(t);
-    size += t->n_filters * t->n_channels * t->n_rows * t->n_cols * sizeof(nn_float);
+size_t tensor4D_get_sizeof_mem_allocated(Tensor4D* t) {
+    size_t size = 0;
+    if (t == NULL) return size;
+
+    size += sizeof(*t);
+    for (int i=0; i<t->n_filters; i++) {
+        size += tensor3D_get_sizeof_mem_allocated(t->filters[i]);
+    }
 
     return size;
 }
 
-unsigned long tensor4D_uint16_get_sizeof_mem_allocated(Tensor4D_uint16* t) {
-    unsigned long size = 0;
-    size += sizeof(t);
+size_t tensor4D_uint16_get_sizeof_mem_allocated(Tensor4D_uint16* t) {
+    size_t size = 0;
+    if (t == NULL) return size;
+
+    size += sizeof(*t);
     t->n_filters * t->n_channels * t->n_rows * t->n_cols * sizeof(uint16_t);
 
     return size;
