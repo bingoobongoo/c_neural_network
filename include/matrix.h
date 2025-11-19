@@ -10,6 +10,7 @@
 #include <openblas_config.h>
 
 #include "config.h"
+#include "vectorization.h"
 
 typedef struct {
     nn_float* entries;

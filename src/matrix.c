@@ -277,12 +277,21 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_add(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
             matrix_assign(into, i, j, sum);
         }
     }
+    #endif
 }
 
 Matrix* matrix_subtract(Matrix* m1, Matrix* m2) {
@@ -318,12 +327,21 @@ void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_sub(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float diff = matrix_get(m1, i, j) - matrix_get(m2, i, j);
             matrix_assign(into, i, j, diff);
         }
     }
+    #endif
 }
 
 Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
@@ -534,12 +552,21 @@ void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_mul(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float product = matrix_get(m1, i, j) * matrix_get(m2, i, j);
             matrix_assign(into, i, j, product);
         }
     }
+    #endif
 }
 
 Matrix* matrix_divide(Matrix* m1, Matrix* m2) {
@@ -575,12 +602,21 @@ void matrix_divide_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_div(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float quotient = matrix_get(m1, i, j) / matrix_get(m2, i, j);
             matrix_assign(into, i, j, quotient);
         }
     }
+    #endif
 }
 
 Matrix* matrix_sum_axis(Matrix* m, int axis) {
@@ -657,11 +693,18 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
 
 nn_float matrix_sum(Matrix* m) {
     nn_float sum = (nn_float)0.0;
+    #ifdef VECTORIZATION
+    sum = simd_sum(
+        m->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             sum += matrix_get(m, i, j);
         }
     }
+    #endif
 
     return sum;
 }
@@ -816,19 +859,37 @@ Matrix* matrix_scale(nn_float scalar, Matrix* m) {
 }
 
 void matrix_scale_into(nn_float scalar, Matrix* m, Matrix* into) {
+    #ifdef VECTORIZATION
+    simd_scale(
+        m->entries, 
+        scalar, 
+        into->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(into, i, j, matrix_get(m, i, j) * scalar);
         }
     }
+    #endif
 }
 
 void matrix_scale_inplace(nn_float scalar, Matrix* m) {
+    #ifdef VECTORIZATION
+    simd_scale(
+        m->entries, 
+        scalar, 
+        m->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, matrix_get(m, i, j) * scalar);
         }
     }
+    #endif
 }
 
 Matrix* matrix_add_scalar(nn_float scalar, Matrix* m) {
@@ -843,20 +904,38 @@ Matrix* matrix_add_scalar(nn_float scalar, Matrix* m) {
 }
 
 void matrix_add_scalar_into(nn_float scalar, Matrix* m, Matrix* into) {
+    #ifdef VECTORIZATION
+    simd_add_scalar(
+        m->entries, 
+        scalar, 
+        into->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(into, i, j, matrix_get(m, i, j) + scalar);
             
         }
     }
+    #endif
 }
 
 void matrix_add_scalar_inplace(nn_float scalar, Matrix* m) {
+    #ifdef VECTORIZATION
+    simd_add_scalar(
+        m->entries, 
+        scalar, 
+        m->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, matrix_get(m, i, j) + scalar);
         }
     }
+    #endif
 }
 
 Matrix* matrix_transpose(Matrix* m) {

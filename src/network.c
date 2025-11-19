@@ -784,6 +784,9 @@ void neural_net_info(NeuralNet* net) {
         #ifdef MULTI_THREADING
         printf("MULTI-THREADING\n");
         #endif
+        #ifdef VECTORIZATION
+        printf("VECTORIZATION\n");
+        #endif
         printf("------------------------------------\n");
     }
     else {
