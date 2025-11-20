@@ -277,12 +277,21 @@ void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_add(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float sum = matrix_get(m1, i, j) + matrix_get(m2, i, j);
             matrix_assign(into, i, j, sum);
         }
     }
+    #endif
 }
 
 Matrix* matrix_subtract(Matrix* m1, Matrix* m2) {
@@ -318,37 +327,21 @@ void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_sub(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float diff = matrix_get(m1, i, j) - matrix_get(m2, i, j);
             matrix_assign(into, i, j, diff);
         }
     }
-}
-
-Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
-    #ifdef DEBUG
-
-    if (m1->n_cols != m2->n_rows) {
-        printf("Matrices have wrong dimensions: ");
-        matrix_print_dimensions(m1); printf(" and "); matrix_print_dimensions(m2);
-        exit(1);
-    }
-
     #endif
-
-    Matrix* dot_matrix = matrix_new(m1->n_rows, m2->n_cols);
-    for (int i=0; i<m1->n_rows; i++) {
-        for (int j=0; j<m2->n_cols; j++) {
-            nn_float dot = 0;
-            for (int k=0; k<m1->n_cols; k++) {
-                dot += matrix_get(m1, i, k) * matrix_get(m2, k, j);
-            }
-            matrix_assign(dot_matrix, i, j, dot);
-        }
-    }
-
-    return dot_matrix;
 }
 
 void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m2_trans) {
@@ -398,8 +391,7 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
         ldc
     );
 
-    #endif
-    #ifdef DOUBLE_PRECISION
+    #elif defined(DOUBLE_PRECISION)
 
     cblas_dgemm(
         CblasRowMajor,
@@ -419,13 +411,15 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
     );
 
     #endif
-
     #endif
+
     #ifndef BLAS
 
     matrix_zero(into);
 
     if (!m1_trans && !m2_trans) {
+        #if defined(CACHE_LOCALITY) && !defined(VECTORIZATION)
+
         #ifdef MULTI_THREADING
         #pragma omp parallel for
         #endif
@@ -441,61 +435,61 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
                     );
                 }
             }
-        }      
-    }
-    else if (m1_trans && !m2_trans) {
+        }
+
+        #elif defined(VECTORIZATION)
+
+        #ifdef MULTI_THREADING
+        #pragma omp parallel for schedule(static)
+        #endif
+        for (int i=0; i<m1->n_rows; i++) {
+            nn_float* m1_row = m1->entries + i * m1->n_cols;
+            nn_float* into_row = into->entries + i * into->n_cols;
+
+            for (int k=0; k<m1->n_cols; k++) {
+                nn_float aik = m1_row[k];
+                simd_vec vm1 = SIMD_SET1(aik);
+                nn_float* m2_row = m2->entries + k * m2->n_cols;
+                int j=0;
+
+                for (; j+NN_SIMD_WIDTH<=m2->n_cols; j+=NN_SIMD_WIDTH) {
+                    simd_vec vm2 = SIMD_LOAD(m2_row + j);
+                    simd_vec vinto = SIMD_LOAD(into_row + j);
+                    simd_vec vprod = SIMD_MUL(vm1, vm2);
+                    vinto = SIMD_ADD(vinto, vprod);
+                    SIMD_STORE(into_row + j, vinto);
+                }
+
+                for (; j<m2->n_cols; j++) {
+                    into_row[j] += aik * m2_row[j];
+                }
+            }
+        }
+
+        #elif !defined(CACHE_LOCALITY)
+
         #ifdef MULTI_THREADING
         #pragma omp parallel for
         #endif
-        for (int i=0; i<m1->n_cols; i++) {
-            for (int k=0; k<m1->n_rows; k++) {
-                nn_float aik = matrix_get(m1, k, i);
-                for (int j=0; j<m2->n_cols; j++) {
+        for (int j=0; j<m2->n_cols; j++) {
+            for (int k=0; k<m1->n_cols; k++) {
+                for (int i=0; i<m1->n_rows; i++) {
+                    nn_float aik = matrix_get(m1, i, k);
                     matrix_assign(
-                        into, 
-                        i, 
+                        into,
+                        i,
                         j,
                         matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
                     );
                 }
             }
-        }        
-    }
-    else if (!m1_trans && m2_trans) {
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
+        }
+        
         #endif
-        for (int i=0; i<m1->n_rows; i++) {
-            for (int k=0; k<m1->n_cols; k++) {
-                nn_float aik = matrix_get(m1, i, k);
-                for (int j=0; j<m2->n_rows; j++) {
-                    matrix_assign(
-                        into, 
-                        i, 
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
-                    );
-                }
-            }
-        } 
     }
     else {
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
-        #endif
-        for (int i=0; i<m1->n_cols; i++) {
-            for (int k=0; k<m1->n_rows; k++) {
-                nn_float aik = matrix_get(m1, k, i);
-                for (int j=0; j<m2->n_rows; j++) {
-                    matrix_assign(
-                        into, 
-                        i, 
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
-                    );
-                }
-            }
-        } 
+        printf("Matrix dot only works for m1_trans=false and m2_trans=false without BLAS.");
+        exit(1);
     }
 
     #endif
@@ -534,12 +528,21 @@ void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_mul(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float product = matrix_get(m1, i, j) * matrix_get(m2, i, j);
             matrix_assign(into, i, j, product);
         }
     }
+    #endif
 }
 
 Matrix* matrix_divide(Matrix* m1, Matrix* m2) {
@@ -575,12 +578,21 @@ void matrix_divide_into(Matrix* m1, Matrix* m2, Matrix* into) {
 
     #endif
 
+    #ifdef VECTORIZATION
+    simd_div(
+        m1->entries, 
+        m2->entries, 
+        into->entries,
+        m1->n_rows * m1->n_cols
+    );
+    #else
     for (int i=0; i<m1->n_rows; i++) {
         for (int j=0; j<m1->n_cols; j++) {
             nn_float quotient = matrix_get(m1, i, j) / matrix_get(m2, i, j);
             matrix_assign(into, i, j, quotient);
         }
     }
+    #endif
 }
 
 Matrix* matrix_sum_axis(Matrix* m, int axis) {
@@ -657,11 +669,18 @@ void matrix_sum_axis_into(Matrix* m, int axis, Matrix* into) {
 
 nn_float matrix_sum(Matrix* m) {
     nn_float sum = (nn_float)0.0;
+    #ifdef VECTORIZATION
+    sum = simd_sum(
+        m->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             sum += matrix_get(m, i, j);
         }
     }
+    #endif
 
     return sum;
 }
@@ -816,19 +835,37 @@ Matrix* matrix_scale(nn_float scalar, Matrix* m) {
 }
 
 void matrix_scale_into(nn_float scalar, Matrix* m, Matrix* into) {
+    #ifdef VECTORIZATION
+    simd_scale(
+        m->entries, 
+        scalar, 
+        into->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(into, i, j, matrix_get(m, i, j) * scalar);
         }
     }
+    #endif
 }
 
 void matrix_scale_inplace(nn_float scalar, Matrix* m) {
+    #ifdef VECTORIZATION
+    simd_scale(
+        m->entries, 
+        scalar, 
+        m->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, matrix_get(m, i, j) * scalar);
         }
     }
+    #endif
 }
 
 Matrix* matrix_add_scalar(nn_float scalar, Matrix* m) {
@@ -843,20 +880,38 @@ Matrix* matrix_add_scalar(nn_float scalar, Matrix* m) {
 }
 
 void matrix_add_scalar_into(nn_float scalar, Matrix* m, Matrix* into) {
+    #ifdef VECTORIZATION
+    simd_add_scalar(
+        m->entries, 
+        scalar, 
+        into->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(into, i, j, matrix_get(m, i, j) + scalar);
             
         }
     }
+    #endif
 }
 
 void matrix_add_scalar_inplace(nn_float scalar, Matrix* m) {
+    #ifdef VECTORIZATION
+    simd_add_scalar(
+        m->entries, 
+        scalar, 
+        m->entries,
+        m->n_rows * m->n_cols
+    );
+    #else
     for (int i=0; i<m->n_rows; i++) {
         for (int j=0; j<m->n_cols; j++) {
             matrix_assign(m, i, j, matrix_get(m, i, j) + scalar);
         }
     }
+    #endif
 }
 
 Matrix* matrix_transpose(Matrix* m) {
@@ -870,6 +925,15 @@ Matrix* matrix_transpose(Matrix* m) {
     return transposed_matrix;
 }
 
+void matrix_transpose_into(Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            matrix_assign(into, j, i, matrix_get(m, i, j));
+
+        }
+    }
+}
+
 void matrix_flip_into(Matrix* m, Matrix* into) {
     int ker_h = m->n_rows;
     int ker_w = m->n_cols;
@@ -878,15 +942,6 @@ void matrix_flip_into(Matrix* m, Matrix* into) {
         nn_float* dst_row = into->entries + (ker_h - 1 - i)*ker_w;
         for (int j=0; j<ker_w; j++) {
             dst_row[ker_w - 1 - j] = src_row[j];
-        }
-    }
-}
-
-void matrix_transpose_into(Matrix* m, Matrix* into) {
-    for (int i=0; i<m->n_rows; i++) {
-        for (int j=0; j<m->n_cols; j++) {
-            matrix_assign(into, j, i, matrix_get(m, i, j));
-
         }
     }
 }

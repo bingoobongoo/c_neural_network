@@ -56,8 +56,6 @@ typedef struct {
     int n_layers;
     Tensor4D** weight_s;
     Matrix** bias_s;
-    Tensor4D** intermediate_w;
-    Matrix** intermediate_b;
 } AdaGradConfig;
 
 typedef struct {
@@ -65,19 +63,15 @@ typedef struct {
     nn_float beta_m;
     nn_float beta_s;
     int n_layers;
-    int ctr;
+
+    nn_float beta_m_pow;
+    nn_float beta_s_pow;
 
     Tensor4D** weight_m;
-    Tensor4D** weight_m_corr;
     Tensor4D** weight_s;
-    Tensor4D** weight_s_corr;
-    Tensor4D** intermediate_w;
     
     Matrix** bias_m;
-    Matrix** bias_m_corr;
     Matrix** bias_s;
-    Matrix** bias_s_corr;
-    Matrix** intermediate_b;
 } AdamConfig;
 
 Optimizer* optimizer_sgd_new(nn_float learning_rate);

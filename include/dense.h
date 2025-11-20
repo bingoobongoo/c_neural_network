@@ -20,4 +20,8 @@ typedef struct {
     // auxiliary gradients
     Matrix* dL_dA; 
     Matrix* dA_dZ;
+
+    // transpose buffers
+    Matrix* weight_t;
+    Matrix* input_t;
 } DenseCache;

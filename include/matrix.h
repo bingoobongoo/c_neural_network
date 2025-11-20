@@ -8,8 +8,10 @@
 #include <omp.h>
 #include <cblas.h>
 #include <openblas_config.h>
+#include <assert.h>
 
 #include "config.h"
+#include "vectorization.h"
 
 typedef struct {
     nn_float* entries;
@@ -49,7 +51,6 @@ Matrix* matrix_add(Matrix* m1, Matrix* m2);
 void matrix_add_into(Matrix* m1, Matrix* m2, Matrix* into);
 Matrix* matrix_subtract(Matrix* m1, Matrix* m2);
 void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into);
-Matrix* matrix_dot(Matrix* m1, Matrix* m2);
 void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m2_trans);
 Matrix* matrix_multiply(Matrix* m1, Matrix* m2);
 void matrix_multiply_into(Matrix* m1, Matrix* m2, Matrix* into);
