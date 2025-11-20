@@ -18,12 +18,12 @@ checks, out of bounds checks etc. Very slow, use only when debugging.
 Enables optimized library for basic linear algerba operations, effectively 
 replacing custom operations with their optimized counterparts from CBLAS library.
 */
-#define BLAS
+// #define BLAS
 
 /*
 Enables im2col method for calculating convolution for forward and backward passes in CNN.
 */
-#define IM2COL_CONV
+// #define IM2COL_CONV
 
 // =============================================================================
 
@@ -60,6 +60,12 @@ performed. The default is 32-bit floating point (single precision).
 
 #define INLINE
 #define MULTI_THREADING
-#define VECTORIZATION
+#define CACHE_LOCALITY
+// #define VECTORIZATION
 
 // =============================================================================
+
+// VECTORIZATION requires CACHE_LOCALITY to be defined
+#ifdef VECTORIZATION
+#define CACHE_LOCALITY
+#endif

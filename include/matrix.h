@@ -8,6 +8,7 @@
 #include <omp.h>
 #include <cblas.h>
 #include <openblas_config.h>
+#include <assert.h>
 
 #include "config.h"
 #include "vectorization.h"

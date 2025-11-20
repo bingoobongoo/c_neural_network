@@ -75,9 +75,3 @@ nn_float simd_sum(
     const nn_float* a,
     int n
 );
-
-nn_float simd_dot(
-    const nn_float* a,
-    const nn_float* b,
-    int n
-);

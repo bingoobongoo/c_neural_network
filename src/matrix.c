@@ -444,6 +444,8 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
     matrix_zero(into);
 
     if (!m1_trans && !m2_trans) {
+        #if defined(CACHE_LOCALITY) && !defined(VECTORIZATION)
+
         #ifdef MULTI_THREADING
         #pragma omp parallel for
         #endif
@@ -459,9 +461,61 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
                     );
                 }
             }
-        }      
+        }
+
+        #elif defined(VECTORIZATION)
+
+        #ifdef MULTI_THREADING
+        #pragma omp parallel for schedule(static)
+        #endif
+        for (int i=0; i<m1->n_rows; i++) {
+            nn_float* m1_row = m1->entries + i * m1->n_cols;
+            nn_float* into_row = into->entries + i * into->n_cols;
+
+            for (int k=0; k<m1->n_cols; k++) {
+                nn_float aik = m1_row[k];
+                simd_vec vm1 = SIMD_SET1(aik);
+                nn_float* m2_row = m2->entries + k * m2->n_cols;
+                int j=0;
+
+                for (; j+NN_SIMD_WIDTH<=m2->n_cols; j+=NN_SIMD_WIDTH) {
+                    simd_vec vm2 = SIMD_LOAD(m2_row + j);
+                    simd_vec vinto = SIMD_LOAD(into_row + j);
+                    simd_vec vprod = SIMD_MUL(vm1, vm2);
+                    vinto = SIMD_ADD(vinto, vprod);
+                    SIMD_STORE(into_row + j, vinto);
+                }
+
+                for (; j<m2->n_cols; j++) {
+                    into_row[j] += aik * m2_row[j];
+                }
+            }
+        }
+
+        #elif !defined(CACHE_LOCALITY)
+
+        #ifdef MULTI_THREADING
+        #pragma omp parallel for
+        #endif
+        for (int j=0; j<m2->n_cols; j++) {
+            for (int k=0; k<m1->n_cols; k++) {
+                for (int i=0; i<m1->n_rows; i++) {
+                    nn_float aik = matrix_get(m1, i, k);
+                    matrix_assign(
+                        into,
+                        i,
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
+                    );
+                }
+            }
+        }
+        
+        #endif
     }
     else if (m1_trans && !m2_trans) {
+        #ifdef CACHE_LOCALITY
+
         #ifdef MULTI_THREADING
         #pragma omp parallel for
         #endif
@@ -477,9 +531,32 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
                     );
                 }
             }
-        }        
+        }
+
+        #else
+
+        #ifdef MULTI_THREADING
+        #pragma omp parallel for
+        #endif
+        for (int j=0; j<m2->n_cols; j++) {
+            for (int k=0; k<m1->n_rows; k++) {
+                for (int i=0; i<m1->n_cols; i++) {
+                    nn_float aik = matrix_get(m1, k, i);
+                    matrix_assign(
+                        into,
+                        i,
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
+                    );
+                }
+            }
+        } 
+        
+        #endif
     }
     else if (!m1_trans && m2_trans) {
+        #ifdef CACHE_LOCALITY
+
         #ifdef MULTI_THREADING
         #pragma omp parallel for
         #endif
@@ -495,9 +572,32 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
                     );
                 }
             }
+        }
+
+        #else
+
+        #ifdef MULTI_THREADING
+        #pragma omp parallel for
+        #endif
+        for (int j=0; j<m2->n_rows; j++) {
+            for (int k=0; k<m1->n_cols; k++) {
+                for (int i=0; i<m1->n_rows; i++) {
+                    nn_float aik = matrix_get(m1, i, k);
+                    matrix_assign(
+                        into,
+                        i,
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
+                    );
+                }
+            }
         } 
+
+        #endif
     }
     else {
+        #ifdef CACHE_LOCALITY
+        
         #ifdef MULTI_THREADING
         #pragma omp parallel for
         #endif
@@ -514,6 +614,27 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
                 }
             }
         } 
+
+        #else
+
+        #ifdef MULTI_THREADING
+        #pragma omp parallel for
+        #endif
+        for (int j=0; j<m2->n_rows; j++) {
+            for (int k=0; k<m1->n_rows; k++) {
+                for (int i=0; i<m1->n_cols; i++) {
+                    nn_float aik = matrix_get(m1, k, i);
+                    matrix_assign(
+                        into,
+                        i,
+                        j,
+                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
+                    );
+                }
+            }
+        } 
+
+        #endif
     }
 
     #endif
@@ -949,6 +1070,15 @@ Matrix* matrix_transpose(Matrix* m) {
     return transposed_matrix;
 }
 
+void matrix_transpose_into(Matrix* m, Matrix* into) {
+    for (int i=0; i<m->n_rows; i++) {
+        for (int j=0; j<m->n_cols; j++) {
+            matrix_assign(into, j, i, matrix_get(m, i, j));
+
+        }
+    }
+}
+
 void matrix_flip_into(Matrix* m, Matrix* into) {
     int ker_h = m->n_rows;
     int ker_w = m->n_cols;
@@ -957,15 +1087,6 @@ void matrix_flip_into(Matrix* m, Matrix* into) {
         nn_float* dst_row = into->entries + (ker_h - 1 - i)*ker_w;
         for (int j=0; j<ker_w; j++) {
             dst_row[ker_w - 1 - j] = src_row[j];
-        }
-    }
-}
-
-void matrix_transpose_into(Matrix* m, Matrix* into) {
-    for (int i=0; i<m->n_rows; i++) {
-        for (int j=0; j<m->n_cols; j++) {
-            matrix_assign(into, j, i, matrix_get(m, i, j));
-
         }
     }
 }

@@ -139,32 +139,3 @@ inline nn_float simd_sum(
 
     return sum;
 }
-
-inline nn_float simd_dot(
-    const nn_float* a,
-    const nn_float* b,
-    int n
-) {
-    simd_vec vacc = SIMD_SET1((nn_float)0.0);
-    nn_float sum = (nn_float)0.0;
-
-    int i=0;
-    for (; i+NN_SIMD_WIDTH<=n; i+=NN_SIMD_WIDTH) {
-        simd_vec va = SIMD_LOAD(a + i);
-        simd_vec vb = SIMD_LOAD(b + i);
-        simd_vec vm = SIMD_DIV(va, vb);
-        SIMD_ADD(vacc, vm); 
-    }
-
-    nn_float tmp[NN_SIMD_WIDTH];
-    SIMD_STORE(tmp, vacc);
-    for (int j=0; j<NN_SIMD_WIDTH; j++) {
-        sum += tmp[j];
-    }
-
-    for (; i<n; i++) {
-        sum += a[i] * b[i];
-    }
-
-    return sum;
-}
