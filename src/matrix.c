@@ -344,31 +344,6 @@ void matrix_subtract_into(Matrix* m1, Matrix* m2, Matrix* into) {
     #endif
 }
 
-Matrix* matrix_dot(Matrix* m1, Matrix* m2) {
-    #ifdef DEBUG
-
-    if (m1->n_cols != m2->n_rows) {
-        printf("Matrices have wrong dimensions: ");
-        matrix_print_dimensions(m1); printf(" and "); matrix_print_dimensions(m2);
-        exit(1);
-    }
-
-    #endif
-
-    Matrix* dot_matrix = matrix_new(m1->n_rows, m2->n_cols);
-    for (int i=0; i<m1->n_rows; i++) {
-        for (int j=0; j<m2->n_cols; j++) {
-            nn_float dot = 0;
-            for (int k=0; k<m1->n_cols; k++) {
-                dot += matrix_get(m1, i, k) * matrix_get(m2, k, j);
-            }
-            matrix_assign(dot_matrix, i, j, dot);
-        }
-    }
-
-    return dot_matrix;
-}
-
 void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m2_trans) {
     #ifdef DEBUG
 
@@ -416,8 +391,7 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
         ldc
     );
 
-    #endif
-    #ifdef DOUBLE_PRECISION
+    #elif defined(DOUBLE_PRECISION)
 
     cblas_dgemm(
         CblasRowMajor,
@@ -437,8 +411,8 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
     );
 
     #endif
-
     #endif
+
     #ifndef BLAS
 
     matrix_zero(into);
@@ -513,128 +487,9 @@ void matrix_dot_into(Matrix* m1, Matrix* m2, Matrix* into, bool m1_trans, bool m
         
         #endif
     }
-    else if (m1_trans && !m2_trans) {
-        #ifdef CACHE_LOCALITY
-
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
-        #endif
-        for (int i=0; i<m1->n_cols; i++) {
-            for (int k=0; k<m1->n_rows; k++) {
-                nn_float aik = matrix_get(m1, k, i);
-                for (int j=0; j<m2->n_cols; j++) {
-                    matrix_assign(
-                        into, 
-                        i, 
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
-                    );
-                }
-            }
-        }
-
-        #else
-
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
-        #endif
-        for (int j=0; j<m2->n_cols; j++) {
-            for (int k=0; k<m1->n_rows; k++) {
-                for (int i=0; i<m1->n_cols; i++) {
-                    nn_float aik = matrix_get(m1, k, i);
-                    matrix_assign(
-                        into,
-                        i,
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, k, j)
-                    );
-                }
-            }
-        } 
-        
-        #endif
-    }
-    else if (!m1_trans && m2_trans) {
-        #ifdef CACHE_LOCALITY
-
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
-        #endif
-        for (int i=0; i<m1->n_rows; i++) {
-            for (int k=0; k<m1->n_cols; k++) {
-                nn_float aik = matrix_get(m1, i, k);
-                for (int j=0; j<m2->n_rows; j++) {
-                    matrix_assign(
-                        into, 
-                        i, 
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
-                    );
-                }
-            }
-        }
-
-        #else
-
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
-        #endif
-        for (int j=0; j<m2->n_rows; j++) {
-            for (int k=0; k<m1->n_cols; k++) {
-                for (int i=0; i<m1->n_rows; i++) {
-                    nn_float aik = matrix_get(m1, i, k);
-                    matrix_assign(
-                        into,
-                        i,
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
-                    );
-                }
-            }
-        } 
-
-        #endif
-    }
     else {
-        #ifdef CACHE_LOCALITY
-        
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
-        #endif
-        for (int i=0; i<m1->n_cols; i++) {
-            for (int k=0; k<m1->n_rows; k++) {
-                nn_float aik = matrix_get(m1, k, i);
-                for (int j=0; j<m2->n_rows; j++) {
-                    matrix_assign(
-                        into, 
-                        i, 
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
-                    );
-                }
-            }
-        } 
-
-        #else
-
-        #ifdef MULTI_THREADING
-        #pragma omp parallel for
-        #endif
-        for (int j=0; j<m2->n_rows; j++) {
-            for (int k=0; k<m1->n_rows; k++) {
-                for (int i=0; i<m1->n_cols; i++) {
-                    nn_float aik = matrix_get(m1, k, i);
-                    matrix_assign(
-                        into,
-                        i,
-                        j,
-                        matrix_get(into, i, j) + aik * matrix_get(m2, j, k)
-                    );
-                }
-            }
-        } 
-
-        #endif
+        printf("Matrix dot only works for m1_trans=false and m2_trans=false without BLAS.");
+        exit(1);
     }
 
     #endif

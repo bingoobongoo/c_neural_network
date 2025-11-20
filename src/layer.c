@@ -77,6 +77,10 @@ void layer_free(Layer* l) {
             tensor3D_free(l->cache.conv.fp_im2col_output);
             l->cache.conv.fp_im2col_output = NULL;
         }
+        if (l->cache.conv.fp_im2col_output_t != NULL) {
+            tensor3D_free(l->cache.conv.fp_im2col_output_t);
+            l->cache.conv.fp_im2col_output_t = NULL;
+        }
         if (l->cache.conv.dL_dW_im2col_input != NULL) {
             tensor3D_free(l->cache.conv.dL_dW_im2col_input);
             l->cache.conv.dL_dW_im2col_input = NULL;
@@ -84,6 +88,10 @@ void layer_free(Layer* l) {
         if (l->cache.conv.dL_dW_im2col_kernel != NULL) {
             tensor3D_free(l->cache.conv.dL_dW_im2col_kernel);
             l->cache.conv.dL_dW_im2col_kernel = NULL;
+        }
+        if (l->cache.conv.dL_dW_im2col_kernel_t != NULL) {
+            tensor3D_free(l->cache.conv.dL_dW_im2col_kernel_t);
+            l->cache.conv.dL_dW_im2col_kernel_t = NULL;
         }
         if (l->cache.conv.dL_dW_im2col_output != NULL) {
             tensor3D_free(l->cache.conv.dL_dW_im2col_output);
@@ -104,6 +112,10 @@ void layer_free(Layer* l) {
         if (l->cache.conv.delta_im2col_output != NULL) {
             tensor3D_free(l->cache.conv.delta_im2col_output);
             l->cache.conv.delta_im2col_output = NULL;
+        }
+        if (l->cache.conv.delta_im2col_output_t != NULL) {
+            tensor3D_free(l->cache.conv.delta_im2col_output_t);
+            l->cache.conv.delta_im2col_output_t = NULL;
         }
         break;
         
@@ -781,6 +793,11 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         output_height * output_width,
         batch_size
     );
+    l->cache.conv.fp_im2col_output_t = tensor3D_new(
+        output_height * output_width,
+        l->params.conv.n_filters,
+        batch_size
+    );
     l->cache.conv.dL_dW_im2col_input = tensor3D_new(
         output_height * output_width,
         filter_height * filter_width * l->params.conv.n_filter_channels,
@@ -789,6 +806,11 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     l->cache.conv.dL_dW_im2col_kernel = tensor3D_new(
         output_height * output_width,
         l->params.conv.n_filters,
+        batch_size
+    );
+    l->cache.conv.dL_dW_im2col_kernel_t = tensor3D_new(
+        l->params.conv.n_filters,
+        output_height * output_width,
         batch_size
     );
     l->cache.conv.dL_dW_im2col_output = tensor3D_new(
@@ -814,12 +836,19 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         input_height * input_width,
         batch_size
     );
+    l->cache.conv.delta_im2col_output_t = tensor3D_new(
+        input_height * input_width,
+        l->params.conv.n_filter_channels,
+        batch_size
+    );
     #else
     l->cache.conv.fp_im2col_input = NULL;
     l->cache.conv.fp_im2col_kernel = NULL;
     l->cache.conv.fp_im2col_output = NULL;
+    l->cache.conv.fp_im2col_output_t = NULL;
     l->cache.conv.dL_dW_im2col_input = NULL;
     l->cache.conv.dL_dW_im2col_kernel = NULL;
+    l->cache.conv.dL_dW_im2col_kernel_t = NULL;
     l->cache.conv.dL_dW_im2col_output = NULL;
     l->cache.conv.dL_dW_im2col_output_sum = NULL;
     l->cache.conv.delta_im2col_input = NULL;
@@ -1185,6 +1214,9 @@ void layer_conv2D_fp(Layer* l) {
             0,
             im2col_input
         );
+
+        #ifdef BLAS
+
         matrix_dot_into(
             l->cache.conv.fp_im2col_kernel,
             im2col_input,
@@ -1192,6 +1224,23 @@ void layer_conv2D_fp(Layer* l) {
             true,
             true
         );
+
+        #else
+
+        Matrix* im2col_output_t = l->cache.conv.fp_im2col_output_t->channels[n];
+        matrix_dot_into(
+            im2col_input,
+            l->cache.conv.fp_im2col_kernel,
+            im2col_output_t,
+            false,
+            false
+        );
+        matrix_transpose_into(
+            im2col_output_t,
+            im2col_output
+        );
+
+        #endif
 
         for (int i=0; i<weight->n_filters; i++) {
             nn_float* src = im2col_output->entries + i*out_size;
@@ -1635,6 +1684,7 @@ void layer_conv2D_bp(Layer* l) {
         for (int n=0; n<input->n_filters; n++) {
             Matrix* input_mat = l->cache.conv.dL_dW_im2col_input->channels[n];
             Matrix* kernel_mat = l->cache.conv.dL_dW_im2col_kernel->channels[n];
+            Matrix* kernel_mat_t = l->cache.conv.dL_dW_im2col_kernel_t->channels[n];
             Matrix* output_mat = l->cache.conv.dL_dW_im2col_output->channels[n];
 
             input_into_im2col_fwise(
@@ -1650,6 +1700,11 @@ void layer_conv2D_bp(Layer* l) {
                 n,
                 kernel_mat
             );
+            
+            #ifdef BLAS
+
+            // IF ERROR
+
             matrix_dot_into(
                 kernel_mat,
                 input_mat,
@@ -1657,6 +1712,22 @@ void layer_conv2D_bp(Layer* l) {
                 true,
                 false
             );
+
+            #else
+
+            matrix_transpose_into(
+                kernel_mat,
+                kernel_mat_t
+            );
+            matrix_dot_into(
+                kernel_mat_t,
+                input_mat,
+                output_mat,
+                false,
+                false
+            );
+            
+            #endif
         }
 
         tensor3D_sum_element_wise_into(
@@ -1889,6 +1960,9 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to) {
             filter_next->n_rows - 1,
             from->cache.conv.delta_im2col_input->channels[n]
         );
+
+        #ifdef BLAS
+
         matrix_dot_into(
             from->cache.conv.delta_im2col_kernel,
             from->cache.conv.delta_im2col_input->channels[n],
@@ -1896,6 +1970,22 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to) {
             true,
             true
         );
+
+        #else
+
+        matrix_dot_into(
+            from->cache.conv.delta_im2col_input->channels[n],
+            from->cache.conv.delta_im2col_kernel,
+            from->cache.conv.delta_im2col_output_t->channels[n],
+            false,
+            false
+        );
+        matrix_transpose_into(
+            from->cache.conv.delta_im2col_output_t->channels[n],
+            from->cache.conv.delta_im2col_output->channels[n]
+        );
+
+        #endif
 
         Matrix* output_im2col_mat = from->cache.conv.delta_im2col_output->channels[n];
         for (int c=0; c<dL_dA->n_channels; c++) {
@@ -2226,13 +2316,16 @@ size_t layer_conv2D_get_sizeof_mem_allocated(Layer* l) {
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.fp_im2col_input);
     size += matrix_get_sizeof_mem_allocated(l->cache.conv.fp_im2col_kernel);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.fp_im2col_output);
+    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.fp_im2col_output_t);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_input);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_kernel);
+    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_kernel_t);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_output);
     size += matrix_get_sizeof_mem_allocated(l->cache.conv.dL_dW_im2col_output_sum);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.delta_im2col_input);
     size += matrix_get_sizeof_mem_allocated(l->cache.conv.delta_im2col_kernel);
     size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.delta_im2col_output);
+    size += tensor3D_get_sizeof_mem_allocated(l->cache.conv.delta_im2col_output_t);
 
     return size;
 }

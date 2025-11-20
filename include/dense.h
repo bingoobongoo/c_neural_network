@@ -21,7 +21,7 @@ typedef struct {
     Matrix* dL_dA; 
     Matrix* dA_dZ;
 
-    // transpose buffer
+    // transpose buffers
     Matrix* weight_t;
     Matrix* input_t;
 } DenseCache;

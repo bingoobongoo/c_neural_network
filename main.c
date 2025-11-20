@@ -30,9 +30,9 @@ int main() {
     );
 
     add_input_layer(x_train->n_cols, net);
-    add_dense_layer(1000, net);
-    add_dense_layer(500, net);
-    // add_batch_norm_dense_layer(0.1f, net);
+    // add_dense_layer(1000, net);
+    // add_dense_layer(500, net);
+    // // add_batch_norm_dense_layer(0.1f, net);
     add_dense_layer(300, net);
     add_dense_layer(100, net);
     add_output_layer(y_train->n_cols, net);

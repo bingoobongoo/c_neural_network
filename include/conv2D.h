@@ -38,4 +38,9 @@ typedef struct {
     Tensor3D* delta_im2col_input;
     Matrix* delta_im2col_kernel;
     Tensor3D* delta_im2col_output;
+
+    // transpose buffers
+    Tensor3D* fp_im2col_output_t;
+    Tensor3D* dL_dW_im2col_kernel_t;
+    Tensor3D* delta_im2col_output_t;
 } ConvCache;

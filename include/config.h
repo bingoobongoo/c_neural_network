@@ -61,7 +61,7 @@ performed. The default is 32-bit floating point (single precision).
 #define INLINE
 #define MULTI_THREADING
 #define CACHE_LOCALITY
-// #define VECTORIZATION
+#define VECTORIZATION
 
 // =============================================================================
 
