@@ -67,7 +67,7 @@ model = models.Model(inputs, outputs)
 # Compile & train
 # -----------------------------
 model.compile(
-    optimizer=keras.optimizers.SGD(learning_rate=0.01, momentum=0.0),
+    optimizer=keras.optimizers.SGD(learning_rate=0.001, momentum=0.0),
     loss="categorical_crossentropy",
     metrics=["accuracy"],
 )
