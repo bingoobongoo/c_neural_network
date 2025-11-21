@@ -540,6 +540,9 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
 
     matrix_zero(l->cache.dense.bias);
 
+    int fan_in = layer_get_n_units(l->prev_layer);
+    int fan_out = layer_get_n_units(l);
+
     switch (act_type)
     {
     case SIGMOID:
@@ -548,7 +551,7 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             (nn_float)0.0,
-            sqrtf((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            sqrtf((nn_float)2.0/(fan_in + fan_out))
         );
 
         #endif
@@ -557,7 +560,7 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             (nn_float)0.0,
-            sqrt((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            sqrt((nn_float)2.0/(fan_in + fan_out))
         );        
 
         #endif
@@ -572,7 +575,7 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             (nn_float)0.0,
-            sqrtf((nn_float)2.0/layer_get_n_units(l->prev_layer))
+            sqrtf((nn_float)2.0/fan_in)
         );
 
         #endif
@@ -581,7 +584,7 @@ void layer_dense_compile(Layer* l, ActivationType act_type, int act_param, int b
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             (nn_float)0.0,
-            sqrt((nn_float)2.0/layer_get_n_units(l->prev_layer))
+            sqrt((nn_float)2.0/fan_in)
         );        
         
         #endif
@@ -657,6 +660,10 @@ void layer_output_compile(Layer* l, Loss* loss, int batch_size) {
     #endif
 
     matrix_zero(l->cache.dense.bias);
+
+    int fan_in = layer_get_n_units(l->prev_layer);
+    int fan_out = layer_get_n_units(l);
+
     switch (l->activation->type)
     {
     case SIGMOID:
@@ -666,7 +673,7 @@ void layer_output_compile(Layer* l, Loss* loss, int batch_size) {
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             (nn_float)0.0,
-            sqrtf((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            sqrtf((nn_float)2.0/(fan_in + fan_out))
         );
 
         #endif
@@ -675,7 +682,7 @@ void layer_output_compile(Layer* l, Loss* loss, int batch_size) {
         matrix_fill_normal_distribution(
             l->cache.dense.weight,
             (nn_float)0.0,
-            sqrt((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            sqrt((nn_float)2.0/(fan_in + fan_out))
         ); 
 
         #endif
@@ -863,6 +870,9 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     
     matrix_zero(l->cache.conv.bias);
 
+    int fan_in = input_channels * filter_height * filter_width;
+    int fan_out = l->params.conv.n_filters * filter_height * filter_width;
+
     switch (l->activation->type)
     {
     case SIGMOID:
@@ -871,7 +881,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         tensor4D_fill_normal_distribution(
             l->cache.conv.weight,
             (nn_float)0.0,
-            sqrtf((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            sqrtf((nn_float)2.0/(fan_in + fan_out))
         );
 
         #endif
@@ -880,7 +890,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         tensor4D_fill_normal_distribution(
             l->cache.conv.weight,
             (nn_float)0.0,
-            sqrt((nn_float)2.0/(layer_get_n_units(l) + layer_get_n_units(l->prev_layer)))
+            sqrt((nn_float)2.0/(fan_in + fan_out))
         );
         
         #endif
@@ -895,7 +905,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         tensor4D_fill_normal_distribution(
             l->cache.conv.weight,
             (nn_float)0.0,
-            sqrtf((nn_float)2.0/layer_get_n_units(l->prev_layer))
+            sqrtf((nn_float)2.0/fan_in)
         );
 
         #endif
@@ -904,7 +914,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         tensor4D_fill_normal_distribution(
             l->cache.conv.weight,
             (nn_float)0.0,
-            sqrt((nn_float)2.0/layer_get_n_units(l->prev_layer))
+            sqrt((nn_float)2.0/fan_in)
         );
         
         #endif
