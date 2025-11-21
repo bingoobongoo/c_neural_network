@@ -634,8 +634,8 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
     nn_float avg_epoch_val_acc;
 
     for (int epoch=1; epoch<=n_epochs; epoch++) {
-        struct timeval start, end;
-        gettimeofday(&start, NULL);
+        struct timespec start, end;
+        clock_gettime(CLOCK_REALTIME, &start);
         for (start_idx=0, i=0; start_idx<training_size - net->batch_size; start_idx+=net->batch_size, i++) {
             if (net->is_cnn) {
                 batchify_tensor_into(x_train_split_tensor, start_idx, net->train_batch);
@@ -663,8 +663,9 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             }
             #endif
         }
-        gettimeofday(&end, NULL);
-        epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec) / 1e6;
+        
+        clock_gettime(CLOCK_REALTIME, &end);
+        epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
         total_time += epoch_time;
 
         sum = (nn_float)0.0;

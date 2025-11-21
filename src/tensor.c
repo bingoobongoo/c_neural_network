@@ -6,8 +6,26 @@ Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels) {
     t->n_cols = n_cols;
     t->n_channels = n_channels;
     t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
+    t->entries = (nn_float*)malloc(n_rows * n_cols * n_channels * sizeof(nn_float));
+    t->view = false;
     for (int i=0; i<n_channels; i++) {
-        t->channels[i] = matrix_new(n_rows, n_cols);
+        t->channels[i] = matrix_view_new(n_rows, n_cols, t->entries + i*n_rows*n_cols);
+        matrix_zero(t->channels[i]);
+    }
+
+    return t;
+}
+
+Tensor3D* tensor3D_view_new(int n_rows, int n_cols, int n_channels, nn_float* entries) {
+    Tensor3D* t = (Tensor3D*)malloc(sizeof(Tensor3D));
+    t->n_rows = n_rows;
+    t->n_cols = n_cols;
+    t->n_channels = n_channels;
+    t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
+    t->entries = entries;
+    t->view = true;
+    for (int i=0; i<n_channels; i++) {
+        t->channels[i] = matrix_view_new(n_rows, n_cols, t->entries + i*n_rows*n_cols);
         matrix_zero(t->channels[i]);
     }
 
@@ -20,7 +38,13 @@ void tensor3D_free(Tensor3D* t) {
     for (int i=0; i<t->n_channels; i++) {
         matrix_free(t->channels[i]);
     }
+
     free(t->channels);
+    t->channels = NULL;
+
+    if (!t->view) free(t->entries);
+    t->entries = NULL;
+
     free(t);
 }
 
@@ -225,8 +249,14 @@ Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
     t->n_channels = n_channels;
     t->n_filters = n_filters;
     t->filters = (Tensor3D**)malloc(n_filters * sizeof(Tensor3D*));
+    t->entries = (nn_float*)malloc(n_rows * n_cols * n_channels * n_filters * sizeof(nn_float));
     for (int i=0; i<n_filters; i++) {
-        t->filters[i] = tensor3D_new(n_rows, n_cols, n_channels);
+        t->filters[i] = tensor3D_view_new(
+            n_rows, 
+            n_cols, 
+            n_channels,
+            t->entries + i*n_rows*n_cols*n_channels
+        );
     }
 
     return t;
@@ -239,6 +269,11 @@ void tensor4D_free(Tensor4D* t) {
         tensor3D_free(t->filters[i]);
     }
     free(t->filters);
+    t->filters = NULL;
+
+    free(t->entries);
+    t->entries = NULL;
+
     free(t);
 }
 
@@ -564,6 +599,9 @@ size_t tensor3D_get_sizeof_mem_allocated(Tensor3D* t) {
         size += matrix_get_sizeof_mem_allocated(t->channels[i]);
     }
 
+    if (!t->view)
+        size += t->n_rows * t->n_cols * t->n_channels * sizeof(nn_float);
+
     return size;
 }
 
@@ -575,6 +613,8 @@ size_t tensor4D_get_sizeof_mem_allocated(Tensor4D* t) {
     for (int i=0; i<t->n_filters; i++) {
         size += tensor3D_get_sizeof_mem_allocated(t->filters[i]);
     }
+
+    size += t->n_rows * t->n_cols * t->n_channels * t->n_filters * sizeof(nn_float);
 
     return size;
 }

@@ -17,6 +17,7 @@ typedef struct {
     nn_float* entries;
     int n_rows;
     int n_cols;
+    bool view;
 } Matrix;
 
 typedef struct {
@@ -31,6 +32,7 @@ typedef enum {
 } CorrelationType;
 
 Matrix* matrix_new(int n_rows, int n_cols);
+Matrix* matrix_view_new(int n_rows, int n_cols, nn_float* entries);
 void matrix_free(Matrix* m);
 nn_float matrix_get(Matrix* m, int row, int col);
 void matrix_assign(Matrix* m, int row, int col, nn_float num);
