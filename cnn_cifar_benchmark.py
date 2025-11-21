@@ -16,38 +16,31 @@ x_test  = x_test.astype("float32") / 255.0
 y_train = keras.utils.to_categorical(y_train, num_classes)
 y_test  = keras.utils.to_categorical(y_test,  num_classes)
 
-# -----------------------------
-# Model: mirrors your C layout
-# -----------------------------
 inputs = layers.Input(shape=(32, 32, 3))
 
-# Conv2D input layer is implicit in Keras via Input
-
 # ---- Block 1 ----
-x = layers.Conv2D(
-    filters=8,
-    kernel_size=(3, 3),
-    strides=(1, 1),
-    padding="valid",
-    kernel_initializer="he_normal",
-    activation="relu"
-)(inputs)
-# x = layers.BatchNormalization()(x)
-# x = layers.Activation("relu")(x)
-x = layers.MaxPooling2D(pool_size=(2, 2), strides=2)(x)
-
-# ---- Block 2 ----
 x = layers.Conv2D(
     filters=16,
     kernel_size=(3, 3),
     strides=(1, 1),
     padding="valid",
     kernel_initializer="he_normal",
-    activation="relu"
+)(inputs)
+# x = layers.BatchNormalization()(x)
+x = layers.Activation("relu")(x)
+# x = layers.MaxPooling2D(pool_size=(2, 2), strides=2)(x)
+
+# ---- Block 2 ----
+x = layers.Conv2D(
+    filters=32,
+    kernel_size=(3, 3),
+    strides=(1, 1),
+    padding="valid",
+    kernel_initializer="he_normal",
 )(x)
 # x = layers.BatchNormalization()(x)
-# x = layers.Activation("relu")(x)
-x = layers.MaxPooling2D(pool_size=(2, 2), strides=2)(x)
+x = layers.Activation("relu")(x)
+# x = layers.MaxPooling2D(pool_size=(2, 2), strides=2)(x)
 
 # ---- Flatten ----
 x = layers.Flatten()(x)
@@ -56,10 +49,9 @@ x = layers.Flatten()(x)
 x = layers.Dense(
     128,
     kernel_initializer="he_normal",
-    activation="relu"
 )(x)
-# x = layers.BatchNormalization()(x)
-# x = layers.Activation("relu")(x)
+x = layers.BatchNormalization()(x)
+x = layers.Activation("relu")(x)
 
 # ---- Output ----
 outputs = layers.Dense(

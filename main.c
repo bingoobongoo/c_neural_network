@@ -61,18 +61,18 @@ int main() {
 
     add_conv_input_layer(32, 32, 3, net);
 
-    add_conv_layer(8, 3, 1, net);
-    // add_batch_norm_conv2D_layer(0.1, net);
-    add_max_pool_layer(2, 2, net);
-
     add_conv_layer(16, 3, 1, net);
     // add_batch_norm_conv2D_layer(0.1, net);
-    add_max_pool_layer(2, 2, net);
+    // add_max_pool_layer(2, 2, net);
+
+    add_conv_layer(32, 3, 1, net);
+    // add_batch_norm_conv2D_layer(0.1, net);
+    // add_max_pool_layer(2, 2, net);
 
     add_flatten_layer(net);
 
     add_dense_layer(128, net);
-    // add_batch_norm_dense_layer(0.1, net);
+    add_batch_norm_dense_layer(0.1, net);
     add_output_layer(10, net);
 
     // add_conv_input_layer(28, 28, 1, net);

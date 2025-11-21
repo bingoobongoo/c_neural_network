@@ -18,7 +18,7 @@ checks, out of bounds checks etc. Very slow, use only when debugging.
 Enables optimized library for basic linear algerba operations, effectively 
 replacing custom operations with their optimized counterparts from CBLAS library.
 */
-// #define BLAS
+#define BLAS
 
 /*
 Enables im2col method for calculating convolution for forward and backward passes in CNN.
