@@ -6,12 +6,19 @@ from keras.api.layers import Dense, Flatten, MaxPooling2D, Conv2D, Input, BatchN
 from keras.api.datasets import fashion_mnist
 from keras.api.utils import to_categorical
 
-(x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
+# (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
+# x_train = x_train.astype("float32") / 255.0
+# x_test  = x_test.astype("float32") / 255.0
+
+(x_train, y_train), (x_test, y_test) = keras.datasets.cifar10.load_data()
 x_train = x_train.astype("float32") / 255.0
 x_test  = x_test.astype("float32") / 255.0
 
-x_train = x_train.reshape(-1, 784)
-x_test  = x_test.reshape(-1, 784)
+
+x_train = x_train.reshape(-1, 3072)
+x_test  = x_test.reshape(-1, 3072)
+# x_train = x_train.reshape(-1, 784)
+# x_test  = x_test.reshape(-1, 784)
 # x_train = x_train.reshape(-1, 28, 28, 1)
 # x_test  = x_test.reshape(-1, 28, 28, 1)
 
@@ -26,9 +33,9 @@ model = Sequential([
     Dense(10, activation="softmax")
 ])
 
-opt = keras.optimizers.Adam(0.001, 0.9, 0.999)
+opt = keras.optimizers.SGD(0.01)
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(optimizer='SGD', loss='categorical_crossentropy', metrics=['accuracy'])
 
 class TimerCallback(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):

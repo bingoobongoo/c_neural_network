@@ -1529,7 +1529,7 @@ void layer_batch_norm_dense_fp(Layer* l, bool training) {
 }
 
 void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch) {
-    // dL_dZ calculation
+    // dL_dA calculation
     apply_loss_dA_into(
         loss, 
         l->cache.dense.output, 
@@ -1591,6 +1591,14 @@ void layer_dense_bp(Layer* l) {
     }
     else if (l->next_layer->l_type == BATCH_NORM_DENSE) {
         bp_delta_from_batch_norm_dense(l->next_layer, l->cache.dense.dL_dA);
+    }
+    else {
+        fprintf(
+            stderr, 
+            "Unsupported next layer type in layer_dense_bp: %d\n", 
+            l->next_layer->l_type
+        );
+        exit(1);
     }
 
     // dL_dZ calculation
@@ -1662,6 +1670,14 @@ void layer_conv2D_bp(Layer* l) {
     else if (l->next_layer->l_type == BATCH_NORM_CONV2D) {
         bp_delta_from_batch_norm_conv2D(l->next_layer, dL_dA);
     }
+    else {
+        fprintf(
+            stderr, 
+            "Unsupported next layer type in layer_conv2D_bp: %d\n", 
+            l->next_layer->l_type
+        );
+        exit(1);
+    }
 
     // dL_dZ calculation
     for (int n=0; n<delta->n_filters; n++) {
@@ -1712,8 +1728,6 @@ void layer_conv2D_bp(Layer* l) {
             );
             
             #ifdef BLAS
-
-            // IF ERROR
 
             matrix_dot_into(
                 kernel_mat,
@@ -1799,6 +1813,14 @@ void layer_max_pool_bp(Layer* l) {
     else if (l->next_layer->l_type == BATCH_NORM_CONV2D) {
         bp_delta_from_batch_norm_conv2D(l->next_layer, l->cache.max_pool.delta);
     }
+    else {
+        fprintf(
+            stderr, 
+            "Unsupported next layer type in layer_max_pool_bp: %d\n", 
+            l->next_layer->l_type
+        );
+        exit(1);
+    }
 }
 
 void layer_flatten_bp(Layer* l) {
@@ -1808,6 +1830,14 @@ void layer_flatten_bp(Layer* l) {
     }
     else if (l->next_layer->l_type == BATCH_NORM_DENSE) {
         bp_delta_from_batch_norm_dense(l->next_layer, l->cache.flat.delta);
+    }
+    else {
+        fprintf(
+            stderr, 
+            "Unsupported next layer type in layer_flatten_bp: %d\n", 
+            l->next_layer->l_type
+        );
+        exit(1);
     }
 }
 
@@ -1821,8 +1851,19 @@ void layer_batch_norm_conv2D_bp(Layer* l) {
     if (l->next_layer->l_type == CONV2D) {
         bp_delta_from_conv2D(l->next_layer, dL_dA);
     }
+    else if (l->next_layer->l_type == MAX_POOL) {
+        bp_delta_from_max_pool(l->next_layer, dL_dA);
+    }
     else if (l->next_layer->l_type == FLATTEN) {
         bp_delta_from_flatten(l->next_layer, dL_dA);
+    }
+    else {
+        fprintf(
+            stderr, 
+            "Unsupported next layer type in layer_batch_norm_conv2D_bp: %d\n", 
+            l->next_layer->l_type
+        );
+        exit(1);
     }
 
     // dL_dZ calculation
@@ -1876,7 +1917,15 @@ void layer_batch_norm_dense_bp(Layer* l) {
 
     // dL/dA calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.bn_dense.dA_dZ);
+        bp_delta_from_dense(l->next_layer, l->cache.bn_dense.dL_dA);
+    }
+    else {
+        fprintf(
+            stderr, 
+            "Unsupported next layer type in layer_batch_norm_dense_bp: %d\n", 
+            l->next_layer->l_type
+        );
+        exit(1);
     }
 
     // dL/dZ calculation

@@ -25,26 +25,28 @@ inputs = layers.Input(shape=(32, 32, 3))
 
 # ---- Block 1 ----
 x = layers.Conv2D(
-    filters=32,
-    kernel_size=(3, 3),
-    strides=(1, 1),
-    padding="valid",          # most likely what you want in C
-    kernel_initializer="he_normal",
-)(inputs)
-# x = layers.BatchNormalization()(x)
-x = layers.Activation("relu")(x)
-x = layers.MaxPooling2D(pool_size=(2, 2), strides=2)(x)
-
-# ---- Block 2 ----
-x = layers.Conv2D(
-    filters=64,
+    filters=8,
     kernel_size=(3, 3),
     strides=(1, 1),
     padding="valid",
     kernel_initializer="he_normal",
+    activation="relu"
+)(inputs)
+# x = layers.BatchNormalization()(x)
+# x = layers.Activation("relu")(x)
+x = layers.MaxPooling2D(pool_size=(2, 2), strides=2)(x)
+
+# ---- Block 2 ----
+x = layers.Conv2D(
+    filters=16,
+    kernel_size=(3, 3),
+    strides=(1, 1),
+    padding="valid",
+    kernel_initializer="he_normal",
+    activation="relu"
 )(x)
 # x = layers.BatchNormalization()(x)
-x = layers.Activation("relu")(x)
+# x = layers.Activation("relu")(x)
 x = layers.MaxPooling2D(pool_size=(2, 2), strides=2)(x)
 
 # ---- Flatten ----
@@ -54,9 +56,10 @@ x = layers.Flatten()(x)
 x = layers.Dense(
     128,
     kernel_initializer="he_normal",
+    activation="relu"
 )(x)
 # x = layers.BatchNormalization()(x)
-x = layers.Activation("relu")(x)
+# x = layers.Activation("relu")(x)
 
 # ---- Output ----
 outputs = layers.Dense(

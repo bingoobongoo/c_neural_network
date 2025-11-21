@@ -10,33 +10,34 @@ int main() {
     
     srand(time(NULL));
 
-    // const char* train_files[] = {
-    //     "data/cifar-10/data_batch_1.bin",
-    //     "data/cifar-10/data_batch_2.bin",
-    //     "data/cifar-10/data_batch_3.bin",
-    //     "data/cifar-10/data_batch_4.bin",
-    //     "data/cifar-10/data_batch_5.bin"
-    // };
+    const char* train_files[] = {
+        "data/cifar-10/data_batch_1.bin",
+        "data/cifar-10/data_batch_2.bin",
+        "data/cifar-10/data_batch_3.bin",
+        "data/cifar-10/data_batch_4.bin",
+        "data/cifar-10/data_batch_5.bin"
+    };
 
-    // const char* test_files[] = {
-    //     "data/cifar-10/test_batch.bin"
-    // };
+    const char* test_files[] = {
+        "data/cifar-10/test_batch.bin"
+    };
 
-    // Matrix* x_train = load_cifar10_images(train_files, 5);
-    // Matrix* x_test = load_cifar10_images(test_files, 1);
-    // normalize(x_train); 
-    // normalize(x_test);
-
-    // Matrix* y_train = load_cifar10_labels(train_files, 5);
-    // Matrix* y_test = load_cifar10_labels(test_files, 1);
-
-    Matrix* x_train = load_ubyte_images("data/fashion_mnist/train-images-idx3-ubyte");
-    Matrix* x_test = load_ubyte_images("data/fashion_mnist/test-images-idx3-ubyte");
+    Matrix* x_train = load_cifar10_images(train_files, 5);
+    Matrix* x_test = load_cifar10_images(test_files, 1);
     normalize(x_train); 
     normalize(x_test);
 
-    Matrix* y_train = load_ubyte_labels("data/fashion_mnist/train-labels-idx1-ubyte");
-    Matrix* y_test = load_ubyte_labels("data/fashion_mnist/test-labels-idx1-ubyte");
+    Matrix* y_train = load_cifar10_labels(train_files, 5);
+    Matrix* y_test = load_cifar10_labels(test_files, 1);
+
+    // Matrix* x_train = load_ubyte_images("data/fashion_mnist/train-images-idx3-ubyte");
+    // Matrix* x_test = load_ubyte_images("data/fashion_mnist/test-images-idx3-ubyte");
+    // normalize(x_train); 
+    // normalize(x_test);
+
+    // Matrix* y_train = load_ubyte_labels("data/fashion_mnist/train-labels-idx1-ubyte");
+    // Matrix* y_test = load_ubyte_labels("data/fashion_mnist/test-labels-idx1-ubyte");
+
     matrix_assign_ptr(&y_train, one_hot_encode(y_train, 10));
     matrix_assign_ptr(&y_test, one_hot_encode(y_test, 10));
 
@@ -44,7 +45,7 @@ int main() {
     shuffle_matrix_inplace(x_test, y_test);
     
     NeuralNet* net = neural_net_new(
-        optimizer_sgd_new(0.01),
+        optimizer_sgd_new(0.001),
         RELU, 0.01,
         CAT_CROSS_ENTROPY, 
         32
@@ -53,35 +54,35 @@ int main() {
     // add_input_layer(x_train->n_cols, net);
     // add_dense_layer(1000, net);
     // add_dense_layer(500, net);
-    // // add_batch_norm_dense_layer(0.1f, net);
+    // add_batch_norm_dense_layer(0.1f, net);
     // add_dense_layer(300, net);
     // add_dense_layer(100, net);
     // add_output_layer(y_train->n_cols, net);
 
-    // add_conv_input_layer(28, 28, 1, net);
+    add_conv_input_layer(32, 32, 3, net);
 
-    // add_conv_layer(32, 3, 1, net);
-    // // add_batch_norm_conv2D_layer(0.1, net);
-    // add_max_pool_layer(2, 2, net);
-
-    // add_conv_layer(64, 3, 1, net);
-    // // add_batch_norm_conv2D_layer(0.1, net);
-    // add_max_pool_layer(2, 2, net);
-
-    // add_flatten_layer(net);
-
-    // add_dense_layer(128, net);
-    // // add_batch_norm_dense_layer(0.1, net);
-    // add_output_layer(10, net);
-
-    add_conv_input_layer(28, 28, 1, net);
-    add_conv_layer(16, 8, 1, net);
+    add_conv_layer(8, 3, 1, net);
     // add_batch_norm_conv2D_layer(0.1, net);
     add_max_pool_layer(2, 2, net);
-    add_conv_layer(8, 4, 1, net);
+
+    add_conv_layer(16, 3, 1, net);
     // add_batch_norm_conv2D_layer(0.1, net);
+    add_max_pool_layer(2, 2, net);
+
     add_flatten_layer(net);
-    add_output_layer(y_train->n_cols, net);
+
+    add_dense_layer(128, net);
+    // add_batch_norm_dense_layer(0.1, net);
+    add_output_layer(10, net);
+
+    // add_conv_input_layer(28, 28, 1, net);
+    // add_conv_layer(16, 8, 1, net);
+    // add_batch_norm_conv2D_layer(0.1, net);
+    // add_max_pool_layer(2, 2, net);
+    // add_conv_layer(8, 4, 1, net);
+    // add_batch_norm_conv2D_layer(0.1, net);
+    // add_flatten_layer(net);
+    // add_output_layer(y_train->n_cols, net);
 
     neural_net_compile(net);
     neural_net_info(net);
