@@ -101,6 +101,50 @@ void neural_net_compile(NeuralNet* net) {
         }
     }
 
+    // tensor views assignment
+    for (int i=1; i<net->n_layers; i++) {
+        Layer* l = net->layers[i];
+        switch(l->l_type)
+        {
+            case CONV2D: {
+                if (l->next_layer->l_type == FLATTEN) {
+                    l->cache.conv.dL_dA = tensor4D_view_new(
+                        l->cache.conv.output->n_rows,
+                        l->cache.conv.output->n_cols,
+                        l->cache.conv.output->n_channels,
+                        l->cache.conv.output->n_filters,
+                        l->next_layer->cache.flat.delta->entries
+                    );
+                }
+                break;
+            }
+            case MAX_POOL: {
+                if (l->next_layer->l_type == FLATTEN) {
+                    l->cache.max_pool.delta = tensor4D_view_new(
+                        l->cache.max_pool.output->n_rows,
+                        l->cache.max_pool.output->n_cols,
+                        l->cache.max_pool.output->n_channels,
+                        l->cache.max_pool.output->n_filters,
+                        l->next_layer->cache.flat.delta->entries
+                    );
+                }
+                break;
+            }
+            case BATCH_NORM_CONV2D: {
+                if (l->next_layer->l_type == FLATTEN) {
+                    l->cache.bn_conv.dL_dA = tensor4D_view_new(
+                        l->cache.bn_conv.output->n_rows,
+                        l->cache.bn_conv.output->n_cols,
+                        l->cache.bn_conv.output->n_channels,
+                        l->cache.bn_conv.output->n_filters,
+                        l->next_layer->cache.flat.delta->entries
+                    );
+                }
+                break;
+            }
+        }
+    }
+
     // optimizer compilation
     switch (net->optimizer->type)
     {

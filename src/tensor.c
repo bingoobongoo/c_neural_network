@@ -48,6 +48,17 @@ void tensor3D_free(Tensor3D* t) {
     free(t);
 }
 
+void tensor3D_view_assign(Tensor3D* t, nn_float* entries) {
+    if (!t->view) {
+        printf("(tensor3D_view_assign) Tensor is not a view.\n");
+        exit(1);
+    }
+    t->entries = entries;
+    for (int i=0; i<t->n_channels; i++) {
+        t->channels[i]->entries = t->entries + (i*t->n_rows*t->n_cols);
+    }
+}
+
 void tensor3D_copy_into(Tensor3D* t, Tensor3D* into) {
     for (int i=0; i<t->n_channels; i++) {
         matrix_copy_into(t->channels[i], into->channels[i]);
@@ -250,6 +261,28 @@ Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
     t->n_filters = n_filters;
     t->filters = (Tensor3D**)malloc(n_filters * sizeof(Tensor3D*));
     t->entries = (nn_float*)malloc(n_rows * n_cols * n_channels * n_filters * sizeof(nn_float));
+    t->view = false;
+    for (int i=0; i<n_filters; i++) {
+        t->filters[i] = tensor3D_view_new(
+            n_rows, 
+            n_cols, 
+            n_channels,
+            t->entries + i*n_rows*n_cols*n_channels
+        );
+    }
+
+    return t;
+}
+
+Tensor4D* tensor4D_view_new(int n_rows, int n_cols, int n_channels, int n_filters, nn_float* entries) {
+    Tensor4D* t = (Tensor4D*)malloc(sizeof(Tensor4D));
+    t->n_rows = n_rows;
+    t->n_cols = n_cols;
+    t->n_channels = n_channels;
+    t->n_filters = n_filters;
+    t->filters = (Tensor3D**)malloc(n_filters * sizeof(Tensor3D*));
+    t->entries = entries;
+    t->view = true;
     for (int i=0; i<n_filters; i++) {
         t->filters[i] = tensor3D_view_new(
             n_rows, 
@@ -271,10 +304,25 @@ void tensor4D_free(Tensor4D* t) {
     free(t->filters);
     t->filters = NULL;
 
-    free(t->entries);
+    if (!t->view) free(t->entries);
     t->entries = NULL;
 
     free(t);
+}
+
+void tensor4D_view_assign(Tensor4D* t, nn_float* entries) {
+    if (!t->view) {
+        printf("(tensor4D_view_assign) Tensor is not a view.\n");
+        exit(1);
+    }
+
+    t->entries = entries;
+    for (int i=0; i<t->n_filters; i++) {
+        tensor3D_view_assign(
+            t->filters[i],
+            t->entries + (i*t->n_rows*t->n_cols*t->n_channels)
+         );
+    }
 }
 
 void tensor4D_copy_into(Tensor4D* t, Tensor4D* into) {
@@ -637,7 +685,8 @@ size_t tensor4D_get_sizeof_mem_allocated(Tensor4D* t) {
         size += tensor3D_get_sizeof_mem_allocated(t->filters[i]);
     }
 
-    size += t->n_rows * t->n_cols * t->n_channels * t->n_filters * sizeof(nn_float);
+    if (!t->view)
+        size += t->n_rows * t->n_cols * t->n_channels * t->n_filters * sizeof(nn_float);
 
     return size;
 }
