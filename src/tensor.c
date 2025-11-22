@@ -551,37 +551,60 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
     int ker_h = kernel->n_rows;
     int ker_w = kernel->n_cols;
 
-    int out_h = (in_h + 2*padding - ker_h) / stride + 1;
-    int out_w = (in_w + 2*padding - ker_w) / stride + 1;
+    int out_h = (in_h + 2 * padding - ker_h) / stride + 1;
+    int out_w = (in_w + 2 * padding - ker_w) / stride + 1;
+    
+    nn_float* channel_ptrs[in_c];
+    for (int k = 0; k < in_c; k++) {
+        channel_ptrs[k] = input->filters[filter_idx]->channels[k]->entries;
+    }
 
-    for (int i=0; i<out_h; i++) {
-        int is = i*stride - padding;
-        for (int j=0; j<out_w; j++) {
-            int js = j*stride - padding;
+    nn_float* im2col_ptr = im2col->entries;
 
-            nn_float* im2col_row = im2col->entries + (i*out_w + j)*im2col->n_cols;
-            int col = 0;
-
-            for (int k=0; k<in_c; k++) {
-                Matrix* cm = input->filters[filter_idx]->channels[k];
-                if (is>=0 && js>=0 && is+ker_h<=in_h && js+ker_w<=in_w) {
-                    for (int l=0; l<ker_h; l++) {
-                        nn_float* src = cm->entries + (is+l)*cm->n_cols + js;
-                        nn_float* dst = im2col_row + col + l*ker_w;
-                        memcpy(dst, src, ker_w*sizeof(nn_float));
+    if (padding == 0) {
+        for (int i = 0; i < out_h; i++) {
+            int row_offset = i * stride;
+            for (int j = 0; j < out_w; j++) {
+                int col_offset = j * stride;
+                
+                for (int k = 0; k < in_c; k++) {
+                    nn_float* src_base = channel_ptrs[k];
+                    
+                    for (int kh = 0; kh < ker_h; kh++) {
+                        int input_row = row_offset + kh;
+                        int input_row_start = input_row * in_w + col_offset;
+                        memcpy(im2col_ptr, &src_base[input_row_start], ker_w * sizeof(nn_float));
+                        im2col_ptr += ker_w;
                     }
-                    col += ker_h*ker_w;
                 }
-                else {
-                    for (int l=0; l<ker_h; l++) {
-                        int isl = is + l;
-                        bool cond = (isl>=0 && isl<in_h);
-                        for (int m=0; m<ker_w; m++, col++) {
-                            int jsm = js + m;
-                            if (cond && jsm>=0 && jsm<in_w)
-                                im2col_row[col] = cm->entries[isl*cm->n_cols + jsm];
-                            else
-                                im2col_row[col] = (nn_float)0.0;
+            }
+        }
+    } 
+    else {
+        for (int i = 0; i < out_h; i++) {
+            int row_offset = i * stride - padding;
+            for (int j = 0; j < out_w; j++) {
+                int col_offset = j * stride - padding;
+
+                for (int k = 0; k < in_c; k++) {
+                    nn_float* src_base = channel_ptrs[k];
+
+                    for (int kh = 0; kh < ker_h; kh++) {
+                        int input_row = row_offset + kh;
+                        
+                        if (input_row >= 0 && input_row < in_h) {
+                            for (int kw = 0; kw < ker_w; kw++) {
+                                int input_col = col_offset + kw;
+                                if (input_col >= 0 && input_col < in_w) {
+                                    *im2col_ptr++ = src_base[input_row * in_w + input_col];
+                                } else {
+                                    *im2col_ptr++ = 0.0f;
+                                }
+                            }
+                        } else {
+                            for (int kw = 0; kw < ker_w; kw++) {
+                                *im2col_ptr++ = (nn_float)0.0;
+                            }
                         }
                     }
                 }

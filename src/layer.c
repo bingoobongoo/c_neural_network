@@ -1890,6 +1890,9 @@ void layer_batch_norm_conv2D_bp(Layer* l) {
     matrix_zero(beta_grad);
     matrix_zero(gamma_grad);
 
+    #ifdef MULTI_THREADING
+    #pragma omp parallel for schedule(static)
+    #endif
     for (int c=0; c<delta->n_channels; c++) {
         nn_float b_sum = (nn_float)0.0;
         nn_float g_sum = (nn_float)0.0;
@@ -2187,9 +2190,6 @@ void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to) {
 void bp_delta_from_batch_norm_dense(Layer* from, Matrix* to) {
     Matrix* bn_input = layer_get_output_matrix(from->prev_layer);
 
-    // #ifdef MULTI_THREADING
-    // #pragma omp parallel for schedule(static)
-    // #endif
     for (int j=0; j<to->n_cols; j++) {
         nn_float mean_j = matrix_get(from->cache.bn_dense.mean, 0, j);
         nn_float var_j = matrix_get(from->cache.bn_dense.variance, 0, j);

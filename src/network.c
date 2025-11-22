@@ -663,7 +663,6 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             }
             #endif
         }
-        
         clock_gettime(CLOCK_REALTIME, &end);
         epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
         total_time += epoch_time;
