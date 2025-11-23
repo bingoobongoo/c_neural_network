@@ -865,6 +865,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     l->cache.conv.delta_im2col_input = NULL;
     l->cache.conv.delta_im2col_kernel = NULL;
     l->cache.conv.delta_im2col_output = NULL;
+    l->cache.conv.delta_im2col_output_t = NULL;
     #endif
 
     l->params.conv.n_units = 
@@ -1268,15 +1269,14 @@ void layer_conv2D_fp(Layer* l) {
             // memcpy(dst, src, out_size*sizeof(nn_float));
         }
         for (int i=0; i<weight->n_filters; i++) {
-            matrix_add_scalar_inplace(
-                matrix_get(bias, 0, i),
-                z->filters[n]->channels[i]
-            );
-            apply_activation_func_into(
-                l->activation,
-                z->filters[n]->channels[i],
-                output->filters[n]->channels[i]
-            );
+            nn_float b = matrix_get(bias, 0, i);
+            nn_float* z_ptr = z->filters[n]->channels[i]->entries;
+            nn_float* out_ptr = output->filters[n]->channels[i]->entries;
+
+            for (int j=0; j<out_h*out_w; j++) {
+                z_ptr[j] += b;
+                out_ptr[j] = apply_activation_func(l->activation, z_ptr[j]);
+            }
         }
     }
 
@@ -1295,15 +1295,14 @@ void layer_conv2D_fp(Layer* l) {
                 l->params.conv.stride,
                 VALID
             );
-            matrix_add_scalar_inplace(
-                matrix_get(bias, 0, i),
-                z->filters[n]->channels[i]
-            );
-            apply_activation_func_into(
-                l->activation,
-                z->filters[n]->channels[i],
-                output->filters[n]->channels[i]
-            );
+            nn_float b = matrix_get(bias, 0, i);
+            nn_float* z_ptr = z->filters[n]->channels[i]->entries;
+            nn_float* out_ptr = output->filters[n]->channels[i]->entries;
+
+            for (int j=0; j<output->n_rows*output->n_cols; j++) {
+                z_ptr[j] += b;
+                out_ptr[j] = apply_activation_func(l->activation, z_ptr[j]);
+            }
         }
     }
 
@@ -1590,6 +1589,10 @@ void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch) {
 }
 
 void layer_dense_bp(Layer* l) {
+    Matrix* z = l->cache.dense.z;
+    Matrix* delta = l->cache.dense.delta;
+    Matrix* dA_dZ = l->cache.dense.dA_dZ;
+    Matrix* dL_dA = l->cache.dense.dL_dA;
     // dL_dA calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
         bp_delta_from_dense(l->next_layer, l->cache.dense.dL_dA);
@@ -1687,16 +1690,15 @@ void layer_conv2D_bp(Layer* l) {
     // dL_dZ calculation
     for (int n=0; n<delta->n_filters; n++) {
         for (int c=0; c<delta->n_channels; c++) {
-            apply_activation_dZ_into(
-                l->activation,
-                z->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c]
-            );
-            matrix_multiply_into(
-                dL_dA->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c],
-                delta->filters[n]->channels[c]
-            );
+            nn_float* z_ptr = z->filters[n]->channels[c]->entries;
+            nn_float* dA_dZ_ptr = dA_dZ->filters[n]->channels[c]->entries;
+            nn_float* dL_dA_ptr = dL_dA->filters[n]->channels[c]->entries;
+            nn_float* delta_ptr = delta->filters[n]->channels[c]->entries;
+
+            for (int i=0; i<delta->n_rows*delta->n_cols; i++) {
+                dA_dZ_ptr[i] = apply_activation_dZ(l->activation, z_ptr[i]);
+                delta_ptr[i] = dL_dA_ptr[i] * dA_dZ_ptr[i];
+            }
         }
     }
 
@@ -1875,16 +1877,15 @@ void layer_batch_norm_conv2D_bp(Layer* l) {
     // dL_dZ calculation
     for (int n=0; n<delta->n_filters; n++) {
         for (int c=0; c<delta->n_channels; c++) {
-            apply_activation_dZ_into(
-                l->activation,
-                z->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c]
-            );
-            matrix_multiply_into(
-                dL_dA->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c],
-                delta->filters[n]->channels[c]
-            );
+            nn_float* z_ptr = z->filters[n]->channels[c]->entries;
+            nn_float* dA_dZ_ptr = dA_dZ->filters[n]->channels[c]->entries;
+            nn_float* dL_dA_ptr = dL_dA->filters[n]->channels[c]->entries;
+            nn_float* delta_ptr = delta->filters[n]->channels[c]->entries;
+
+            for (int i=0; i<delta->n_rows*delta->n_cols; i++) {
+                dA_dZ_ptr[i] = apply_activation_dZ(l->activation, z_ptr[i]);
+                delta_ptr[i] = dL_dA_ptr[i] * dA_dZ_ptr[i];
+            }
         }
     }
 

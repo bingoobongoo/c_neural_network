@@ -24,9 +24,11 @@ typedef struct {
 
 Activation* activation_new(ActivationType type, nn_float param);
 
-Matrix* apply_activation_func(Activation* activation, Matrix* z_m);
+nn_float apply_activation_func(Activation* activation, nn_float z);
+Matrix* apply_activation_func_matrix(Activation* activation, Matrix* z_m);
 void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* into);
-Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m);
+nn_float apply_activation_dZ(Activation* activation, nn_float z);
+Matrix* apply_activation_dZ_matrix(Activation* activation, Matrix* z_m);
 void apply_activation_dZ_into(Activation* activation, Matrix* z_m, Matrix* into);
 
 nn_float sigmoid(nn_float z, nn_float param);

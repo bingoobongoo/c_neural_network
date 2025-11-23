@@ -1064,7 +1064,8 @@ void matrix_acc_convolve_full_into(Matrix* input, Matrix* kflip, Matrix* into, M
     int ker_h = kflip->n_rows;
     int ker_w = kflip->n_cols;
     int pad_h = in_h + 2*(ker_h-1);
-    int pad_w = in_w + 2*(ker_w-1);;
+    int pad_w = in_w + 2*(ker_w-1);
+
     matrix_zero(padding);
 
     for (int i=0; i<in_h; i++) {
