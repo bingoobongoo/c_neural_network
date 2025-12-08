@@ -9,7 +9,7 @@ typedef struct {
     int n_channels;
     Matrix** channels;
     nn_float* entries;
-    bool view;
+    bool is_view;
 } Tensor3D;
 
 typedef struct {
@@ -19,7 +19,7 @@ typedef struct {
     int n_filters;
     Tensor3D** filters;
     nn_float* entries;
-    bool view;
+    bool is_view;
 } Tensor4D;
 
 typedef struct {

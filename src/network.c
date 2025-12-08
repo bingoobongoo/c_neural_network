@@ -10,7 +10,7 @@ NeuralNet* neural_net_new(Optimizer* opt, ActivationType act_type, nn_float act_
     net->train_batch = NULL;
     net->label_batch = NULL;
     net->batch_size = batch_size;
-    net->layers = (Layer**)malloc(20 * sizeof(Layer*));
+    net->layers = (Layer**)malloc(100 * sizeof(Layer*));
     net->compiled = false;
     net->is_cnn = false;
 
@@ -34,12 +34,10 @@ void neural_net_free(NeuralNet* net) {
 
 void neural_net_compile(NeuralNet* net) {
     // 1. link layers
-    // 2. initialize activation for each layer
-    // 3. initialize weight and bias matrices
-    // 4. initialize static storage for gradients, output and z
-    // 5. initialize static storage for auxiliary gradients
-    // 6. initialize static storage for optimizer matrices
-    // 7. initialize batches
+    // 2. initialize weight and bias matrices
+    // 3. initialize static storage for gradients, output and z
+    // 4. initialize static storage for auxiliary gradients
+    // 5. initialize static storage for optimizer matrices
 
     neural_net_link_layers(net);
 
@@ -663,7 +661,8 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
     Matrix* y_train_split = matrix_slice_rows(y_train, 0, training_size);
     Matrix* y_val_split = matrix_slice_rows(y_train, training_size, val_size);
 
-    nn_float* avg_loss = (nn_float*)malloc(train_batches * sizeof(nn_float));
+    nn_float* avg_train_loss = (nn_float*)malloc(train_batches * sizeof(nn_float));
+    nn_float* avg_val_loss = (nn_float*)malloc(val_batches * sizeof(nn_float));
     nn_float* train_acc = (nn_float*)malloc(train_batches * sizeof(nn_float));
     nn_float* val_acc = (nn_float*)malloc(val_batches * sizeof(nn_float));
 
@@ -673,9 +672,9 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
     nn_float epoch_time;
     nn_float total_time = (nn_float)0.0;
     nn_float sum;
-    nn_float avg_epoch_loss;
-    nn_float avg_epoch_train_acc;
-    nn_float avg_epoch_val_acc;
+    nn_float avg_epoch_train_loss, avg_epoch_val_loss;
+    nn_float avg_epoch_train_acc, avg_epoch_val_acc;
+    nn_float samples_per_sec;
 
     for (int epoch=1; epoch<=n_epochs; epoch++) {
         struct timespec start, end;
@@ -689,7 +688,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             }
             batchify_matrix_into(y_train_split, start_idx, net->label_batch);
             forward_prop(net, true);
-            avg_loss[i] = get_avg_batch_loss(
+            avg_train_loss[i] = get_avg_batch_loss(
                 net->loss, 
                 net->layers[net->n_layers-1]->cache.dense.output, 
                 net->label_batch->data.matrix
@@ -711,11 +710,13 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
         epoch_time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
         total_time += epoch_time;
 
+        samples_per_sec = i * net->batch_size / epoch_time;
+
         sum = (nn_float)0.0;
         for (int j=0; j<i; j++) {
-            sum += avg_loss[j];
+            sum += avg_train_loss[j];
         }
-        avg_epoch_loss = sum / (nn_float)i;
+        avg_epoch_train_loss = sum / (nn_float)i;
 
         sum = (nn_float)0.0;
         for (int j=0; j<i; j++) {
@@ -732,11 +733,22 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
             }
             batchify_matrix_into(y_val_split, start_idx, net->label_batch);
             forward_prop(net, false);
+            avg_val_loss[i] = get_avg_batch_loss(
+                net->loss, 
+                net->layers[net->n_layers-1]->cache.dense.output, 
+                net->label_batch->data.matrix
+            );
             Matrix* y_pred = net->layers[net->n_layers-1]->cache.dense.output;
             Matrix* y_true = net->label_batch->data.matrix;
             score_batch(net->batch_score, y_pred, y_true);
             val_acc[i] = net->batch_score->accuracy;
         }
+
+        sum = (nn_float)0.0;
+        for (int j=0; j<i; j++) {
+            sum += avg_val_loss[j];
+        }
+        avg_epoch_val_loss = sum / (nn_float)i;
 
         sum = (nn_float)0.0;
         for (int j=0; j<i; j++) {
@@ -752,16 +764,18 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
         }
 
         printf(
-            "Epoch: %d/%d   loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", 
-            epoch, n_epochs, avg_epoch_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time
+            "Epoch: %d/%d   train_loss: %f   val_loss: %f   train_acc: %.4f   val_acc: %.4f   time: %.3fs\n", 
+            epoch, n_epochs, avg_epoch_train_loss, avg_epoch_val_loss, avg_epoch_train_acc, avg_epoch_val_acc, epoch_time
         );
 
         save_epoch_to_csv(
             epoch,
-            avg_epoch_loss,
+            avg_epoch_train_loss,
+            avg_epoch_val_loss,
             avg_epoch_train_acc,
             avg_epoch_val_acc,
             epoch_time,
+            samples_per_sec,
             "training_stats.csv"
         );
 
@@ -782,7 +796,7 @@ void fit(Matrix* x_train, Matrix* y_train, int n_epochs, nn_float validation, Ne
         matrix_free(x_val_split_mat);
     }
     
-    free(avg_loss); free(val_acc); free(train_acc);
+    free(avg_train_loss); free(avg_val_loss); free(val_acc); free(train_acc);
     matrix_free(y_train_split);
     matrix_free(y_val_split);
 }

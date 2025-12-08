@@ -7,7 +7,7 @@ Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels) {
     t->n_channels = n_channels;
     t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
     t->entries = (nn_float*)malloc(n_rows * n_cols * n_channels * sizeof(nn_float));
-    t->view = false;
+    t->is_view = false;
     for (int i=0; i<n_channels; i++) {
         t->channels[i] = matrix_view_new(n_rows, n_cols, t->entries + i*n_rows*n_cols);
         matrix_zero(t->channels[i]);
@@ -23,7 +23,7 @@ Tensor3D* tensor3D_view_new(int n_rows, int n_cols, int n_channels, nn_float* en
     t->n_channels = n_channels;
     t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
     t->entries = entries;
-    t->view = true;
+    t->is_view = true;
     for (int i=0; i<n_channels; i++) {
         t->channels[i] = matrix_view_new(n_rows, n_cols, t->entries + i*n_rows*n_cols);
         matrix_zero(t->channels[i]);
@@ -42,14 +42,14 @@ void tensor3D_free(Tensor3D* t) {
     free(t->channels);
     t->channels = NULL;
 
-    if (!t->view) free(t->entries);
+    if (!t->is_view) free(t->entries);
     t->entries = NULL;
 
     free(t);
 }
 
 void tensor3D_view_assign(Tensor3D* t, nn_float* entries) {
-    if (!t->view) {
+    if (!t->is_view) {
         printf("(tensor3D_view_assign) Tensor is not a view.\n");
         exit(1);
     }
@@ -261,7 +261,7 @@ Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
     t->n_filters = n_filters;
     t->filters = (Tensor3D**)malloc(n_filters * sizeof(Tensor3D*));
     t->entries = (nn_float*)malloc(n_rows * n_cols * n_channels * n_filters * sizeof(nn_float));
-    t->view = false;
+    t->is_view = false;
     for (int i=0; i<n_filters; i++) {
         t->filters[i] = tensor3D_view_new(
             n_rows, 
@@ -282,7 +282,7 @@ Tensor4D* tensor4D_view_new(int n_rows, int n_cols, int n_channels, int n_filter
     t->n_filters = n_filters;
     t->filters = (Tensor3D**)malloc(n_filters * sizeof(Tensor3D*));
     t->entries = entries;
-    t->view = true;
+    t->is_view = true;
     for (int i=0; i<n_filters; i++) {
         t->filters[i] = tensor3D_view_new(
             n_rows, 
@@ -304,14 +304,14 @@ void tensor4D_free(Tensor4D* t) {
     free(t->filters);
     t->filters = NULL;
 
-    if (!t->view) free(t->entries);
+    if (!t->is_view) free(t->entries);
     t->entries = NULL;
 
     free(t);
 }
 
 void tensor4D_view_assign(Tensor4D* t, nn_float* entries) {
-    if (!t->view) {
+    if (!t->is_view) {
         printf("(tensor4D_view_assign) Tensor is not a view.\n");
         exit(1);
     }
@@ -670,7 +670,7 @@ size_t tensor3D_get_sizeof_mem_allocated(Tensor3D* t) {
         size += matrix_get_sizeof_mem_allocated(t->channels[i]);
     }
 
-    if (!t->view)
+    if (!t->is_view)
         size += t->n_rows * t->n_cols * t->n_channels * sizeof(nn_float);
 
     return size;
@@ -685,7 +685,7 @@ size_t tensor4D_get_sizeof_mem_allocated(Tensor4D* t) {
         size += tensor3D_get_sizeof_mem_allocated(t->filters[i]);
     }
 
-    if (!t->view)
+    if (!t->is_view)
         size += t->n_rows * t->n_cols * t->n_channels * t->n_filters * sizeof(nn_float);
 
     return size;

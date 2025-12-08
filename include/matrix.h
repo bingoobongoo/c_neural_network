@@ -17,7 +17,7 @@ typedef struct {
     nn_float* entries;
     int n_rows;
     int n_cols;
-    bool view;
+    bool is_view;
 } Matrix;
 
 typedef struct {

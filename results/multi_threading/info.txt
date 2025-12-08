@@ -1,0 +1,71 @@
+Networks:
+A - DNN (300, 100) params:266610
+=======================================================
+B - DNN (1000, 500, 300, 100) params:1466910
+=======================================================
+C - DNN (1000, 1000, 500, 500, 300, 100) params:2718410
+D:
+add_conv_input_layer(28, 28, 1, net);
+
+add_conv_layer(16, 3, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+add_max_pool_layer(3, 3, net);
+
+add_conv_layer(32, 3, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+add_max_pool_layer(3, 3, net);
+
+add_flatten_layer(net);
+
+add_dense_layer(64, net);
+add_batch_norm_dense_layer(0.1, net);
+add_output_layer(10, net);
+=======================================================
+E:
+add_conv_input_layer(28, 28, 1, net);
+
+add_conv_layer(16, 3, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+add_max_pool_layer(2, 2, net);
+
+add_conv_layer(32, 3, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+add_max_pool_layer(2, 2, net);
+
+add_conv_layer(64, 2, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+
+add_flatten_layer(net);
+
+add_dense_layer(64, net);
+add_batch_norm_dense_layer(0.1, net);
+add_output_layer(10, net);
+=======================================================
+F:
+add_conv_input_layer(28, 28, 1, net);
+
+add_conv_layer(32, 3, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+add_max_pool_layer(2, 2, net);
+
+add_conv_layer(64, 3, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+add_max_pool_layer(2, 2, net);
+
+add_conv_layer(128, 2, 1, net);
+add_batch_norm_conv2D_layer(0.1, net);
+
+add_flatten_layer(net);
+
+add_dense_layer(64, net);
+add_batch_norm_dense_layer(0.1, net);
+add_output_layer(10, net);
+=======================================================
+
+Configurations:
+1 - no multi-threading
+2 - multi-threading
+
+batch_size: 32
+Optimizer: SGD
+lr: 0.001

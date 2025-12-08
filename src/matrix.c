@@ -5,7 +5,7 @@ Matrix* matrix_new(int n_rows, int n_cols) {
     m->n_rows = n_rows;
     m->n_cols = n_cols;
     m->entries = (nn_float*)malloc(n_rows * n_cols * sizeof(nn_float));
-    m->view = false;
+    m->is_view = false;
 
     return m;
 }
@@ -15,7 +15,7 @@ Matrix* matrix_view_new(int n_rows, int n_cols, nn_float* entries) {
     m->n_rows = n_rows;
     m->n_cols = n_cols;
     m->entries = entries;
-    m->view = true;
+    m->is_view = true;
 
     return m;
 }
@@ -23,7 +23,7 @@ Matrix* matrix_view_new(int n_rows, int n_cols, nn_float* entries) {
 void matrix_free(Matrix* m) {
     if (m == NULL) return;
 
-    if (!m->view) free(m->entries);
+    if (!m->is_view) free(m->entries);
     m->entries = NULL;
 
     free(m);
@@ -1108,7 +1108,7 @@ size_t matrix_get_sizeof_mem_allocated(Matrix* m) {
 
     size += sizeof(*m);
 
-    if (!m->view)
+    if (!m->is_view)
         size += m->n_rows * m->n_cols * sizeof(nn_float);
 
     return size;

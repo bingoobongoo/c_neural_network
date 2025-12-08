@@ -33,9 +33,10 @@ model = Sequential([
     Dense(10, activation="softmax")
 ])
 
-opt = keras.optimizers.SGD(0.01)
+opt = keras.optimizers.SGD(0.001)
 
 model.compile(optimizer='SGD', loss='categorical_crossentropy', metrics=['accuracy'])
+model.summary()
 
 class TimerCallback(tf.keras.callbacks.Callback):
     def on_epoch_begin(self, epoch, logs=None):

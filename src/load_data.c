@@ -69,9 +69,9 @@ Matrix* load_ubyte_images(char* ubyte_file) {
     }
 
     int n_pixels = height * width;
-
     Matrix* feature_m = matrix_new(n_samples, n_pixels);
     unsigned char* pixel_values = malloc(n_pixels * sizeof(unsigned char));
+    
     for (int i=0; i<n_samples; i++) {
         fread(pixel_values, 1, n_pixels, file);
         for (int j=0; j<n_pixels; j++) {
