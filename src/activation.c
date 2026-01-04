@@ -55,7 +55,17 @@ Activation* activation_new(ActivationType type, nn_float param) {
     }
 }
 
-Matrix* apply_activation_func(Activation* activation, Matrix* z_m) {
+nn_float apply_activation_func(Activation* activation, nn_float z) {
+    if (activation->type != SOFTMAX) {
+        return activation->activation_func(z, activation->activation_param);
+    }
+    else {
+        printf("(apply_activation_func) Cannot use this function with softmax activation.\n");
+        exit(1);
+    }
+}
+
+Matrix* apply_activation_func_matrix(Activation* activation, Matrix* z_m) {
     if (activation->type != SOFTMAX) {
         Matrix* a = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
@@ -137,7 +147,17 @@ void apply_activation_func_into(Activation* activation, Matrix* z_m, Matrix* int
     } 
 }
 
-Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m) {
+nn_float apply_activation_dZ(Activation* activation, nn_float z) {
+    if (activation->type != SOFTMAX) {
+        return activation->dZ(z, activation->activation_param);
+    }
+    else {
+        printf("(apply_activation_dZ) Cannot use this function with softmax activation.\n");
+        exit(1);
+    }
+}
+
+Matrix* apply_activation_dZ_matrix(Activation* activation, Matrix* z_m) {
     if (activation->type != SOFTMAX) {
         Matrix* dZ = matrix_new(z_m->n_rows, z_m->n_cols);
         for (int i=0; i<z_m->n_rows; i++) {
@@ -151,7 +171,7 @@ Matrix* apply_activation_dZ(Activation* activation, Matrix* z_m) {
         return dZ;
     }
     else if (activation->type == SOFTMAX) {
-        Matrix* dZ = apply_activation_func(activation, z_m);
+        Matrix* dZ = apply_activation_func_matrix(activation, z_m);
         matrix_subtract_into(dZ, activation->y_true_batch->data.matrix, dZ);
 
         return dZ;

@@ -763,12 +763,16 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
         1,
         l->params.conv.n_filters
     );
-    l->cache.conv.dL_dA = tensor4D_new(
-        output_height,
-        output_width,
-        l->params.conv.n_filters,
-        batch_size
-    );
+
+    if (l->next_layer->l_type != FLATTEN) {
+        l->cache.conv.dL_dA = tensor4D_new(
+            output_height,
+            output_width,
+            l->params.conv.n_filters,
+            batch_size
+        );
+    }
+
     l->cache.conv.dA_dZ = tensor4D_new(
         output_height,
         output_width,
@@ -861,6 +865,7 @@ void layer_conv2D_compile(Layer* l, ActivationType act_type, int act_param, int 
     l->cache.conv.delta_im2col_input = NULL;
     l->cache.conv.delta_im2col_kernel = NULL;
     l->cache.conv.delta_im2col_output = NULL;
+    l->cache.conv.delta_im2col_output_t = NULL;
     #endif
 
     l->params.conv.n_units = 
@@ -940,9 +945,10 @@ void layer_flatten_compile(Layer* l, int batch_size) {
     int input_height = layer_get_output_tensor4D(l->prev_layer)->n_rows;
     int input_width = layer_get_output_tensor4D(l->prev_layer)->n_cols;
     l->params.flat.n_units = input_channels * input_height * input_width;
-    l->cache.flat.output = matrix_new(
+    l->cache.flat.output = matrix_view_new(
         batch_size,
-        layer_get_n_units(l)
+        layer_get_n_units(l),
+        NULL
     );
     l->cache.flat.delta = matrix_new(
         batch_size,
@@ -966,12 +972,14 @@ void layer_max_pool_compile(Layer* l, int batch_size) {
         input_channels,
         batch_size
     );
-    l->cache.max_pool.delta = tensor4D_new(
-        output_height,
-        output_width,
-        input_channels,
-        batch_size
-    );
+    if (l->next_layer->l_type != FLATTEN) {
+        l->cache.max_pool.delta = tensor4D_new(
+            output_height,
+            output_width,
+            input_channels,
+            batch_size
+        );
+    }
     l->cache.max_pool.argmax = tensor4D_uint16_new(
         output_height,
         output_width,
@@ -1027,12 +1035,14 @@ void layer_batch_norm_conv2D_compile(Layer* l, ActivationType act_type, int act_
         output_channels,
         output_filters
     );
-    l->cache.bn_conv.dL_dA = tensor4D_new(
-        output_height,
-        output_width,
-        output_channels,
-        output_filters
-    );
+    if (l->next_layer->l_type != FLATTEN) {
+        l->cache.bn_conv.dL_dA = tensor4D_new(
+            output_height,
+            output_width,
+            output_channels,
+            output_filters
+        );
+    }
     l->cache.bn_conv.dA_dZ = tensor4D_new(
         output_height,
         output_width,
@@ -1173,28 +1183,40 @@ void layer_conv2D_input_fp(Layer* l, Batch* train_batch) {
 }
 
 void layer_dense_fp(Layer* l) {
+    Matrix* z = l->cache.dense.z;
+    Matrix* bias = l->cache.dense.bias;
+    Matrix* input = layer_get_output_matrix(l->prev_layer);
+    Matrix* output = l->cache.dense.output;
+    Matrix* weight = l->cache.dense.weight;
+
     matrix_dot_into(
-        layer_get_output_matrix(l->prev_layer), 
-        l->cache.dense.weight, 
-        l->cache.dense.z,
+        input, 
+        weight, 
+        z,
         false,
         false
     );
-    bias_add_to_dense_z(l->cache.dense.bias, l->cache.dense.z);
-    apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
+    bias_add_to_dense_z(bias, z);
+    apply_activation_func_into(l->activation, z, output);
 }
 
 void layer_output_fp(Layer* l, Batch* label_batch) {
-    matrix_dot_into(layer_get_output_matrix(
-        l->prev_layer), 
-        l->cache.dense.weight, 
-        l->cache.dense.z,
+    Matrix* z = l->cache.dense.z;
+    Matrix* bias = l->cache.dense.bias;
+    Matrix* input = layer_get_output_matrix(l->prev_layer);
+    Matrix* output = l->cache.dense.output;
+    Matrix* weight = l->cache.dense.weight;
+
+    matrix_dot_into(
+        input, 
+        weight, 
+        z,
         false,
         false
     );
-    bias_add_to_dense_z(l->cache.dense.bias, l->cache.dense.z);
+    bias_add_to_dense_z(bias, z);
     l->activation->y_true_batch = label_batch;
-    apply_activation_func_into(l->activation, l->cache.dense.z, l->cache.dense.output);
+    apply_activation_func_into(l->activation, z, output);
 }
 
 void layer_conv2D_fp(Layer* l) {
@@ -1254,19 +1276,19 @@ void layer_conv2D_fp(Layer* l) {
 
         for (int i=0; i<weight->n_filters; i++) {
             nn_float* src = im2col_output->entries + i*out_size;
-            nn_float* dst = z->filters[n]->channels[i]->entries;
-            memcpy(dst, src, out_size*sizeof(nn_float));
+            z->filters[n]->channels[i]->entries = src;
+            // nn_float* dst = z->filters[n]->channels[i]->entries;
+            // memcpy(dst, src, out_size*sizeof(nn_float));
         }
         for (int i=0; i<weight->n_filters; i++) {
-            matrix_add_scalar_inplace(
-                matrix_get(bias, 0, i),
-                z->filters[n]->channels[i]
-            );
-            apply_activation_func_into(
-                l->activation,
-                z->filters[n]->channels[i],
-                output->filters[n]->channels[i]
-            );
+            nn_float b = matrix_get(bias, 0, i);
+            nn_float* z_ptr = z->filters[n]->channels[i]->entries;
+            nn_float* out_ptr = output->filters[n]->channels[i]->entries;
+
+            for (int j=0; j<out_h*out_w; j++) {
+                z_ptr[j] += b;
+                out_ptr[j] = apply_activation_func(l->activation, z_ptr[j]);
+            }
         }
     }
 
@@ -1285,15 +1307,14 @@ void layer_conv2D_fp(Layer* l) {
                 l->params.conv.stride,
                 VALID
             );
-            matrix_add_scalar_inplace(
-                matrix_get(bias, 0, i),
-                z->filters[n]->channels[i]
-            );
-            apply_activation_func_into(
-                l->activation,
-                z->filters[n]->channels[i],
-                output->filters[n]->channels[i]
-            );
+            nn_float b = matrix_get(bias, 0, i);
+            nn_float* z_ptr = z->filters[n]->channels[i]->entries;
+            nn_float* out_ptr = output->filters[n]->channels[i]->entries;
+
+            for (int j=0; j<output->n_rows*output->n_cols; j++) {
+                z_ptr[j] += b;
+                out_ptr[j] = apply_activation_func(l->activation, z_ptr[j]);
+            }
         }
     }
 
@@ -1303,12 +1324,7 @@ void layer_conv2D_fp(Layer* l) {
 void layer_flatten_fp(Layer* l) {
     Tensor4D* t = layer_get_output_tensor4D(l->prev_layer);
     Matrix* m = l->cache.flat.output;
-    tensor4D_into_matrix_fwise(
-        t,
-        m,
-        false,
-        false
-    );
+    m->entries = t->entries;
 }
 
 void layer_max_pool_fp(Layer* l) {
@@ -1529,33 +1545,43 @@ void layer_batch_norm_dense_fp(Layer* l, bool training) {
 }
 
 void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch) {
+    Matrix* input = layer_get_output_matrix(l->prev_layer);
+    Matrix* input_t = l->cache.dense.input_t;
+    Matrix* output = l->cache.dense.output;
+    Matrix* dL_dA = l->cache.dense.dL_dA;
+    Matrix* z = l->cache.dense.z;
+    Matrix* dA_dZ = l->cache.dense.dA_dZ;
+    Matrix* delta = l->cache.dense.delta;
+    Matrix* weight_grad = l->cache.dense.weight_grad;
+    Matrix* bias_grad = l->cache.dense.bias_grad;
+
     // dL_dA calculation
     apply_loss_dA_into(
         loss, 
-        l->cache.dense.output, 
+        output, 
         label_batch->data.matrix, 
-        l->cache.dense.dL_dA
+        dL_dA
     );
 
     // dL_dZ calculation
     apply_activation_dZ_into(
         l->activation, 
-        l->cache.dense.z, 
-        l->cache.dense.dA_dZ
+        z, 
+        dA_dZ
     );
     matrix_multiply_into(
-        l->cache.dense.dL_dA, 
-        l->cache.dense.dA_dZ, 
-        l->cache.dense.delta
+        dL_dA, 
+        dA_dZ, 
+        delta
     );
 
     // dL_dW calculation
     #ifdef BLAS
 
     matrix_dot_into(
-        layer_get_output_matrix(l->prev_layer), 
-        l->cache.dense.delta, 
-        l->cache.dense.weight_grad,
+        input, 
+        delta, 
+        weight_grad,
         true,
         false
     );
@@ -1563,13 +1589,13 @@ void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch) {
     #else
 
     matrix_transpose_into(
-        layer_get_output_matrix(l->prev_layer),
-        l->cache.dense.input_t
+        input,
+        input_t
     );
     matrix_dot_into(
-        l->cache.dense.input_t, 
-        l->cache.dense.delta, 
-        l->cache.dense.weight_grad,
+        input_t, 
+        delta, 
+        weight_grad,
         false,
         false
     );
@@ -1578,19 +1604,28 @@ void layer_output_bp(Layer* l, Loss* loss, Batch* label_batch) {
 
     // dL_dB calculation
     matrix_sum_axis_into(
-        l->cache.dense.delta, 
+        delta, 
         1, 
-        l->cache.dense.bias_grad
+        bias_grad
     );
 }
 
 void layer_dense_bp(Layer* l) {
+    Matrix* input = layer_get_output_matrix(l->prev_layer);
+    Matrix* input_t = l->cache.dense.input_t;
+    Matrix* z = l->cache.dense.z;
+    Matrix* delta = l->cache.dense.delta;
+    Matrix* dA_dZ = l->cache.dense.dA_dZ;
+    Matrix* dL_dA = l->cache.dense.dL_dA;
+    Matrix* weight_grad = l->cache.dense.weight_grad;
+    Matrix* bias_grad = l->cache.dense.bias_grad;
+
     // dL_dA calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.dense.dL_dA);
+        bp_delta_from_dense(l->next_layer, dL_dA);
     }
     else if (l->next_layer->l_type == BATCH_NORM_DENSE) {
-        bp_delta_from_batch_norm_dense(l->next_layer, l->cache.dense.dL_dA);
+        bp_delta_from_batch_norm_dense(l->next_layer, dL_dA);
     }
     else {
         fprintf(
@@ -1604,22 +1639,22 @@ void layer_dense_bp(Layer* l) {
     // dL_dZ calculation
     apply_activation_dZ_into(
         l->activation, 
-        l->cache.dense.z, 
-        l->cache.dense.dA_dZ
+        z, 
+        dA_dZ
     );
     matrix_multiply_into(
-        l->cache.dense.dL_dA, 
-        l->cache.dense.dA_dZ, 
-        l->cache.dense.delta
+        dL_dA, 
+        dA_dZ, 
+        delta
     );
 
     // dL_dW calculation
     #ifdef BLAS
 
     matrix_dot_into(
-        layer_get_output_matrix(l->prev_layer), 
-        l->cache.dense.delta, 
-        l->cache.dense.weight_grad,
+        input, 
+        delta, 
+        weight_grad,
         true,
         false
     );
@@ -1627,13 +1662,13 @@ void layer_dense_bp(Layer* l) {
     #else
 
     matrix_transpose_into(
-        layer_get_output_matrix(l->prev_layer),
-        l->cache.dense.input_t
+        input,
+        input_t
     );
     matrix_dot_into(
-        l->cache.dense.input_t, 
-        l->cache.dense.delta, 
-        l->cache.dense.weight_grad,
+        input_t, 
+        delta, 
+        weight_grad,
         false,
         false
     );
@@ -1642,9 +1677,9 @@ void layer_dense_bp(Layer* l) {
 
     // dL_dB calculation
     matrix_sum_axis_into(
-        l->cache.dense.delta, 
+        delta, 
         1, 
-        l->cache.dense.bias_grad
+        bias_grad
     );
 }
 
@@ -1682,16 +1717,15 @@ void layer_conv2D_bp(Layer* l) {
     // dL_dZ calculation
     for (int n=0; n<delta->n_filters; n++) {
         for (int c=0; c<delta->n_channels; c++) {
-            apply_activation_dZ_into(
-                l->activation,
-                z->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c]
-            );
-            matrix_multiply_into(
-                dL_dA->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c],
-                delta->filters[n]->channels[c]
-            );
+            nn_float* z_ptr = z->filters[n]->channels[c]->entries;
+            nn_float* dA_dZ_ptr = dA_dZ->filters[n]->channels[c]->entries;
+            nn_float* dL_dA_ptr = dL_dA->filters[n]->channels[c]->entries;
+            nn_float* delta_ptr = delta->filters[n]->channels[c]->entries;
+
+            for (int i=0; i<delta->n_rows*delta->n_cols; i++) {
+                dA_dZ_ptr[i] = apply_activation_dZ(l->activation, z_ptr[i]);
+                delta_ptr[i] = dL_dA_ptr[i] * dA_dZ_ptr[i];
+            }
         }
     }
 
@@ -1764,8 +1798,9 @@ void layer_conv2D_bp(Layer* l) {
             nn_float* row = output_sum_mat->entries + f * k;
             for (int c=0; c<weight->n_channels; c++) {
                 nn_float* src = row + c * weight->n_rows * weight->n_cols;
-                nn_float* dst = weight_grad->filters[f]->channels[c]->entries;
-                memcpy(dst, src, weight->n_rows * weight->n_cols * sizeof(nn_float));
+                weight_grad->filters[f]->channels[c]->entries = src;
+                // nn_float* dst = weight_grad->filters[f]->channels[c]->entries;
+                // memcpy(dst, src, weight->n_rows * weight->n_cols * sizeof(nn_float));
             }
         }
 
@@ -1803,15 +1838,17 @@ void layer_conv2D_bp(Layer* l) {
 }
 
 void layer_max_pool_bp(Layer* l) {
+    Tensor4D* delta = l->cache.max_pool.delta;
+
     // dL_dZ calculation
     if (l->next_layer->l_type == CONV2D) {
-        bp_delta_from_conv2D(l->next_layer, l->cache.max_pool.delta);
+        bp_delta_from_conv2D(l->next_layer, delta);
     }
     else if (l->next_layer->l_type == FLATTEN) {
-        bp_delta_from_flatten(l->next_layer, l->cache.max_pool.delta);     
+        bp_delta_from_flatten(l->next_layer, delta);     
     }
     else if (l->next_layer->l_type == BATCH_NORM_CONV2D) {
-        bp_delta_from_batch_norm_conv2D(l->next_layer, l->cache.max_pool.delta);
+        bp_delta_from_batch_norm_conv2D(l->next_layer, delta);
     }
     else {
         fprintf(
@@ -1824,12 +1861,14 @@ void layer_max_pool_bp(Layer* l) {
 }
 
 void layer_flatten_bp(Layer* l) {
+    Matrix* delta = l->cache.flat.delta;
+
     // dL_dZ calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.flat.delta);
+        bp_delta_from_dense(l->next_layer, delta);
     }
     else if (l->next_layer->l_type == BATCH_NORM_DENSE) {
-        bp_delta_from_batch_norm_dense(l->next_layer, l->cache.flat.delta);
+        bp_delta_from_batch_norm_dense(l->next_layer, delta);
     }
     else {
         fprintf(
@@ -1869,16 +1908,15 @@ void layer_batch_norm_conv2D_bp(Layer* l) {
     // dL_dZ calculation
     for (int n=0; n<delta->n_filters; n++) {
         for (int c=0; c<delta->n_channels; c++) {
-            apply_activation_dZ_into(
-                l->activation,
-                z->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c]
-            );
-            matrix_multiply_into(
-                dL_dA->filters[n]->channels[c],
-                dA_dZ->filters[n]->channels[c],
-                delta->filters[n]->channels[c]
-            );
+            nn_float* z_ptr = z->filters[n]->channels[c]->entries;
+            nn_float* dA_dZ_ptr = dA_dZ->filters[n]->channels[c]->entries;
+            nn_float* dL_dA_ptr = dL_dA->filters[n]->channels[c]->entries;
+            nn_float* delta_ptr = delta->filters[n]->channels[c]->entries;
+
+            for (int i=0; i<delta->n_rows*delta->n_cols; i++) {
+                dA_dZ_ptr[i] = apply_activation_dZ(l->activation, z_ptr[i]);
+                delta_ptr[i] = dL_dA_ptr[i] * dA_dZ_ptr[i];
+            }
         }
     }
 
@@ -1920,7 +1958,7 @@ void layer_batch_norm_dense_bp(Layer* l) {
 
     // dL/dA calculation
     if (l->next_layer->l_type == DENSE || l->next_layer->l_type == OUTPUT) {
-        bp_delta_from_dense(l->next_layer, l->cache.bn_dense.dL_dA);
+        bp_delta_from_dense(l->next_layer, dL_dA);
     }
     else {
         fprintf(
@@ -1934,13 +1972,13 @@ void layer_batch_norm_dense_bp(Layer* l) {
     // dL/dZ calculation
     apply_activation_dZ_into(
         l->activation,
-        l->cache.bn_dense.z,
-        l->cache.bn_dense.dA_dZ
+        z,
+        dA_dZ
     );
     matrix_multiply_into(
-        l->cache.bn_dense.dL_dA,
-        l->cache.bn_dense.dA_dZ,
-        l->cache.bn_dense.delta
+        dL_dA,
+        dA_dZ,
+        delta
     );
 
     // dL/dgamma and dL/dbeta calculation
@@ -1968,11 +2006,15 @@ void layer_batch_norm_dense_bp(Layer* l) {
 }
 
 void bp_delta_from_dense(Layer* from, Matrix* to) {
+    Matrix* delta = from->cache.dense.delta;
+    Matrix* weight = from->cache.dense.weight;
+    Matrix* weight_t = from->cache.dense.weight_t;
+
     #ifdef BLAS
 
     matrix_dot_into(
-        from->cache.dense.delta,
-        from->cache.dense.weight,
+        delta,
+        weight,
         to,
         false,
         true
@@ -1981,12 +2023,12 @@ void bp_delta_from_dense(Layer* from, Matrix* to) {
     #else
 
     matrix_transpose_into(
-        from->cache.dense.weight,
-        from->cache.dense.weight_t
+        weight,
+        weight_t
     );
     matrix_dot_into(
-        from->cache.dense.delta,
-        from->cache.dense.weight_t,
+        delta,
+        weight_t,
         to,
         false,
         false
@@ -2052,8 +2094,9 @@ void bp_delta_from_conv2D(Layer* from, Tensor4D* to) {
         Matrix* output_im2col_mat = from->cache.conv.delta_im2col_output->channels[n];
         for (int c=0; c<dL_dA->n_channels; c++) {
             nn_float* src = output_im2col_mat->entries + c * dL_dA->n_rows * dL_dA->n_cols;
-            nn_float* dst = dL_dA->filters[n]->channels[c]->entries;
-            memcpy(dst, src, dL_dA->n_rows * dL_dA->n_cols * sizeof(nn_float));
+            dL_dA->filters[n]->channels[c]->entries = src;
+            // nn_float* dst = dL_dA->filters[n]->channels[c]->entries;
+            // memcpy(dst, src, dL_dA->n_rows * dL_dA->n_cols * sizeof(nn_float));
         }
     }
 
@@ -2117,10 +2160,18 @@ void bp_delta_from_max_pool(Layer* from, Tensor4D* to) {
 }
 
 void bp_delta_from_flatten(Layer* from, Tensor4D* to) {
-    matrix_into_tensor4D(
-        from->cache.flat.delta,
-        to
-    );
+    // PLACEHOLDER FUNCTION
+    // Because "to" points directly to data from "from" layer, there is no need to
+    // perform any calculations. Saving this code if I need to revert changes in the future.
+    // -------------------------------------------------------------------------------------
+    // matrix_into_tensor4D(
+    //     from->cache.flat.delta,
+    //     to
+    // );
+    // tensor4D_view_assign(
+    //     to,
+    //     from->cache.flat.delta->entries
+    // );
 }
 
 void bp_delta_from_batch_norm_conv2D(Layer* from, Tensor4D* to) {

@@ -23,7 +23,7 @@ replacing custom operations with their optimized counterparts from CBLAS library
 /*
 Enables im2col method for calculating convolution for forward and backward passes in CNN.
 */
-#define IM2COL_CONV
+// #define IM2COL_CONV
 
 // =============================================================================
 
@@ -59,7 +59,7 @@ performed. The default is 32-bit floating point (single precision).
 // OPTIMIZATIONS
 
 #define INLINE
-#define MULTI_THREADING
+// #define MULTI_THREADING
 #define CACHE_LOCALITY
 #define VECTORIZATION
 

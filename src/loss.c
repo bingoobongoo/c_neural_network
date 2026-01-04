@@ -76,7 +76,7 @@ void apply_loss_dA_into(Loss* loss, Matrix* output_activation_m, Matrix* label_m
 nn_float get_avg_batch_loss(Loss* loss, Matrix* output_activation_m, Matrix* label_m) {
     nn_float avg_loss = (nn_float)0.0;
     apply_loss_func_into(loss, output_activation_m, label_m, loss->loss_m);
-    avg_loss = matrix_sum(loss->loss_m) / (label_m->n_rows * label_m->n_cols);
+    avg_loss = matrix_sum(loss->loss_m) / label_m->n_rows;
 
     return avg_loss;
 
@@ -93,17 +93,17 @@ nn_float mse_dA(nn_float output_activation, nn_float label) {
 nn_float cat_cross_entropy(nn_float output_activation, nn_float label) {
     if (label > (nn_float)0.0)
         #ifdef SINGLE_PRECISION
-        return -label * logf(output_activation + (nn_float)1e-9);
+        return -label * logf(output_activation + (nn_float)1e-7);
         #endif
         #ifdef DOUBLE_PRECISION
-        return -label * log(output_activation + (nn_float)1e-9);
+        return -label * log(output_activation + (nn_float)1e-7);
         #endif
     return (nn_float)0.0;
 }
 
 nn_float cat_cross_entropy_dA(nn_float output_activation, nn_float label) {
-    // simplified version of derivative, dC/dZ = y_pred-y_true with softmax, so
-    // because dC/dZ = dA/dZ * dC/dA and dA/dZ = y_pred-y_true, then
-    // dC/dA = 1
+    // simplified version of derivative, dL/dZ = y_pred-y_true with softmax, so
+    // because dL/dZ = dA/dZ * dL/dA and dA/dZ = y_pred-y_true, then
+    // dL/dA = 1
     return (nn_float)1.0;
 }   

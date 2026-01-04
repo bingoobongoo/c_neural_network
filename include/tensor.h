@@ -8,6 +8,8 @@ typedef struct {
     int n_cols;
     int n_channels;
     Matrix** channels;
+    nn_float* entries;
+    bool is_view;
 } Tensor3D;
 
 typedef struct {
@@ -16,6 +18,8 @@ typedef struct {
     int n_channels;
     int n_filters;
     Tensor3D** filters;
+    nn_float* entries;
+    bool is_view;
 } Tensor4D;
 
 typedef struct {
@@ -34,13 +38,17 @@ typedef struct {
 } Tensor4D_uint16;
 
 Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels);
+Tensor3D* tensor3D_view_new(int n_rows, int n_cols, int n_channels, nn_float* entries);
 void tensor3D_free(Tensor3D* t);
+void tensor3D_view_assign(Tensor3D* t, nn_float* entries);
 void tensor3D_copy_into(Tensor3D* from, Tensor3D* to);
 void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into);
 void tensor3D_acc_correlate_into(Tensor3D* input, Tensor3D* kernel, Matrix* into,  int stride, CorrelationType type);
 
 Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters);
+Tensor4D* tensor4D_view_new(int n_rows, int n_cols, int n_channels, int n_filters, nn_float* entries);
 void tensor4D_free(Tensor4D* t);
+void tensor4D_view_assign(Tensor4D* t, nn_float* entries);
 void tensor4D_copy_into(Tensor4D* t, Tensor4D* into);
 void tensor4D_slice_into(Tensor4D* t, int start_idx, int slice_size, Tensor4D* into);
 void tensor4D_flip_into(Tensor4D* t, Tensor4D* flipped);

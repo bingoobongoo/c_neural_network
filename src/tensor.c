@@ -6,8 +6,26 @@ Tensor3D* tensor3D_new(int n_rows, int n_cols, int n_channels) {
     t->n_cols = n_cols;
     t->n_channels = n_channels;
     t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
+    t->entries = (nn_float*)malloc(n_rows * n_cols * n_channels * sizeof(nn_float));
+    t->is_view = false;
     for (int i=0; i<n_channels; i++) {
-        t->channels[i] = matrix_new(n_rows, n_cols);
+        t->channels[i] = matrix_view_new(n_rows, n_cols, t->entries + i*n_rows*n_cols);
+        matrix_zero(t->channels[i]);
+    }
+
+    return t;
+}
+
+Tensor3D* tensor3D_view_new(int n_rows, int n_cols, int n_channels, nn_float* entries) {
+    Tensor3D* t = (Tensor3D*)malloc(sizeof(Tensor3D));
+    t->n_rows = n_rows;
+    t->n_cols = n_cols;
+    t->n_channels = n_channels;
+    t->channels = (Matrix**)malloc(n_channels * sizeof(Matrix*));
+    t->entries = entries;
+    t->is_view = true;
+    for (int i=0; i<n_channels; i++) {
+        t->channels[i] = matrix_view_new(n_rows, n_cols, t->entries + i*n_rows*n_cols);
         matrix_zero(t->channels[i]);
     }
 
@@ -20,8 +38,25 @@ void tensor3D_free(Tensor3D* t) {
     for (int i=0; i<t->n_channels; i++) {
         matrix_free(t->channels[i]);
     }
+
     free(t->channels);
+    t->channels = NULL;
+
+    if (!t->is_view) free(t->entries);
+    t->entries = NULL;
+
     free(t);
+}
+
+void tensor3D_view_assign(Tensor3D* t, nn_float* entries) {
+    if (!t->is_view) {
+        printf("(tensor3D_view_assign) Tensor is not a view.\n");
+        exit(1);
+    }
+    t->entries = entries;
+    for (int i=0; i<t->n_channels; i++) {
+        t->channels[i]->entries = t->entries + (i*t->n_rows*t->n_cols);
+    }
 }
 
 void tensor3D_copy_into(Tensor3D* t, Tensor3D* into) {
@@ -43,9 +78,9 @@ void tensor3D_sum_element_wise_into(Tensor3D* t, Matrix* into) {
 }
 
 void tensor3D_acc_correlate_into(Tensor3D* input, Tensor3D* kernel, Matrix* into, int stride, CorrelationType type) {
-    #ifdef MULTI_THREADING
-    #pragma omp parallel for schedule(static)
-    #endif
+    // #ifdef MULTI_THREADING
+    // #pragma omp parallel for schedule(static)
+    // #endif
     for (int c=0; c<input->n_channels; c++) {
         matrix_acc_correlate_into(
             input->channels[c],
@@ -225,8 +260,36 @@ Tensor4D* tensor4D_new(int n_rows, int n_cols, int n_channels, int n_filters) {
     t->n_channels = n_channels;
     t->n_filters = n_filters;
     t->filters = (Tensor3D**)malloc(n_filters * sizeof(Tensor3D*));
+    t->entries = (nn_float*)malloc(n_rows * n_cols * n_channels * n_filters * sizeof(nn_float));
+    t->is_view = false;
     for (int i=0; i<n_filters; i++) {
-        t->filters[i] = tensor3D_new(n_rows, n_cols, n_channels);
+        t->filters[i] = tensor3D_view_new(
+            n_rows, 
+            n_cols, 
+            n_channels,
+            t->entries + i*n_rows*n_cols*n_channels
+        );
+    }
+
+    return t;
+}
+
+Tensor4D* tensor4D_view_new(int n_rows, int n_cols, int n_channels, int n_filters, nn_float* entries) {
+    Tensor4D* t = (Tensor4D*)malloc(sizeof(Tensor4D));
+    t->n_rows = n_rows;
+    t->n_cols = n_cols;
+    t->n_channels = n_channels;
+    t->n_filters = n_filters;
+    t->filters = (Tensor3D**)malloc(n_filters * sizeof(Tensor3D*));
+    t->entries = entries;
+    t->is_view = true;
+    for (int i=0; i<n_filters; i++) {
+        t->filters[i] = tensor3D_view_new(
+            n_rows, 
+            n_cols, 
+            n_channels,
+            t->entries + i*n_rows*n_cols*n_channels
+        );
     }
 
     return t;
@@ -239,7 +302,27 @@ void tensor4D_free(Tensor4D* t) {
         tensor3D_free(t->filters[i]);
     }
     free(t->filters);
+    t->filters = NULL;
+
+    if (!t->is_view) free(t->entries);
+    t->entries = NULL;
+
     free(t);
+}
+
+void tensor4D_view_assign(Tensor4D* t, nn_float* entries) {
+    if (!t->is_view) {
+        printf("(tensor4D_view_assign) Tensor is not a view.\n");
+        exit(1);
+    }
+
+    t->entries = entries;
+    for (int i=0; i<t->n_filters; i++) {
+        tensor3D_view_assign(
+            t->filters[i],
+            t->entries + (i*t->n_rows*t->n_cols*t->n_channels)
+         );
+    }
 }
 
 void tensor4D_copy_into(Tensor4D* t, Tensor4D* into) {
@@ -516,37 +599,60 @@ void input_into_im2col_fwise(Tensor4D* input, int filter_idx, Tensor4D* kernel, 
     int ker_h = kernel->n_rows;
     int ker_w = kernel->n_cols;
 
-    int out_h = (in_h + 2*padding - ker_h) / stride + 1;
-    int out_w = (in_w + 2*padding - ker_w) / stride + 1;
+    int out_h = (in_h + 2 * padding - ker_h) / stride + 1;
+    int out_w = (in_w + 2 * padding - ker_w) / stride + 1;
+    
+    nn_float* channel_ptrs[in_c];
+    for (int k = 0; k < in_c; k++) {
+        channel_ptrs[k] = input->filters[filter_idx]->channels[k]->entries;
+    }
 
-    for (int i=0; i<out_h; i++) {
-        int is = i*stride - padding;
-        for (int j=0; j<out_w; j++) {
-            int js = j*stride - padding;
+    nn_float* im2col_ptr = im2col->entries;
 
-            nn_float* im2col_row = im2col->entries + (i*out_w + j)*im2col->n_cols;
-            int col = 0;
-
-            for (int k=0; k<in_c; k++) {
-                Matrix* cm = input->filters[filter_idx]->channels[k];
-                if (is>=0 && js>=0 && is+ker_h<=in_h && js+ker_w<=in_w) {
-                    for (int l=0; l<ker_h; l++) {
-                        nn_float* src = cm->entries + (is+l)*cm->n_cols + js;
-                        nn_float* dst = im2col_row + col + l*ker_w;
-                        memcpy(dst, src, ker_w*sizeof(nn_float));
+    if (padding == 0) {
+        for (int i = 0; i < out_h; i++) {
+            int row_offset = i * stride;
+            for (int j = 0; j < out_w; j++) {
+                int col_offset = j * stride;
+                
+                for (int k = 0; k < in_c; k++) {
+                    nn_float* src_base = channel_ptrs[k];
+                    
+                    for (int kh = 0; kh < ker_h; kh++) {
+                        int input_row = row_offset + kh;
+                        int input_row_start = input_row * in_w + col_offset;
+                        memcpy(im2col_ptr, &src_base[input_row_start], ker_w * sizeof(nn_float));
+                        im2col_ptr += ker_w;
                     }
-                    col += ker_h*ker_w;
                 }
-                else {
-                    for (int l=0; l<ker_h; l++) {
-                        int isl = is + l;
-                        bool cond = (isl>=0 && isl<in_h);
-                        for (int m=0; m<ker_w; m++, col++) {
-                            int jsm = js + m;
-                            if (cond && jsm>=0 && jsm<in_w)
-                                im2col_row[col] = cm->entries[isl*cm->n_cols + jsm];
-                            else
-                                im2col_row[col] = (nn_float)0.0;
+            }
+        }
+    } 
+    else {
+        for (int i = 0; i < out_h; i++) {
+            int row_offset = i * stride - padding;
+            for (int j = 0; j < out_w; j++) {
+                int col_offset = j * stride - padding;
+
+                for (int k = 0; k < in_c; k++) {
+                    nn_float* src_base = channel_ptrs[k];
+
+                    for (int kh = 0; kh < ker_h; kh++) {
+                        int input_row = row_offset + kh;
+                        
+                        if (input_row >= 0 && input_row < in_h) {
+                            for (int kw = 0; kw < ker_w; kw++) {
+                                int input_col = col_offset + kw;
+                                if (input_col >= 0 && input_col < in_w) {
+                                    *im2col_ptr++ = src_base[input_row * in_w + input_col];
+                                } else {
+                                    *im2col_ptr++ = 0.0f;
+                                }
+                            }
+                        } else {
+                            for (int kw = 0; kw < ker_w; kw++) {
+                                *im2col_ptr++ = (nn_float)0.0;
+                            }
                         }
                     }
                 }
@@ -564,6 +670,9 @@ size_t tensor3D_get_sizeof_mem_allocated(Tensor3D* t) {
         size += matrix_get_sizeof_mem_allocated(t->channels[i]);
     }
 
+    if (!t->is_view)
+        size += t->n_rows * t->n_cols * t->n_channels * sizeof(nn_float);
+
     return size;
 }
 
@@ -575,6 +684,9 @@ size_t tensor4D_get_sizeof_mem_allocated(Tensor4D* t) {
     for (int i=0; i<t->n_filters; i++) {
         size += tensor3D_get_sizeof_mem_allocated(t->filters[i]);
     }
+
+    if (!t->is_view)
+        size += t->n_rows * t->n_cols * t->n_channels * t->n_filters * sizeof(nn_float);
 
     return size;
 }
